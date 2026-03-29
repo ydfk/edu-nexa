@@ -1,0 +1,9 @@
+basePath: /api
+host: localhost:25610
+info:
+  contact: {}
+  description: EduNexa 托管服务 API
+  title: EduNexa API
+  version: "1.0"
+paths: {}
+swagger: "2.0"

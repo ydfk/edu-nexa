@@ -1,0 +1,41 @@
+{
+  "pages": [
+    "pages/dashboard/index",
+    "pages/meal/index",
+    "pages/homework/index",
+    "pages/mine/index"
+  ],
+  "window": {
+    "navigationBarTitleText": "学栖 · EduNexa",
+    "navigationBarBackgroundColor": "#FFFFFF",
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#F6F8F5",
+    "backgroundTextStyle": "light"
+  },
+  "tabBar": {
+    "color": "#5C635D",
+    "selectedColor": "#1C7A57",
+    "backgroundColor": "#FFFFFF",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/dashboard/index",
+        "text": "工作台"
+      },
+      {
+        "pagePath": "pages/meal/index",
+        "text": "用餐"
+      },
+      {
+        "pagePath": "pages/homework/index",
+        "text": "作业"
+      },
+      {
+        "pagePath": "pages/mine/index",
+        "text": "我的"
+      }
+    ]
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
+}

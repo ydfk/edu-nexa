@@ -1,0 +1,14 @@
+{
+  "name": "edu-nexa",
+  "private": true,
+  "packageManager": "pnpm@10.6.2",
+  "scripts": {
+    "dev:admin": "pnpm --dir apps/admin dev",
+    "build:admin": "pnpm --dir apps/admin build",
+    "lint:admin": "pnpm --dir apps/admin lint",
+    "test:admin": "pnpm --dir apps/admin test:run"
+  },
+  "pnpm": {
+    "ignoredBuiltDependencies": []
+  }
+}

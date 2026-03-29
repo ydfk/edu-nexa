@@ -1,0 +1,113 @@
+import { useSyncExternalStore } from "react";
+
+const sessionStorageKey = "edunexa.admin.session.v1";
+const sessionEventName = "edunexa-admin-session-change";
+const adminRoles = new Set(["admin", "teacher"]);
+
+export type AdminSessionUser = {
+  id: string;
+  displayName: string;
+  phone: string;
+  roles: string[];
+};
+
+export type AdminSession = {
+  token: string;
+  user: AdminSessionUser | null;
+};
+
+const emptySession: AdminSession = {
+  token: "",
+  user: null,
+};
+
+export function useAdminSession() {
+  return useSyncExternalStore(
+    subscribeSession,
+    getAdminSessionSnapshot,
+    getAdminSessionSnapshot
+  );
+}
+
+export function getAdminSessionSnapshot(): AdminSession {
+  if (typeof window === "undefined") {
+    return emptySession;
+  }
+
+  const raw = window.localStorage.getItem(sessionStorageKey);
+  if (!raw) {
+    return emptySession;
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as Partial<AdminSession>;
+    return {
+      token: typeof parsed.token === "string" ? parsed.token : "",
+      user: isSessionUser(parsed.user) ? parsed.user : null,
+    };
+  } catch {
+    return emptySession;
+  }
+}
+
+export function saveAdminSession(session: AdminSession) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.setItem(sessionStorageKey, JSON.stringify(session));
+  notifySessionChanged();
+}
+
+export function clearAdminSession() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.removeItem(sessionStorageKey);
+  notifySessionChanged();
+}
+
+export function hasAdminAccess(session: AdminSession) {
+  if (!session.token || !session.user) {
+    return false;
+  }
+
+  return session.user.roles.some((role) => adminRoles.has(role));
+}
+
+function subscribeSession(onStoreChange: () => void) {
+  if (typeof window === "undefined") {
+    return () => undefined;
+  }
+
+  const handleSessionChange = () => {
+    onStoreChange();
+  };
+
+  window.addEventListener("storage", handleSessionChange);
+  window.addEventListener(sessionEventName, handleSessionChange);
+
+  return () => {
+    window.removeEventListener("storage", handleSessionChange);
+    window.removeEventListener(sessionEventName, handleSessionChange);
+  };
+}
+
+function notifySessionChanged() {
+  window.dispatchEvent(new Event(sessionEventName));
+}
+
+function isSessionUser(value: unknown): value is AdminSessionUser {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const user = value as Record<string, unknown>;
+  return (
+    typeof user.id === "string" &&
+    typeof user.displayName === "string" &&
+    typeof user.phone === "string" &&
+    Array.isArray(user.roles)
+  );
+}

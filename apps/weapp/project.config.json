@@ -1,0 +1,20 @@
+{
+  "description": "EduNexa 微信小程序",
+  "packOptions": {
+    "ignore": []
+  },
+  "compileType": "miniprogram",
+  "libVersion": "3.6.0",
+  "appid": "touristappid",
+  "projectname": "edunexa-weapp",
+  "miniprogramRoot": "miniprogram/",
+  "setting": {
+    "urlCheck": false,
+    "es6": true,
+    "enhance": true,
+    "postcss": true,
+    "minified": false
+  },
+  "simulatorType": "wechat",
+  "condition": {}
+}

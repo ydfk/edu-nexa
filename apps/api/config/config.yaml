@@ -1,0 +1,12 @@
+app:
+  port: "25610"
+  env: "development"
+jwt:
+  secret: "edunexa-dev-secret"
+  expiration: 604800
+database:
+  path: "data/edunexa.sqlite"
+wechat:
+  app_id: ""
+  app_secret: ""
+  dev_phone: "13900000000"
