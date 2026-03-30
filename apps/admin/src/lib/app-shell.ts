@@ -3,7 +3,11 @@ import {
   BellRing,
   BookOpenCheck,
   Building2,
+  CalendarRange,
+  ClipboardList,
+  GalleryVerticalEnd,
   LayoutDashboard,
+  ScrollText,
   Settings,
   Soup,
   Users,
@@ -40,7 +44,7 @@ export const appNavigation: AppNavGroup[] = [
       {
         href: "/students",
         label: "学生台账",
-        description: "维护学生档案与托管状态",
+        description: "维护学生档案、学校班级与服务状态",
         icon: Users,
       },
     ],
@@ -61,6 +65,18 @@ export const appNavigation: AppNavGroup[] = [
         icon: BookOpenCheck,
       },
       {
+        href: "/daily-homework",
+        label: "每日作业",
+        description: "按学校和班级维护当天作业内容",
+        icon: ClipboardList,
+      },
+      {
+        href: "/service-calendar",
+        label: "服务日历",
+        description: "配置哪一天开放用餐和作业辅导",
+        icon: CalendarRange,
+      },
+      {
         href: "/guardians",
         label: "家校同步",
         description: "管理家长通知与反馈模板",
@@ -71,6 +87,18 @@ export const appNavigation: AppNavGroup[] = [
   {
     title: "系统配置",
     items: [
+      {
+        href: "/home-content",
+        label: "首页配置",
+        description: "配置小程序首页文案、公告与轮播图",
+        icon: GalleryVerticalEnd,
+      },
+      {
+        href: "/integration-guide",
+        label: "接入指引",
+        description: "查看本地、OSS、又拍云与审核配置说明",
+        icon: ScrollText,
+      },
       {
         href: "/settings",
         label: "基础设置",

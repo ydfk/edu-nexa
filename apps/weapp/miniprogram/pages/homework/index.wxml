@@ -1,19 +1,142 @@
 <view class="page">
   <view class="hero">
-    <view class="hero-title">把作业状态和反馈一次记录完整。</view>
-    <view class="hero-subtitle">后续可直接扩展图片、语音和常用短语模板。</view>
+    <view class="hero-title">
+      {{canManage ? "机构端作业记录" : activeRole === "guardian" ? "家长端作业查看" : "先登录查看作业"}}
+    </view>
+    <view class="hero-subtitle">
+      {{canManage ? "按学校、班级和学生维护当天作业反馈。" : "按日期查看孩子的作业内容和完成情况。"}}
+    </view>
   </view>
 
   <view class="section">
-    <view class="section-title">今日作业反馈</view>
+    <view class="section-title">日期筛选</view>
+    <view class="toolbar">
+      <button class="mini-button" data-offset="-1" bindtap="handleShiftDate">前一天</button>
+      <view class="date-chip">{{selectedDate}}</view>
+      <button class="mini-button" data-offset="1" bindtap="handleShiftDate">后一天</button>
+    </view>
+  </view>
+
+  <view class="section" wx:if="{{activeRole === 'guardian' && students.length > 0}}">
+    <view class="section-title">孩子切换</view>
+    <scroll-view class="chip-scroll" scroll-x>
+      <view class="chip-row">
+        <block wx:for="{{students}}" wx:key="id">
+          <view
+            class="student-chip {{selectedStudentId === item.id ? 'student-chip-active' : ''}}"
+            data-student-id="{{item.id}}"
+            bindtap="handleSelectStudent"
+          >
+            {{item.name}}
+          </view>
+        </block>
+      </view>
+    </scroll-view>
+  </view>
+
+  <view class="section" wx:if="{{assignments.length > 0}}">
+    <view class="section-title">
+      {{activeRole === "teacher" ? "今日作业模板" : "今日老师布置"}}
+    </view>
     <view class="list">
-      <block wx:for="{{records}}" wx:key="studentName">
-        <view class="list-item">
-          <view class="list-title">{{item.studentName}}</view>
-          <view class="tag">{{item.status}}</view>
-          <view class="list-meta">{{item.remark}}</view>
+      <block wx:for="{{assignments}}" wx:key="id">
+        <view
+          class="list-item {{canManage ? 'is-clickable' : ''}}"
+          data-assignment-id="{{item.id}}"
+          bindtap="handleSelectAssignment"
+        >
+          <view class="row-between">
+            <view class="list-title">{{item.schoolName}} · {{item.className}}</view>
+            <view class="tag">当天作业</view>
+          </view>
+          <view class="list-meta">{{item.content}}</view>
+          <view class="list-meta" wx:if="{{item.remark}}">{{item.remark}}</view>
         </view>
       </block>
+    </view>
+  </view>
+
+  <view class="section" wx:if="{{canManage && assignmentDraft}}">
+    <view class="section-title">编辑每日作业</view>
+    <view class="list-item">
+      <view class="list-title">{{assignmentDraft.schoolName}} · {{assignmentDraft.className}}</view>
+      <textarea
+        class="editor-textarea"
+        placeholder="填写当天老师统一布置的作业内容"
+        value="{{assignmentDraft.content}}"
+        bindinput="handleAssignmentContentInput"
+      />
+      <textarea
+        class="editor-textarea compact"
+        placeholder="补充说明"
+        value="{{assignmentDraft.remark}}"
+        bindinput="handleAssignmentRemarkInput"
+      />
+      <button class="action-button secondary" bindtap="handleSaveAssignment">保存每日作业</button>
+    </view>
+  </view>
+
+  <view class="section">
+    <view class="section-title">
+      {{canManage ? "学生作业反馈" : "当日作业反馈"}}
+    </view>
+    <view class="list" wx:if="{{records.length > 0}}">
+      <block wx:for="{{records}}" wx:key="id">
+        <view
+          class="list-item {{canManage ? 'is-clickable' : ''}}"
+          data-record-id="{{item.id}}"
+          bindtap="handleSelectHomeworkRecord"
+        >
+          <view class="row-between">
+            <view class="list-title">{{item.studentName}}</view>
+            <view class="tag">{{item.statusLabel}}</view>
+          </view>
+          <view class="list-meta">{{item.schoolName}} · {{item.className}}</view>
+          <view class="list-meta">{{item.assignmentContent}}</view>
+          <view class="list-meta">{{item.remark}}</view>
+          <view class="image-grid" wx:if="{{item.imageUrls && item.imageUrls.length > 0}}">
+            <block wx:for="{{item.imageUrls}}" wx:key="*this">
+              <image class="record-image" mode="aspectFill" src="{{item}}" />
+            </block>
+          </view>
+        </view>
+      </block>
+    </view>
+    <view class="empty-card" wx:else>当前日期还没有作业反馈。</view>
+  </view>
+
+  <view class="section" wx:if="{{canManage && homeworkEditorDraft}}">
+    <view class="section-title">编辑学生反馈</view>
+    <view class="list-item">
+      <view class="list-title">{{homeworkEditorDraft.studentName}}</view>
+      <view class="list-meta">{{homeworkEditorDraft.schoolName}} · {{homeworkEditorDraft.className}}</view>
+      <picker range="{{statusOptions}}" range-key="label" value="{{homeworkEditorDraft.statusIndex}}" bindchange="handleHomeworkStatusChange">
+        <view class="picker-field">当前状态：{{statusOptions[homeworkEditorDraft.statusIndex].label}}</view>
+      </picker>
+      <textarea
+        class="editor-textarea"
+        placeholder="填写作业反馈"
+        value="{{homeworkEditorDraft.remark}}"
+        bindinput="handleHomeworkRemarkInput"
+      />
+      <view class="image-grid" wx:if="{{homeworkEditorDraft.imageUrls && homeworkEditorDraft.imageUrls.length > 0}}">
+        <block wx:for="{{homeworkEditorDraft.imageUrls}}" wx:key="*this">
+          <view class="image-card">
+            <image class="record-image" mode="aspectFill" src="{{item}}" />
+            <view
+              class="image-remove"
+              data-image-url="{{item}}"
+              bindtap="handleRemoveHomeworkImage"
+            >
+              删除
+            </view>
+          </view>
+        </block>
+      </view>
+      <button class="action-button secondary" loading="{{uploadingImages}}" bindtap="handleChooseHomeworkImages">
+        {{uploadingImages ? "上传中..." : "上传作业图片"}}
+      </button>
+      <button class="action-button" bindtap="handleSaveHomeworkRecord">保存作业反馈</button>
     </view>
   </view>
 </view>

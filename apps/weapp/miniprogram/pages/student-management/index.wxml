@@ -1,0 +1,81 @@
+<view class="page">
+  <view class="hero">
+    <view class="hero-title">学生与缴费管理</view>
+    <view class="hero-subtitle">
+      {{canEdit ? "维护学生、监护人和服务有效期。" : "当前角色没有学生管理权限。"}}
+    </view>
+  </view>
+
+  <view class="section" wx:if="{{students.length > 0}}">
+    <view class="row-between">
+      <view class="section-title">学生列表</view>
+      <button class="mini-button" wx:if="{{canEdit}}" bindtap="handleCreateStudent">新增学生</button>
+    </view>
+    <scroll-view class="chip-scroll" scroll-x>
+      <view class="chip-row">
+        <block wx:for="{{students}}" wx:key="id">
+          <view
+            class="student-chip {{selectedStudentId === item.id ? 'student-chip-active' : ''}}"
+            data-student-id="{{item.id}}"
+            bindtap="handleSelectStudent"
+          >
+            {{item.name}}
+          </view>
+        </block>
+      </view>
+    </scroll-view>
+  </view>
+
+  <view class="section" wx:elif="{{canEdit}}">
+    <view class="row-between">
+      <view class="section-title">学生列表</view>
+      <button class="mini-button" bindtap="handleCreateStudent">新增学生</button>
+    </view>
+    <view class="empty-card">当前还没有学生，先新增第一位学生。</view>
+  </view>
+
+  <view class="section" wx:if="{{canEdit && draft}}">
+    <view class="section-title">学生资料</view>
+    <view class="list-item">
+      <picker range="{{campuses}}" range-key="name" value="{{draft.campusIndex}}" bindchange="handleCampusChange">
+        <view class="picker-field">
+          所属校区：{{campuses[draft.campusIndex] ? campuses[draft.campusIndex].name : "请选择"}}
+        </view>
+      </picker>
+      <input class="picker-field" placeholder="学生姓名" value="{{draft.name}}" data-field="name" bindinput="handleFieldInput" />
+      <input class="picker-field" placeholder="学校名称" value="{{draft.schoolName}}" data-field="schoolName" bindinput="handleFieldInput" />
+      <input class="picker-field" placeholder="班级名称" value="{{draft.className}}" data-field="className" bindinput="handleFieldInput" />
+      <input class="picker-field" placeholder="年级" value="{{draft.grade}}" data-field="grade" bindinput="handleFieldInput" />
+      <input class="picker-field" placeholder="监护人姓名" value="{{draft.guardianName}}" data-field="guardianName" bindinput="handleFieldInput" />
+      <input class="picker-field" placeholder="监护人手机号" type="number" value="{{draft.guardianPhone}}" data-field="guardianPhone" bindinput="handleFieldInput" />
+    </view>
+  </view>
+
+  <view class="section" wx:if="{{canEdit && serviceDraft}}">
+    <view class="section-title">缴费与服务期</view>
+    <view class="list-item">
+      <picker range="{{paymentStatusOptions}}" range-key="label" value="{{serviceDraft.paymentStatusIndex}}" bindchange="handlePaymentStatusChange">
+        <view class="picker-field">
+          缴费状态：{{paymentStatusOptions[serviceDraft.paymentStatusIndex].label}}
+        </view>
+      </picker>
+      <picker mode="date" value="{{serviceDraft.paidAt}}" data-field="paidAt" bindchange="handleServiceDateChange">
+        <view class="picker-field">缴费时间：{{serviceDraft.paidAt || "请选择"}}</view>
+      </picker>
+      <picker mode="date" value="{{serviceDraft.serviceStartDate}}" data-field="serviceStartDate" bindchange="handleServiceDateChange">
+        <view class="picker-field">服务开始：{{serviceDraft.serviceStartDate || "请选择"}}</view>
+      </picker>
+      <picker mode="date" value="{{serviceDraft.serviceEndDate}}" data-field="serviceEndDate" bindchange="handleServiceDateChange">
+        <view class="picker-field">服务结束：{{serviceDraft.serviceEndDate || "请选择"}}</view>
+      </picker>
+      <textarea
+        class="editor-textarea compact"
+        placeholder="备注，例如月度托管、待续费"
+        value="{{serviceDraft.remark}}"
+        data-field="remark"
+        bindinput="handleServiceFieldInput"
+      />
+      <button class="action-button" bindtap="handleSave">保存学生与缴费信息</button>
+    </view>
+  </view>
+</view>

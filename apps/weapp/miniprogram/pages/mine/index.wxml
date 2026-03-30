@@ -12,8 +12,11 @@
         <view class="list-title">微信手机号登录</view>
         <view class="list-meta">当前状态：{{loginState}}</view>
         <view class="helper-text">
-          先调用微信登录，再通过手机号授权把凭证发给后端换取账号。
+          先获取微信登录态，再按角色登录。教师和监护人可以共用同一手机号。
         </view>
+        <picker range="{{roleOptions}}" range-key="label" value="{{roleHintIndex}}" bindchange="handleRoleHintChange">
+          <view class="picker-field">本次登录角色：{{roleOptions[roleHintIndex].label}}</view>
+        </picker>
         <button class="action-button secondary" bindtap="handleWeChatLogin">
           1. 获取微信登录态
         </button>
@@ -24,8 +27,42 @@
         >
           2. 获取手机号并登录
         </button>
+        <button class="action-button ghost" wx:if="{{activeRole}}" bindtap="handleLogout">
+          退出当前会话
+        </button>
       </view>
     </view>
+  </view>
+
+  <view class="section" wx:if="{{canSwitchRole}}">
+    <view class="section-title">切换当前角色</view>
+    <view class="chip-row">
+      <block wx:for="{{switchRoleOptions}}" wx:key="value">
+        <view
+          class="student-chip {{activeRole === item.value ? 'student-chip-active' : ''}}"
+          data-role="{{item.value}}"
+          bindtap="handleSwitchRole"
+        >
+          {{item.label}}
+        </view>
+      </block>
+    </view>
+  </view>
+
+  <view class="section">
+    <view class="section-title">绑定学生</view>
+    <view class="list" wx:if="{{boundStudents.length > 0}}">
+      <block wx:for="{{boundStudents}}" wx:key="id">
+        <view class="list-item">
+          <view class="list-title">{{item.name}}</view>
+          <view class="list-meta">{{item.schoolName}} · {{item.className}}</view>
+          <view class="list-meta">
+            服务期：{{item.serviceSummary.serviceStartDate || '--'}} 至 {{item.serviceSummary.serviceEndDate || '--'}}
+          </view>
+        </view>
+      </block>
+    </view>
+    <view class="empty-card" wx:else>当前手机号还没有绑定学生关系。</view>
   </view>
 
   <view class="section">
@@ -36,6 +73,20 @@
           <view class="list-title">{{item}}</view>
         </view>
       </block>
+    </view>
+  </view>
+
+  <view class="section" wx:if="{{canManageStudents || canManageServiceCalendar}}">
+    <view class="section-title">管理操作</view>
+    <view class="list">
+      <view class="list-item is-clickable" wx:if="{{canManageStudents}}" bindtap="openStudentManagement">
+        <view class="list-title">学生与缴费管理</view>
+        <view class="list-meta">维护学生、监护人、学校班级和服务有效期。</view>
+      </view>
+      <view class="list-item is-clickable" wx:if="{{canManageServiceCalendar}}" bindtap="openServiceCalendar">
+        <view class="list-title">服务日历管理</view>
+        <view class="list-meta">设置每天是否提供晚辅用餐和作业辅导。</view>
+      </view>
     </view>
   </view>
 </view>

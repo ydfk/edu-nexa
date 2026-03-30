@@ -1,20 +1,95 @@
 <view class="page">
   <view class="hero">
-    <view class="hero-title">晚餐登记要快，状态要准。</view>
-    <view class="hero-subtitle">到校后优先完成请假、用餐、异常备注三项确认。</view>
+    <view class="hero-title">
+      {{canManage ? "机构端用餐登记" : activeRole === "guardian" ? "家长端用餐查看" : "先登录查看用餐"}}
+    </view>
+    <view class="hero-subtitle">
+      {{canManage ? "按日期维护机构内学生的晚辅用餐状态。" : "按日期查看孩子的当日用餐反馈。"}}
+    </view>
   </view>
 
   <view class="section">
-    <view class="section-title">今日用餐记录</view>
-    <view class="list">
-      <block wx:for="{{records}}" wx:key="studentName">
-        <view class="list-item">
-          <view class="list-title">{{item.studentName}}</view>
+    <view class="section-title">日期筛选</view>
+    <view class="toolbar">
+      <button class="mini-button" data-offset="-1" bindtap="handleShiftDate">前一天</button>
+      <view class="date-chip">{{selectedDate}}</view>
+      <button class="mini-button" data-offset="1" bindtap="handleShiftDate">后一天</button>
+    </view>
+  </view>
+
+  <view class="section" wx:if="{{activeRole === 'guardian' && students.length > 0}}">
+    <view class="section-title">孩子切换</view>
+    <scroll-view class="chip-scroll" scroll-x>
+      <view class="chip-row">
+        <block wx:for="{{students}}" wx:key="id">
+          <view
+            class="student-chip {{selectedStudentId === item.id ? 'student-chip-active' : ''}}"
+            data-student-id="{{item.id}}"
+            bindtap="handleSelectStudent"
+          >
+            {{item.name}}
+          </view>
+        </block>
+      </view>
+    </scroll-view>
+  </view>
+
+  <view class="section">
+    <view class="section-title">
+      {{canManage ? "学生用餐列表" : "当日用餐记录"}}
+    </view>
+    <view class="list" wx:if="{{records.length > 0}}">
+      <block wx:for="{{records}}" wx:key="id">
+        <view
+          class="list-item {{canManage ? 'is-clickable' : ''}}"
+          data-record-id="{{item.id}}"
+          bindtap="handleSelectTeacherRecord"
+        >
+          <view class="row-between">
+            <view class="list-title">{{item.studentName}}</view>
+            <view class="tag">{{item.statusLabel}}</view>
+          </view>
           <view class="list-meta">{{item.campusName}}</view>
-          <view class="tag">{{item.status}}</view>
+          <view class="list-meta" wx:if="{{item.schoolInfo}}">{{item.schoolInfo}}</view>
           <view class="list-meta">{{item.remark}}</view>
+          <view class="image-grid" wx:if="{{item.imageUrls && item.imageUrls.length > 0}}">
+            <block wx:for="{{item.imageUrls}}" wx:key="*this">
+              <image class="record-image" mode="aspectFill" src="{{item}}" />
+            </block>
+          </view>
         </view>
       </block>
+    </view>
+    <view class="empty-card" wx:else>当前日期还没有用餐记录。</view>
+  </view>
+
+  <view class="section" wx:if="{{canManage && editorDraft}}">
+    <view class="section-title">编辑当前学生</view>
+    <view class="list-item">
+      <view class="list-title">{{editorDraft.studentName}}</view>
+      <picker range="{{statusOptions}}" range-key="label" value="{{editorDraft.statusIndex}}" bindchange="handleMealStatusChange">
+        <view class="picker-field">当前状态：{{statusOptions[editorDraft.statusIndex].label}}</view>
+      </picker>
+      <textarea
+        class="editor-textarea"
+        placeholder="填写用餐备注"
+        value="{{editorDraft.remark}}"
+        bindinput="handleMealRemarkInput"
+      />
+      <view class="image-grid" wx:if="{{editorDraft.imageUrls && editorDraft.imageUrls.length > 0}}">
+        <block wx:for="{{editorDraft.imageUrls}}" wx:key="*this">
+          <view class="image-card">
+            <image class="record-image" mode="aspectFill" src="{{item}}" />
+            <view class="image-remove" data-image-url="{{item}}" bindtap="handleRemoveImage">
+              删除
+            </view>
+          </view>
+        </block>
+      </view>
+      <button class="action-button secondary" loading="{{uploadingImages}}" bindtap="handleChooseImages">
+        {{uploadingImages ? "上传中..." : "上传用餐图片"}}
+      </button>
+      <button class="action-button" bindtap="handleSaveRecord">保存用餐记录</button>
     </view>
   </view>
 </view>

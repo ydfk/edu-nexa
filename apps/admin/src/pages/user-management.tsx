@@ -179,7 +179,7 @@ export default function UserManagement() {
         <div
           className={`capitalize ${
             row.getValue("status") === "active"
-              ? "text-green-600"
+              ? "text-blue-600"
               : row.getValue("status") === "inactive"
                 ? "text-red-600"
                 : "text-yellow-600"

@@ -14,5 +14,8 @@ test("shows product navigation entries", () => {
 
   expect(screen.getByText("工作台")).toBeInTheDocument();
   expect(screen.getByText("用餐登记")).toBeInTheDocument();
+  expect(screen.getByText("每日作业")).toBeInTheDocument();
+  expect(screen.getByText("首页配置")).toBeInTheDocument();
+  expect(screen.getByText("接入指引")).toBeInTheDocument();
   expect(screen.getByText("基础设置")).toBeInTheDocument();
 });

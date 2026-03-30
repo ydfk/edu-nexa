@@ -1,0 +1,11 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "EduNexa: 打开微信小程序工程",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "powershell -ExecutionPolicy Bypass -File \"${workspaceFolder}\\scripts\\dev-weapp.ps1\" -WechatDevtoolsPath \"${config:edunexa.wechatDevtoolsPath}\""
+    }
+  ]
+}

@@ -7,6 +7,7 @@ type Student struct {
 	CampusID      string `gorm:"size:36;index;not null" json:"campusId"`
 	Name          string `gorm:"size:32;not null" json:"name"`
 	SchoolName    string `gorm:"size:64" json:"schoolName"`
+	ClassName     string `gorm:"size:32;index" json:"className"`
 	Grade         string `gorm:"size:16" json:"grade"`
 	GuardianName  string `gorm:"size:32" json:"guardianName"`
 	GuardianPhone string `gorm:"size:32" json:"guardianPhone"`

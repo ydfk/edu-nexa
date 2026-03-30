@@ -20,6 +20,8 @@ const emptySession: AdminSession = {
   token: "",
   user: null,
 };
+let cachedRawSession = "";
+let cachedSessionSnapshot: AdminSession = emptySession;
 
 export function useAdminSession() {
   return useSyncExternalStore(
@@ -36,16 +38,26 @@ export function getAdminSessionSnapshot(): AdminSession {
 
   const raw = window.localStorage.getItem(sessionStorageKey);
   if (!raw) {
+    cachedRawSession = "";
+    cachedSessionSnapshot = emptySession;
     return emptySession;
+  }
+
+  if (raw === cachedRawSession) {
+    return cachedSessionSnapshot;
   }
 
   try {
     const parsed = JSON.parse(raw) as Partial<AdminSession>;
-    return {
+    cachedRawSession = raw;
+    cachedSessionSnapshot = {
       token: typeof parsed.token === "string" ? parsed.token : "",
       user: isSessionUser(parsed.user) ? parsed.user : null,
     };
+    return cachedSessionSnapshot;
   } catch {
+    cachedRawSession = "";
+    cachedSessionSnapshot = emptySession;
     return emptySession;
   }
 }

@@ -1,0 +1,60 @@
+<view class="page">
+  <view class="hero">
+    <view class="hero-title">服务日历管理</view>
+    <view class="hero-subtitle">
+      {{canEdit ? "按日期设置各校区是否提供用餐和作业服务。" : "当前角色没有服务日历权限。"}}
+    </view>
+  </view>
+
+  <view class="section">
+    <view class="section-title">日期筛选</view>
+    <view class="toolbar">
+      <button class="mini-button" data-offset="-1" bindtap="handleShiftDate">前一天</button>
+      <view class="date-chip">{{selectedDate}}</view>
+      <button class="mini-button" data-offset="1" bindtap="handleShiftDate">后一天</button>
+    </view>
+  </view>
+
+  <view class="section" wx:if="{{calendarItems.length > 0}}">
+    <view class="section-title">校区列表</view>
+    <view class="list">
+      <block wx:for="{{calendarItems}}" wx:key="campusId">
+        <view
+          class="list-item is-clickable"
+          data-campus-id="{{item.campusId}}"
+          bindtap="handleSelectCampus"
+        >
+          <view class="row-between">
+            <view class="list-title">{{item.campusName}}</view>
+            <view class="tag">
+              {{item.hasMealService ? "用餐开" : "用餐关"}} / {{item.hasHomeworkService ? "作业开" : "作业关"}}
+            </view>
+          </view>
+          <view class="list-meta">{{item.remark || "暂无说明"}}</view>
+        </view>
+      </block>
+    </view>
+  </view>
+
+  <view class="section" wx:if="{{canEdit && editorDraft}}">
+    <view class="section-title">编辑当前校区</view>
+    <view class="list-item">
+      <view class="list-title">{{editorDraft.campusName}}</view>
+      <view class="switch-row">
+        <view class="list-meta">晚辅用餐</view>
+        <switch color="#1c7a57" checked="{{editorDraft.hasMealService}}" bindchange="handleMealSwitch" />
+      </view>
+      <view class="switch-row">
+        <view class="list-meta">作业辅导</view>
+        <switch color="#1c7a57" checked="{{editorDraft.hasHomeworkService}}" bindchange="handleHomeworkSwitch" />
+      </view>
+      <textarea
+        class="editor-textarea compact"
+        placeholder="填写当天服务安排说明"
+        value="{{editorDraft.remark}}"
+        bindinput="handleRemarkInput"
+      />
+      <button class="action-button" bindtap="handleSave">保存服务日历</button>
+    </view>
+  </view>
+</view>

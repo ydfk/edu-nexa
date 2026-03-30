@@ -3,11 +3,19 @@ package main
 import (
 	"github.com/ydfk/edu-nexa/apps/api/internal/api/auth"
 	"github.com/ydfk/edu-nexa/apps/api/internal/api/campus"
+	"github.com/ydfk/edu-nexa/apps/api/internal/api/guardian"
 	"github.com/ydfk/edu-nexa/apps/api/internal/api/health"
+	"github.com/ydfk/edu-nexa/apps/api/internal/api/homeconfig"
+	"github.com/ydfk/edu-nexa/apps/api/internal/api/homeworkassignment"
 	"github.com/ydfk/edu-nexa/apps/api/internal/api/homeworkrecord"
 	"github.com/ydfk/edu-nexa/apps/api/internal/api/mealrecord"
 	"github.com/ydfk/edu-nexa/apps/api/internal/api/overview"
+	"github.com/ydfk/edu-nexa/apps/api/internal/api/runtimeconfig"
+	"github.com/ydfk/edu-nexa/apps/api/internal/api/serviceday"
 	"github.com/ydfk/edu-nexa/apps/api/internal/api/student"
+	"github.com/ydfk/edu-nexa/apps/api/internal/api/studentservice"
+	"github.com/ydfk/edu-nexa/apps/api/internal/api/teacher"
+	"github.com/ydfk/edu-nexa/apps/api/internal/api/upload"
 	"github.com/ydfk/edu-nexa/apps/api/internal/middleware"
 	"github.com/ydfk/edu-nexa/apps/api/pkg/config"
 	"github.com/ydfk/edu-nexa/apps/api/pkg/logger"
@@ -33,9 +41,11 @@ func api() {
 		Format: "${ip} ${status} ${latency} ${method} ${path}\n",
 		Output: logger.GetFiberLogWriter(),
 	}))
+	app.Static(config.Current.Storage.Local.PublicPath, config.Current.Storage.Local.Dir)
 
 	health.RegisterRoutes(app)
 	auth.RegisterUnProtectedRoutes(app)
+	homeconfig.RegisterPublicRoutes(app.Group("/api"))
 
 	protectedAPI := app.Group("/api")
 	protectedAPI.Use(jwtware.New(jwtware.Config{
@@ -53,6 +63,14 @@ func api() {
 	overview.RegisterRoutes(protectedAPI)
 	campus.RegisterRoutes(protectedAPI)
 	student.RegisterRoutes(protectedAPI)
+	guardian.RegisterRoutes(protectedAPI)
+	teacher.RegisterRoutes(protectedAPI)
+	studentservice.RegisterRoutes(protectedAPI)
+	runtimeconfig.RegisterRoutes(protectedAPI)
+	serviceday.RegisterRoutes(protectedAPI)
+	homeworkassignment.RegisterRoutes(protectedAPI)
+	upload.RegisterRoutes(protectedAPI)
+	homeconfig.RegisterRoutes(protectedAPI)
 	mealrecord.RegisterRoutes(protectedAPI)
 	homeworkrecord.RegisterRoutes(protectedAPI)
 

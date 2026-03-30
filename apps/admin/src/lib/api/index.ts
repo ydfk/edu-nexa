@@ -2,7 +2,6 @@ import { createAlova } from "alova";
 import { createServerTokenAuthentication } from "alova/client";
 import ReactHook from "alova/react";
 import adapterFetch from "alova/fetch";
-import { mockAdapter } from "./mock/index";
 
 const { onAuthRequired, onResponseRefreshToken } = createServerTokenAuthentication({
   async login(response) {
@@ -17,13 +16,10 @@ const { onAuthRequired, onResponseRefreshToken } = createServerTokenAuthenticati
   },
 });
 
-const useMock = import.meta.env.VITE_USE_MOCK === "true";
-console.log("🚀 ~ useMock:", useMock);
-
 export const alovaInstance = createAlova({
   baseURL: "/api",
   statesHook: ReactHook,
-  requestAdapter: useMock ? mockAdapter : adapterFetch(),
+  requestAdapter: adapterFetch(),
   beforeRequest: onAuthRequired(),
   responded: onResponseRefreshToken(),
 });

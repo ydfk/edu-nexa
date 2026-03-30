@@ -17,7 +17,6 @@
     "cz:pass": "git add . & czg --no-verify"
   },
   "dependencies": {
-    "@alova/mock": "^2.0.18",
     "@hookform/resolvers": "^5.2.2",
     "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-aspect-ratio": "^1.1.8",

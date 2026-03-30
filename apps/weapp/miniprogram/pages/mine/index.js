@@ -1,20 +1,45 @@
 const { weappPhoneLogin } = require("../../services/auth");
-const { getSession, setSession } = require("../../store/session");
+const { getStudents } = require("../../services/records");
+const {
+  clearSession,
+  getSession,
+  setActiveRole,
+  setSession,
+} = require("../../store/session");
+
+const roleOptions = [
+  { label: "管理员", value: "admin" },
+  { label: "监护人", value: "guardian" },
+  { label: "教师", value: "teacher" },
+];
 
 Page({
   data: {
+    activeRole: "",
+    boundStudents: [],
+    canSwitchRole: false,
+    canManageServiceCalendar: false,
+    canManageStudents: false,
     loginState: "未登录",
-    shortcuts: ["切换校区", "登录设置", "反馈模板", "操作说明"],
+    roleHintIndex: 0,
+    roleOptions,
+    switchRoleOptions: [],
+    shortcuts: ["切换当前角色", "查看绑定学生", "确认服务有效期", "查看登录设置"],
     userInfo: {
-      campusName: "南湖校区",
-      name: "微信手机号登录",
+      campusName: "微信手机号登录",
+      name: "未登录",
       phone: "未绑定",
-      role: "监护人默认登录，可按账号关系扩展角色",
+      role: "请先完成登录",
     },
     wxCode: "",
   },
   onShow() {
     this.syncSessionState();
+  },
+  handleRoleHintChange(event) {
+    this.setData({
+      roleHintIndex: Number(event.detail.value),
+    });
   },
   handleWeChatLogin() {
     wx.login({
@@ -51,22 +76,19 @@ Page({
       return;
     }
 
+    const roleHint = this.data.roleOptions[this.data.roleHintIndex].value;
+
     weappPhoneLogin({
       phoneCode: event.detail.code,
-      roleHint: "guardian",
+      roleHint,
       wxCode: this.data.wxCode,
     })
       .then((payload) => {
-        setSession(payload);
-        this.setData({
-          loginState: "已登录",
-          userInfo: {
-            campusName: "微信手机号会话",
-            name: payload.user.displayName || "监护人",
-            phone: payload.user.phone || "未绑定",
-            role: (payload.user.roles || []).join(" / ") || "guardian",
-          },
+        setSession({
+          ...payload,
+          activeRole: roleHint,
         });
+        this.syncSessionState();
         wx.showToast({
           title: "登录成功",
           icon: "success",
@@ -79,20 +101,102 @@ Page({
         });
       });
   },
+  handleSwitchRole(event) {
+    const role = event.currentTarget.dataset.role;
+    setActiveRole(role);
+    this.syncSessionState();
+  },
+  handleLogout() {
+    clearSession();
+    this.setData({
+      activeRole: "",
+      boundStudents: [],
+      canManageServiceCalendar: false,
+      canManageStudents: false,
+      canSwitchRole: false,
+      loginState: "未登录",
+      userInfo: {
+        campusName: "微信手机号登录",
+        name: "未登录",
+        phone: "未绑定",
+        role: "请先完成登录",
+      },
+      switchRoleOptions: [],
+      wxCode: "",
+    });
+  },
   syncSessionState() {
     const session = getSession();
     if (!session.token || !session.user) {
+      this.setData({
+        activeRole: "",
+        boundStudents: [],
+        canManageServiceCalendar: false,
+        canManageStudents: false,
+        canSwitchRole: false,
+        loginState: "未登录",
+        switchRoleOptions: [],
+        userInfo: {
+          campusName: "微信手机号登录",
+          name: "未登录",
+          phone: "未绑定",
+          role: "请先完成登录",
+        },
+      });
       return;
     }
 
+    const activeRole = session.activeRole || (session.user.roles || [])[0] || "";
+    const activeRoleLabel = formatRoleLabel(activeRole);
+
     this.setData({
+      activeRole,
+      canManageServiceCalendar: activeRole === "admin",
+      canManageStudents: activeRole === "teacher" || activeRole === "admin",
       loginState: "已登录",
+      canSwitchRole: Array.isArray(session.user.roles) && session.user.roles.length > 1,
+      switchRoleOptions: buildSwitchRoleOptions(session.user.roles || []),
       userInfo: {
         campusName: "微信手机号会话",
-        name: session.user.displayName || "监护人",
+        name: session.user.displayName || activeRoleLabel,
         phone: session.user.phone || "未绑定",
-        role: (session.user.roles || []).join(" / ") || "guardian",
+        role: `当前角色：${activeRoleLabel}；已开通：${(session.user.roles || [])
+          .map(formatRoleLabel)
+          .join(" / ")}`,
       },
+    });
+
+    getStudents({ guardianPhone: session.user.phone }).then((students) => {
+      this.setData({
+        boundStudents: students,
+      });
+    });
+  },
+  openStudentManagement() {
+    wx.navigateTo({
+      url: "/pages/student-management/index",
+    });
+  },
+  openServiceCalendar() {
+    wx.navigateTo({
+      url: "/pages/service-calendar/index",
     });
   },
 });
+
+function formatRoleLabel(role) {
+  switch (role) {
+    case "teacher":
+      return "教师";
+    case "guardian":
+      return "监护人";
+    case "admin":
+      return "管理员";
+    default:
+      return role || "未分配";
+  }
+}
+
+function buildSwitchRoleOptions(roles) {
+  return roleOptions.filter((item) => roles.includes(item.value));
+}

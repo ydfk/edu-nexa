@@ -1,6 +1,7 @@
 const storageKey = "edunexa.weapp.session.v1";
 
 const sessionStore = {
+  activeRole: "",
   loginType: "",
   token: "",
   user: null,
@@ -13,6 +14,7 @@ function hydrateSession() {
       return;
     }
 
+    sessionStore.activeRole = payload.activeRole || inferActiveRole(payload.user);
     sessionStore.loginType = payload.loginType || "";
     sessionStore.token = payload.token || "";
     sessionStore.user = payload.user || null;
@@ -22,6 +24,7 @@ function hydrateSession() {
 }
 
 function setSession(payload) {
+  sessionStore.activeRole = payload.activeRole || inferActiveRole(payload.user);
   sessionStore.loginType = payload.loginType || "";
   sessionStore.token = payload.token || "";
   sessionStore.user = payload.user || null;
@@ -34,6 +37,7 @@ function setSession(payload) {
 }
 
 function clearSession() {
+  sessionStore.activeRole = "";
   sessionStore.loginType = "";
   sessionStore.token = "";
   sessionStore.user = null;
@@ -47,10 +51,33 @@ function clearSession() {
 
 function getSession() {
   return {
+    activeRole: sessionStore.activeRole,
     loginType: sessionStore.loginType,
     token: sessionStore.token,
     user: sessionStore.user,
   };
+}
+
+function setActiveRole(role) {
+  sessionStore.activeRole = role || inferActiveRole(sessionStore.user);
+
+  try {
+    wx.setStorageSync(storageKey, sessionStore);
+  } catch (error) {
+    console.warn("更新小程序角色失败", error);
+  }
+}
+
+function inferActiveRole(user) {
+  if (!user || !Array.isArray(user.roles) || user.roles.length === 0) {
+    return "";
+  }
+
+  if (user.roles.includes("guardian")) {
+    return "guardian";
+  }
+
+  return user.roles[0];
 }
 
 module.exports = {
@@ -58,4 +85,5 @@ module.exports = {
   setSession,
   clearSession,
   getSession,
+  setActiveRole,
 };
