@@ -96,10 +96,10 @@ func getOrCreateConfig() (*model.Config, error) {
 	}
 
 	config = &model.Config{
-		Announcement: "首页介绍、图片和公告都可以在后台统一配置。",
+		Announcement: "",
 		BannersJSON:  string(bannersJSON),
-		HeroSubtitle: "首页介绍、用餐反馈、作业反馈都围绕晚辅主链路展开。",
-		HeroTitle:    "教师记录，监护人查看。",
+		HeroSubtitle: "",
+		HeroTitle:    "",
 		Scene:        homeScene,
 	}
 	if err := db.DB.Create(config).Error; err != nil {
@@ -152,16 +152,16 @@ func defaultBanners(banners []bannerPayload) []bannerPayload {
 
 	return []bannerPayload{
 		{
-			ID:       "banner-campus",
-			Image:    "/assets/intro-campus.svg",
-			Subtitle: "首页介绍、图片和公告都可以在后台统一配置。",
-			Title:    "机构介绍和服务说明先在首页讲清楚",
+			ID:       "banner-service",
+			Image:    "",
+			Subtitle: "",
+			Title:    "",
 		},
 		{
 			ID:       "banner-feedback",
-			Image:    "/assets/intro-feedback.svg",
-			Subtitle: "教师记录，监护人按日期查看，多学生家庭支持切换。",
-			Title:    "晚辅用餐和作业反馈是当前两条主链路",
+			Image:    "",
+			Subtitle: "",
+			Title:    "",
 		},
 	}
 }
@@ -171,7 +171,7 @@ func defaultBannerID(id string, index int) string {
 		return id
 	}
 	if index == 0 {
-		return "banner-campus"
+		return "banner-service"
 	}
 	if index == 1 {
 		return "banner-feedback"
@@ -181,12 +181,12 @@ func defaultBannerID(id string, index int) string {
 
 func defaultBannerImage(index int) string {
 	if index == 0 {
-		return "/assets/intro-campus.svg"
+		return ""
 	}
 	if index == 1 {
-		return "/assets/intro-feedback.svg"
+		return ""
 	}
-	return "/assets/intro-campus.svg"
+	return ""
 }
 
 func defaultString(value string, fallback string) string {

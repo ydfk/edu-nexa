@@ -12,3 +12,5 @@ apps/api/data/
 apps/api/log/
 
 apps/weapp/dist/
+.history/
+./logs/

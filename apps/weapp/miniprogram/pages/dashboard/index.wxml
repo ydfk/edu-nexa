@@ -1,53 +1,82 @@
 <view class="page">
-  <view class="hero">
-    <view class="hero-title">{{homeHeroTitle}}</view>
-    <view class="hero-subtitle">{{homeHeroSubtitle}}</view>
-  </view>
+  <van-cell-group inset>
+    <van-cell
+      title="{{homeHeroTitle || '学栖'}}"
+      label="{{homeHeroSubtitle || ''}}"
+      value="{{identityLabel || '未登录'}}"
+    />
+    <van-cell title="日期" value="{{serviceDate}}" />
+  </van-cell-group>
 
-  <view class="section">
-    <view class="section-title">公告</view>
-    <view class="empty-card">{{homeAnnouncement}}</view>
-  </view>
+  <van-notice-bar
+    wx:if="{{homeAnnouncement}}"
+    custom-class="block-gap"
+    background="#f0fff4"
+    color="#06ae56"
+    left-icon="volume-o"
+    text="{{homeAnnouncement}}"
+  />
 
-  <view class="section">
-    <view class="section-title">机构介绍</view>
-    <swiper class="banner-swiper" autoplay circular indicator-dots interval="4500">
+  <van-grid
+    wx:if="{{quickActions.length > 0}}"
+    custom-class="block-gap"
+    border="{{false}}"
+    column-num="{{4}}"
+  >
+    <block wx:for="{{quickActions}}" wx:key="action">
+      <van-grid-item
+        icon="apps-o"
+        text="{{item.label}}"
+        data-action="{{item.action}}"
+        bind:click="handleQuickAction"
+      >
+        <view slot="text" class="grid-text">
+          <view>{{item.label}}</view>
+          <text class="grid-subtext">{{item.value}}</text>
+        </view>
+      </van-grid-item>
+    </block>
+  </van-grid>
+
+  <van-panel title="今日" custom-class="block-gap" wx:if="{{metrics.length > 0}}">
+    <van-cell-group border="{{false}}">
+      <block wx:for="{{metrics}}" wx:key="label">
+        <van-cell title="{{item.label}}" value="{{item.value}}" />
+      </block>
+    </van-cell-group>
+  </van-panel>
+
+  <van-panel title="焦点" custom-class="block-gap" wx:if="{{banners.length > 0}}">
+    <swiper
+      class="swipe-shell"
+      autoplay
+      circular
+      interval="4000"
+      indicator-dots
+      indicator-active-color="#07c160"
+    >
       <block wx:for="{{banners}}" wx:key="id">
         <swiper-item>
-          <view class="banner-card">
-            <image class="banner-image" mode="aspectFill" src="{{item.image}}" />
-            <view class="banner-content">
-              <view class="list-title">{{item.title}}</view>
-              <view class="list-meta">{{item.subtitle}}</view>
-            </view>
-          </view>
+          <image class="swipe-image" mode="aspectFill" src="{{item.image}}" />
         </swiper-item>
       </block>
     </swiper>
-  </view>
-
-  <view class="section">
-    <view class="section-title">今日概览</view>
-    <view class="grid">
-      <block wx:for="{{metrics}}" wx:key="label">
-        <view class="card">
-          <view class="card-label">{{item.label}}</view>
-          <view class="card-value">{{item.value}}</view>
-        </view>
+    <van-cell-group border="{{false}}">
+      <block wx:for="{{banners}}" wx:key="id">
+        <van-cell
+          wx:if="{{item.title || item.subtitle}}"
+          title="{{item.title || '-'}}"
+          label="{{item.subtitle || ''}}"
+        />
       </block>
-    </view>
-  </view>
+    </van-cell-group>
+  </van-panel>
 
-  <view class="section">
-    <view class="section-title">
-      {{activeRole === "teacher" ? "教师待办" : activeRole === "guardian" ? "家长提示" : "登录提示"}}
-    </view>
-    <view class="list">
-      <block wx:for="{{tips}}" wx:key="*this">
-        <view class="list-item">
-          <view class="list-title">{{item}}</view>
-        </view>
+  <van-panel title="处理" custom-class="block-gap" wx:if="{{highlightItems.length > 0}}">
+    <van-cell-group border="{{false}}">
+      <block wx:for="{{highlightItems}}" wx:key="label">
+        <van-cell title="{{item.label}}" value="{{item.value}}" />
       </block>
-    </view>
-  </view>
+    </van-cell-group>
+  </van-panel>
 </view>

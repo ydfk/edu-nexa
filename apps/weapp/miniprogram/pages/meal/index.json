@@ -1,3 +1,19 @@
 {
-  "navigationBarTitleText": "用餐登记"
+  "navigationBarTitleText": "用餐",
+  "usingComponents": {
+    "van-button": "@vant/weapp/button/index",
+    "van-calendar": "@vant/weapp/calendar/index",
+    "van-cell": "@vant/weapp/cell/index",
+    "van-cell-group": "@vant/weapp/cell-group/index",
+    "van-empty": "@vant/weapp/empty/index",
+    "van-field": "@vant/weapp/field/index",
+    "van-panel": "@vant/weapp/panel/index",
+    "van-radio": "@vant/weapp/radio/index",
+    "van-radio-group": "@vant/weapp/radio-group/index",
+    "van-submit-bar": "@vant/weapp/submit-bar/index",
+    "van-tag": "@vant/weapp/tag/index",
+    "van-tabs": "@vant/weapp/tabs/index",
+    "van-tab": "@vant/weapp/tab/index",
+    "van-uploader": "@vant/weapp/uploader/index"
+  }
 }

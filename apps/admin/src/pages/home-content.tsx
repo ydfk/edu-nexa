@@ -124,7 +124,7 @@ export default function HomeContentPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor={`banner-subtitle-${index}`}>说明</Label>
+                <Label htmlFor={`banner-subtitle-${index}`}>副标题</Label>
                 <Textarea
                   id={`banner-subtitle-${index}`}
                   disabled={loading}
@@ -166,12 +166,12 @@ export default function HomeContentPage() {
           </div>
           {config.banners.map((banner) => (
             <div key={banner.id} className="rounded-2xl border p-4">
-              <p className="font-medium">{banner.title || "未填写标题"}</p>
+              <p className="font-medium">{banner.title || "-"}</p>
               <p className="mt-2 text-sm text-muted-foreground">
-                {banner.subtitle || "未填写说明"}
+                {banner.subtitle || "-"}
               </p>
               <p className="mt-3 text-xs text-muted-foreground">
-                图片：{banner.image || "未填写"}
+                图片：{banner.image || "-"}
               </p>
             </div>
           ))}

@@ -1,3 +1,28 @@
 .page {
-  padding-bottom: 48rpx;
+  padding-bottom: 56rpx;
+}
+
+.block-gap {
+  margin-top: 24rpx;
+}
+
+.grid-text {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6rpx;
+}
+
+.grid-subtext {
+  font-size: 20rpx;
+  color: #7b8c9f;
+}
+
+.swipe-shell {
+  height: 280rpx;
+}
+
+.swipe-image {
+  width: 100%;
+  height: 100%;
 }

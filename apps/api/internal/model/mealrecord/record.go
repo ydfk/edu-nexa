@@ -4,8 +4,6 @@ import "github.com/ydfk/edu-nexa/apps/api/internal/model/base"
 
 type Record struct {
 	base.BaseModel
-	CampusID     string `gorm:"size:36;index;not null" json:"campusId"`
-	CampusName   string `gorm:"size:64" json:"campusName"`
 	StudentID    string `gorm:"size:36;index;not null" json:"studentId"`
 	StudentName  string `gorm:"size:32" json:"studentName"`
 	ServiceDate  string `gorm:"size:10;index;not null" json:"serviceDate"`

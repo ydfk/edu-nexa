@@ -1,44 +1,111 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { RouterProvider, createBrowserRouter } from "react-router-dom";
-import { RedirectAuthenticatedUser, RequireAdminAuth } from "@/components/auth/route-guards";
+import {
+  RedirectAuthenticatedUser,
+  RequireBackofficeAuth,
+  RequireRoles,
+} from "@/components/auth/route-guards";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/theme-provider";
 import Unauthorized from "@/components/error/unauthorized";
 import Layout from "@/components/layout/layout";
 import DashboardPage from "@/pages/dashboard";
-import CampusesPage from "@/pages/campuses";
 import DailyHomeworkPage from "@/pages/daily-homework";
+import GuardiansPage from "@/pages/guardians";
+import SchoolsPage from "@/pages/schools";
 import StudentsPage from "@/pages/students";
 import MealRecordsPage from "@/pages/meal-records";
 import HomeworkRecordsPage from "@/pages/homework-records";
-import GuardiansPage from "@/pages/guardians";
 import ServiceCalendarPage from "@/pages/service-calendar";
-import HomeContentPage from "@/pages/home-content";
-import IntegrationGuidePage from "@/pages/integration-guide";
-import SettingsPage from "@/pages/settings";
+import StatisticsPage from "@/pages/statistics";
+import TeachersPage from "@/pages/teachers";
 import LoginPage from "@/pages/login";
 import "./index.css";
 
 const router = createBrowserRouter([
   {
-    element: <RequireAdminAuth />,
+    element: <RequireBackofficeAuth />,
     children: [
       {
         path: "/",
         element: <Layout />,
         children: [
           { index: true, element: <DashboardPage /> },
-          { path: "campuses", element: <CampusesPage /> },
-          { path: "students", element: <StudentsPage /> },
+          {
+            path: "statistics",
+            element: (
+              <RequireRoles allowedRoles={["admin", "teacher"]}>
+                <StatisticsPage />
+              </RequireRoles>
+            ),
+          },
+          {
+            path: "teachers",
+            element: (
+              <RequireRoles allowedRoles={["admin"]}>
+                <TeachersPage />
+              </RequireRoles>
+            ),
+          },
+          {
+            path: "schools",
+            element: (
+              <RequireRoles allowedRoles={["admin", "teacher"]}>
+                <SchoolsPage />
+              </RequireRoles>
+            ),
+          },
+          {
+            path: "grades",
+            element: (
+              <RequireRoles allowedRoles={["admin", "teacher"]}>
+                <SchoolsPage />
+              </RequireRoles>
+            ),
+          },
+          {
+            path: "classes",
+            element: (
+              <RequireRoles allowedRoles={["admin", "teacher"]}>
+                <SchoolsPage />
+              </RequireRoles>
+            ),
+          },
+          {
+            path: "guardians",
+            element: (
+              <RequireRoles allowedRoles={["admin", "teacher"]}>
+                <GuardiansPage />
+              </RequireRoles>
+            ),
+          },
+          {
+            path: "students",
+            element: (
+              <RequireRoles allowedRoles={["admin", "teacher"]}>
+                <StudentsPage />
+              </RequireRoles>
+            ),
+          },
           { path: "meal-records", element: <MealRecordsPage /> },
           { path: "homework-records", element: <HomeworkRecordsPage /> },
-          { path: "daily-homework", element: <DailyHomeworkPage /> },
-          { path: "service-calendar", element: <ServiceCalendarPage /> },
-          { path: "guardians", element: <GuardiansPage /> },
-          { path: "home-content", element: <HomeContentPage /> },
-          { path: "integration-guide", element: <IntegrationGuidePage /> },
-          { path: "settings", element: <SettingsPage /> },
+          {
+            path: "daily-homework",
+            element: (
+              <RequireRoles allowedRoles={["admin", "teacher"]}>
+                <DailyHomeworkPage />
+              </RequireRoles>
+            ),
+          },
+          {
+            path: "service-calendar",
+            element: (
+              <RequireRoles allowedRoles={["admin", "teacher"]}>
+                <ServiceCalendarPage />
+              </RequireRoles>
+            ),
+          },
         ],
       },
     ],

@@ -1,7 +1,8 @@
+import type { ReactElement } from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
-import { hasAdminAccess, useAdminSession } from "@/lib/auth/session";
+import { hasAnySessionRole, hasBackofficeAccess, useAdminSession } from "@/lib/auth/session";
 
-export function RequireAdminAuth() {
+export function RequireBackofficeAuth() {
   const location = useLocation();
   const session = useAdminSession();
 
@@ -15,17 +16,33 @@ export function RequireAdminAuth() {
     );
   }
 
-  if (!hasAdminAccess(session)) {
+  if (!hasBackofficeAccess(session)) {
     return <Navigate to="/401" replace />;
   }
 
   return <Outlet />;
 }
 
+export function RequireRoles({
+  allowedRoles,
+  children,
+}: {
+  allowedRoles: string[];
+  children: ReactElement;
+}) {
+  const session = useAdminSession();
+
+  if (!hasAnySessionRole(session, allowedRoles)) {
+    return <Navigate to="/401" replace />;
+  }
+
+  return children;
+}
+
 export function RedirectAuthenticatedUser() {
   const session = useAdminSession();
 
-  if (hasAdminAccess(session)) {
+  if (hasBackofficeAccess(session)) {
     return <Navigate to="/" replace />;
   }
 

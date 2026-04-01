@@ -1,92 +1,76 @@
 <view class="page">
-  <view class="hero">
-    <view class="hero-title">{{userInfo.name}}</view>
-    <view class="hero-subtitle">{{userInfo.campusName}} · {{userInfo.role}}</view>
-    <view class="hero-meta">{{userInfo.phone}}</view>
+  <van-cell-group inset>
+    <van-cell title="手机号" value="{{userInfo.phone || '-'}}" />
+    <van-cell title="角色" value="{{isLoggedIn ? userInfo.role : '-'}}" />
+  </van-cell-group>
+
+  <van-tabs
+    wx:if="{{!isLoggedIn}}"
+    custom-class="block-gap"
+    active="{{roleHintValue}}"
+    bind:change="handleRoleHintChange"
+  >
+    <block wx:for="{{roleOptions}}" wx:key="value">
+      <van-tab title="{{item.label}}" name="{{item.value}}" />
+    </block>
+  </van-tabs>
+
+  <view wx:if="{{!isLoggedIn}}" class="block-gap">
+    <van-button round custom-class="full-button" bind:click="handleWeChatLogin">
+      获取登录态
+    </van-button>
+    <van-button
+      round
+      type="primary"
+      custom-class="full-button block-gap-sm"
+      open-type="getPhoneNumber"
+      bindgetphonenumber="handleGetPhoneNumber"
+    >
+      微信手机号登录
+    </van-button>
   </view>
 
-  <view class="section">
-    <view class="section-title">登录方式</view>
-    <view class="list">
-      <view class="list-item">
-        <view class="list-title">微信手机号登录</view>
-        <view class="list-meta">当前状态：{{loginState}}</view>
-        <view class="helper-text">
-          先获取微信登录态，再按角色登录。教师和监护人可以共用同一手机号。
-        </view>
-        <picker range="{{roleOptions}}" range-key="label" value="{{roleHintIndex}}" bindchange="handleRoleHintChange">
-          <view class="picker-field">本次登录角色：{{roleOptions[roleHintIndex].label}}</view>
-        </picker>
-        <button class="action-button secondary" bindtap="handleWeChatLogin">
-          1. 获取微信登录态
-        </button>
-        <button
-          class="action-button"
-          open-type="getPhoneNumber"
-          bindgetphonenumber="handleGetPhoneNumber"
-        >
-          2. 获取手机号并登录
-        </button>
-        <button class="action-button ghost" wx:if="{{activeRole}}" bindtap="handleLogout">
-          退出当前会话
-        </button>
-      </view>
-    </view>
-  </view>
+  <van-tabs
+    wx:if="{{isLoggedIn && canSwitchRole}}"
+    custom-class="block-gap"
+    active="{{activeRole}}"
+    bind:change="handleSwitchRoleChange"
+  >
+    <block wx:for="{{switchRoleOptions}}" wx:key="value">
+      <van-tab title="{{item.label}}" name="{{item.value}}" />
+    </block>
+  </van-tabs>
 
-  <view class="section" wx:if="{{canSwitchRole}}">
-    <view class="section-title">切换当前角色</view>
-    <view class="chip-row">
-      <block wx:for="{{switchRoleOptions}}" wx:key="value">
-        <view
-          class="student-chip {{activeRole === item.value ? 'student-chip-active' : ''}}"
-          data-role="{{item.value}}"
-          bindtap="handleSwitchRole"
-        >
-          {{item.label}}
-        </view>
-      </block>
-    </view>
-  </view>
-
-  <view class="section">
-    <view class="section-title">绑定学生</view>
-    <view class="list" wx:if="{{boundStudents.length > 0}}">
+  <van-panel wx:if="{{boundStudents.length > 0}}" custom-class="block-gap" title="学生">
+    <van-cell-group border="{{false}}">
       <block wx:for="{{boundStudents}}" wx:key="id">
-        <view class="list-item">
-          <view class="list-title">{{item.name}}</view>
-          <view class="list-meta">{{item.schoolName}} · {{item.className}}</view>
-          <view class="list-meta">
-            服务期：{{item.serviceSummary.serviceStartDate || '--'}} 至 {{item.serviceSummary.serviceEndDate || '--'}}
-          </view>
-        </view>
+        <van-cell
+          title="{{item.name}}"
+          label="{{item.schoolName}} {{item.className}}"
+          value="{{item.serviceSummary.serviceEndDate || '-'}}"
+        />
       </block>
-    </view>
-    <view class="empty-card" wx:else>当前手机号还没有绑定学生关系。</view>
+    </van-cell-group>
+  </van-panel>
+
+  <van-cell-group wx:if="{{managementEntries.length > 0}}" custom-class="block-gap" inset>
+    <block wx:for="{{managementEntries}}" wx:key="action">
+      <van-cell
+        title="{{item.title}}"
+        is-link
+        data-entry="{{item.action}}"
+        bind:click="handleOpenEntry"
+      />
+    </block>
+  </van-cell-group>
+
+  <view wx:if="{{isLoggedIn}}" class="block-gap">
+    <van-button round custom-class="full-button" bind:click="handleLogout">
+      退出
+    </van-button>
   </view>
 
-  <view class="section">
-    <view class="section-title">快捷入口</view>
-    <view class="list">
-      <block wx:for="{{shortcuts}}" wx:key="*this">
-        <view class="list-item">
-          <view class="list-title">{{item}}</view>
-        </view>
-      </block>
-    </view>
-  </view>
-
-  <view class="section" wx:if="{{canManageStudents || canManageServiceCalendar}}">
-    <view class="section-title">管理操作</view>
-    <view class="list">
-      <view class="list-item is-clickable" wx:if="{{canManageStudents}}" bindtap="openStudentManagement">
-        <view class="list-title">学生与缴费管理</view>
-        <view class="list-meta">维护学生、监护人、学校班级和服务有效期。</view>
-      </view>
-      <view class="list-item is-clickable" wx:if="{{canManageServiceCalendar}}" bindtap="openServiceCalendar">
-        <view class="list-title">服务日历管理</view>
-        <view class="list-meta">设置每天是否提供晚辅用餐和作业辅导。</view>
-      </view>
-    </view>
+  <view wx:if="{{!isLoggedIn && !loginState}}" class="block-gap">
+    <van-empty description="未登录" />
   </view>
 </view>

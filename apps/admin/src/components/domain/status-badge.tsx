@@ -9,15 +9,31 @@ const statusMap: Record<
 > = {
   active: {
     label: "启用",
-    className: "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-200",
+    className: "border-transparent bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-200",
   },
   completed: {
     label: "已完成",
-    className: "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-200",
+    className: "border-transparent bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-200",
+  },
+  partial: {
+    label: "完成一部分",
+    className: "border-transparent bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-200",
   },
   pending: {
     label: "待处理",
+    className: "border-transparent bg-slate-100 text-slate-700 dark:bg-slate-500/20 dark:text-slate-200",
+  },
+  paid: {
+    label: "已缴费",
+    className: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-200",
+  },
+  unpaid: {
+    label: "待缴费",
     className: "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-200",
+  },
+  paused: {
+    label: "已暂停",
+    className: "border-transparent bg-slate-100 text-slate-700 dark:bg-slate-500/20 dark:text-slate-200",
   },
   in_progress: {
     label: "处理中",
@@ -25,7 +41,7 @@ const statusMap: Record<
   },
   leave: {
     label: "请假",
-    className: "bg-slate-200 text-slate-700 dark:bg-slate-500/20 dark:text-slate-200",
+    className: "border-transparent bg-slate-100 text-slate-700 dark:bg-slate-500/20 dark:text-slate-200",
   },
   pending_parent_followup: {
     label: "待家长跟进",
@@ -36,7 +52,7 @@ const statusMap: Record<
 export function StatusBadge({ status }: { status: string }) {
   const item = statusMap[status] ?? {
     label: status,
-    className: "bg-muted text-muted-foreground",
+    className: "border-transparent bg-muted text-muted-foreground",
   };
 
   return <Badge className={item.className}>{item.label}</Badge>;

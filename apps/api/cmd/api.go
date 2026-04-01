@@ -2,8 +2,10 @@ package main
 
 import (
 	"github.com/ydfk/edu-nexa/apps/api/internal/api/auth"
-	"github.com/ydfk/edu-nexa/apps/api/internal/api/campus"
+	"github.com/ydfk/edu-nexa/apps/api/internal/api/classgroup"
 	"github.com/ydfk/edu-nexa/apps/api/internal/api/guardian"
+	"github.com/ydfk/edu-nexa/apps/api/internal/api/guardianprofile"
+	"github.com/ydfk/edu-nexa/apps/api/internal/api/gradelevel"
 	"github.com/ydfk/edu-nexa/apps/api/internal/api/health"
 	"github.com/ydfk/edu-nexa/apps/api/internal/api/homeconfig"
 	"github.com/ydfk/edu-nexa/apps/api/internal/api/homeworkassignment"
@@ -11,11 +13,13 @@ import (
 	"github.com/ydfk/edu-nexa/apps/api/internal/api/mealrecord"
 	"github.com/ydfk/edu-nexa/apps/api/internal/api/overview"
 	"github.com/ydfk/edu-nexa/apps/api/internal/api/runtimeconfig"
+	"github.com/ydfk/edu-nexa/apps/api/internal/api/school"
 	"github.com/ydfk/edu-nexa/apps/api/internal/api/serviceday"
 	"github.com/ydfk/edu-nexa/apps/api/internal/api/student"
 	"github.com/ydfk/edu-nexa/apps/api/internal/api/studentservice"
 	"github.com/ydfk/edu-nexa/apps/api/internal/api/teacher"
 	"github.com/ydfk/edu-nexa/apps/api/internal/api/upload"
+	"github.com/ydfk/edu-nexa/apps/api/internal/api/usermanagement"
 	"github.com/ydfk/edu-nexa/apps/api/internal/middleware"
 	"github.com/ydfk/edu-nexa/apps/api/pkg/config"
 	"github.com/ydfk/edu-nexa/apps/api/pkg/logger"
@@ -61,10 +65,14 @@ func api() {
 
 	auth.RegisterRoutes(protectedAPI)
 	overview.RegisterRoutes(protectedAPI)
-	campus.RegisterRoutes(protectedAPI)
+	school.RegisterRoutes(protectedAPI)
+	gradelevel.RegisterRoutes(protectedAPI)
+	classgroup.RegisterRoutes(protectedAPI)
+	guardianprofile.RegisterRoutes(protectedAPI)
 	student.RegisterRoutes(protectedAPI)
 	guardian.RegisterRoutes(protectedAPI)
 	teacher.RegisterRoutes(protectedAPI)
+	usermanagement.RegisterRoutes(protectedAPI)
 	studentservice.RegisterRoutes(protectedAPI)
 	runtimeconfig.RegisterRoutes(protectedAPI)
 	serviceday.RegisterRoutes(protectedAPI)

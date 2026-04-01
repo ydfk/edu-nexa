@@ -1,233 +1,189 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertCircle, ArrowRight, CheckCircle2 } from "lucide-react";
-import { StatusBadge } from "@/components/domain/status-badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
 import {
-  fetchCampuses,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { useAdminSession } from "@/lib/auth/session";
+import {
   fetchHomeworkRecords,
   fetchMealRecords,
-  fetchOverview,
+  fetchSchools,
   fetchStudents,
-  type CampusItem,
   type HomeworkRecordItem,
   type MealRecordItem,
-  type OverviewItem,
+  type SchoolItem,
   type StudentItem,
 } from "@/lib/server-data";
 
 export default function DashboardPage() {
-  const [campuses, setCampuses] = useState<CampusItem[]>([]);
+  const session = useAdminSession();
   const [homeworkRecords, setHomeworkRecords] = useState<HomeworkRecordItem[]>([]);
   const [mealRecords, setMealRecords] = useState<MealRecordItem[]>([]);
-  const [overview, setOverview] = useState<OverviewItem | null>(null);
+  const [schools, setSchools] = useState<SchoolItem[]>([]);
   const [students, setStudents] = useState<StudentItem[]>([]);
 
   useEffect(() => {
     let cancelled = false;
 
-    Promise.all([
-      fetchOverview(),
-      fetchCampuses(),
-      fetchStudents(),
-      fetchMealRecords(),
-      fetchHomeworkRecords(),
-    ])
-      .then(([overviewData, campusItems, studentItems, mealItems, homeworkItems]) => {
+    async function loadData() {
+      try {
+        const studentItems = await fetchStudents(
+          session.user?.roles.includes("guardian")
+            ? { guardianPhone: session.user?.phone || "" }
+            : undefined
+        );
+        const [schoolItems, mealItems, homeworkItems] = await Promise.all([
+          fetchSchools({ status: "active" }),
+          fetchMealRecords(),
+          fetchHomeworkRecords(),
+        ]);
+
         if (cancelled) {
           return;
         }
-        setOverview(overviewData);
-        setCampuses(campusItems);
+
+        const visibleStudentIDs = new Set(studentItems.map((item) => item.id));
         setStudents(studentItems);
-        setMealRecords(mealItems);
-        setHomeworkRecords(homeworkItems);
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setOverview(null);
-          setCampuses([]);
-          setStudents([]);
-          setMealRecords([]);
-          setHomeworkRecords([]);
+        setSchools(schoolItems);
+        setMealRecords(
+          session.user?.roles.includes("guardian")
+            ? mealItems.filter((item) => visibleStudentIDs.has(item.studentId))
+            : mealItems
+        );
+        setHomeworkRecords(
+          session.user?.roles.includes("guardian")
+            ? homeworkItems.filter((item) => visibleStudentIDs.has(item.studentId))
+            : homeworkItems
+        );
+      } catch {
+        if (cancelled) {
+          return;
         }
-      });
+        setStudents([]);
+        setSchools([]);
+        setMealRecords([]);
+        setHomeworkRecords([]);
+      }
+    }
+
+    void loadData();
 
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [session.user?.phone, session.user?.roles]);
 
-  const campusProgress = useMemo(() => {
-    const studentCountMap = students.reduce<Record<string, number>>((acc, item) => {
-      acc[item.campusId] = (acc[item.campusId] || 0) + 1;
-      return acc;
-    }, {});
+  const today = new Date().toISOString().slice(0, 10);
+  const todayMealCount = useMemo(
+    () =>
+      mealRecords.filter((item) => item.serviceDate === today && item.status === "completed").length,
+    [mealRecords, today]
+  );
+  const todayHomeworkCount = useMemo(
+    () =>
+      homeworkRecords.filter((item) => {
+        return item.serviceDate === today && ["completed", "partial"].includes(item.status);
+      }).length,
+    [homeworkRecords, today]
+  );
+  const recentHomework = homeworkRecords.slice(0, 5);
+  const recentMeals = mealRecords.slice(0, 5);
+  const isGuardian = session.user?.roles.includes("guardian");
 
-    return campuses.map((campus) => {
-      const campusStudentCount = studentCountMap[campus.id] || 0;
-      const campusMealCount = mealRecords.filter(
-        (item) => item.campusId === campus.id && item.status === "completed"
-      ).length;
-      const campusHomeworkCount = homeworkRecords.filter((item) => {
-        return item.campusId === campus.id && ["completed", "partial"].includes(item.status);
-      }).length;
-
-      return {
-        homeworkPercent:
-          campusStudentCount > 0
-            ? Math.round((campusHomeworkCount / campusStudentCount) * 100)
-            : 0,
-        mealPercent:
-          campusStudentCount > 0 ? Math.round((campusMealCount / campusStudentCount) * 100) : 0,
-        name: campus.name,
-      };
-    });
-  }, [campuses, homeworkRecords, mealRecords, students]);
-
-  const latestHomeworkRecords = homeworkRecords.slice(0, 5);
+  const metricItems = isGuardian
+    ? [
+        { label: "关联学生", value: students.length },
+        { label: "用餐记录", value: mealRecords.length },
+        { label: "作业记录", value: homeworkRecords.length },
+      ]
+    : [
+        { label: "学校", value: schools.length },
+        { label: "学生", value: students.length },
+        { label: "今日用餐", value: todayMealCount },
+        { label: "今日作业", value: todayHomeworkCount },
+      ];
 
   return (
-    <div className="space-y-6">
-      <section className="grid gap-4 lg:grid-cols-[1.6fr_1fr]">
-        <Card className="border-none bg-[linear-gradient(135deg,_rgba(37,99,235,0.96),_rgba(22,59,140,0.98))] text-white shadow-xl shadow-blue-950/20">
-          <CardHeader className="space-y-3">
-            <p className="text-sm font-medium uppercase tracking-[0.3em] text-white/70">
-              今日运营窗口
-            </p>
-            <CardTitle className="max-w-2xl text-3xl leading-tight">
-              现在页面只展示真实数据，没有任何模拟记录或预填统计。
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-4 md:grid-cols-3">
-            <div className="rounded-2xl bg-white/10 p-4">
-              <p className="text-sm text-white/70">当前重点</p>
-              <p className="mt-2 text-xl font-semibold">先补齐校区、学生、服务日历基础数据</p>
-            </div>
-            <div className="rounded-2xl bg-white/10 p-4">
-              <p className="text-sm text-white/70">录入顺序</p>
-              <p className="mt-2 text-xl font-semibold">校区 → 学生 → 每日作业 → 用餐/作业反馈</p>
-            </div>
-            <div className="rounded-2xl bg-white/10 p-4">
-              <p className="text-sm text-white/70">当前日期</p>
-              <p className="mt-2 text-xl font-semibold">{overview?.date || "未获取"}</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-none bg-card/90 shadow-lg">
-          <CardHeader>
-            <CardTitle className="text-lg">运营提醒</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {(overview?.alerts || []).length > 0 ? (
-              overview?.alerts.map((item) => (
-                <div
-                  key={item.title}
-                  className="flex items-start gap-3 rounded-2xl border p-4"
-                >
-                  {item.level === "warning" ? (
-                    <AlertCircle className="mt-0.5 size-5 text-amber-600" />
-                  ) : (
-                    <CheckCircle2 className="mt-0.5 size-5 text-blue-600" />
-                  )}
-                  <div className="space-y-1">
-                    <p className="font-medium">{item.title}</p>
-                    <p className="text-sm text-muted-foreground">{item.message}</p>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="rounded-2xl border p-4 text-sm text-muted-foreground">
-                当前没有提醒信息。
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </section>
-
+    <div className="flex flex-col gap-6">
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {(overview?.metrics || []).map((metric) => (
-          <Card key={metric.key} className="border-none bg-card/90 shadow-md">
-            <CardContent className="space-y-2 p-5">
-              <p className="text-sm text-muted-foreground">{metric.label}</p>
-              <p className="text-3xl font-semibold tracking-tight">{metric.value}</p>
-              <p className="text-sm text-muted-foreground">来自当前真实库统计</p>
+        {metricItems.map((item) => (
+          <Card key={item.label}>
+            <CardContent className="flex items-end justify-between p-5">
+              <div className="flex flex-col gap-2">
+                <CardDescription>{item.label}</CardDescription>
+                <CardTitle className="text-4xl font-semibold tracking-tight">{item.value}</CardTitle>
+              </div>
+              <Badge variant="outline">{today}</Badge>
             </CardContent>
           </Card>
         ))}
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-[1.2fr_1fr]">
-        <Card className="border-none bg-card/90 shadow-md">
+      <section className="grid gap-4 lg:grid-cols-2">
+        <Card>
           <CardHeader>
-            <CardTitle className="text-lg">校区进度看板</CardTitle>
+            <CardTitle>最近用餐</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-5">
-            {campusProgress.length > 0 ? (
-              campusProgress.map((item) => (
-                <div key={item.name} className="space-y-3 rounded-2xl border p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium">{item.name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        用餐与作业登记进度
-                      </p>
-                    </div>
-                    <ArrowRight className="size-4 text-muted-foreground" />
+          <CardContent className="space-y-4">
+            {recentMeals.length > 0 ? (
+              recentMeals.map((item) => (
+                <div key={item.id} className="rounded-lg border bg-muted/20 p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-medium">{item.studentName}</p>
+                    <RecordBadge status={item.status} />
                   </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span>晚餐</span>
-                      <span>{item.mealPercent}%</span>
-                    </div>
-                    <Progress value={item.mealPercent} />
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span>作业</span>
-                      <span>{item.homeworkPercent}%</span>
-                    </div>
-                    <Progress value={item.homeworkPercent} />
-                  </div>
+                  <p className="mt-2 text-sm text-muted-foreground">{item.serviceDate}</p>
+                  <p className="mt-2 text-sm">{item.remark || "-"}</p>
                 </div>
               ))
             ) : (
-              <div className="rounded-2xl border p-4 text-sm text-muted-foreground">
-                当前还没有足够的真实数据生成校区进度。
-              </div>
+              <div className="text-sm text-muted-foreground">暂无记录</div>
             )}
           </CardContent>
         </Card>
 
-        <Card className="border-none bg-card/90 shadow-md">
+        <Card>
           <CardHeader>
-            <CardTitle className="text-lg">最近更新</CardTitle>
+            <CardTitle>最近作业</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {latestHomeworkRecords.length > 0 ? (
-              latestHomeworkRecords.map((item) => (
-                <div
-                  key={item.id}
-                  className="rounded-2xl border border-dashed p-4 transition-colors hover:border-primary/40"
-                >
+            {recentHomework.length > 0 ? (
+              recentHomework.map((item) => (
+                <div key={item.id} className="rounded-lg border bg-muted/20 p-4">
                   <div className="flex items-center justify-between gap-2">
                     <p className="font-medium">{item.studentName}</p>
-                    <StatusBadge status={item.status} />
+                    <RecordBadge status={item.status} />
                   </div>
                   <p className="mt-2 text-sm text-muted-foreground">
-                    {item.campusName || "未匹配校区"} · {item.subjectSummary || "未填写科目"}
+                    {[item.serviceDate, item.schoolName, item.className].filter(Boolean).join(" / ")}
                   </p>
-                  <p className="mt-2 text-sm">{item.remark || "暂无反馈"}</p>
+                  <p className="mt-2 text-sm">{item.subjectSummary || item.remark || "-"}</p>
                 </div>
               ))
             ) : (
-              <div className="rounded-2xl border p-4 text-sm text-muted-foreground">
-                当前还没有最近作业更新。
-              </div>
+              <div className="text-sm text-muted-foreground">暂无记录</div>
             )}
           </CardContent>
         </Card>
       </section>
     </div>
+  );
+}
+
+function RecordBadge({ status }: { status: string }) {
+  const labelMap: Record<string, string> = {
+    completed: "已完成",
+    partial: "完成一部分",
+    pending: "待处理",
+  };
+
+  return (
+    <Badge variant={status === "completed" ? "default" : "secondary"}>
+      {labelMap[status] || status}
+    </Badge>
   );
 }

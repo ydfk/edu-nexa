@@ -1,109 +1,103 @@
 import type { LucideIcon } from "lucide-react";
 import {
-  BellRing,
+  BarChart3,
   BookOpenCheck,
-  Building2,
   CalendarRange,
   ClipboardList,
-  GalleryVerticalEnd,
   LayoutDashboard,
-  ScrollText,
-  Settings,
+  School2,
   Soup,
+  UserCog,
   Users,
 } from "lucide-react";
 
+export type AppRole = "admin" | "teacher" | "guardian";
+
 type AppNavItem = {
   href: string;
-  label: string;
-  description: string;
   icon: LucideIcon;
+  label: string;
+  roles: AppRole[];
 };
 
 type AppNavGroup = {
-  title: string;
   items: AppNavItem[];
+  title: string;
 };
 
 export const appNavigation: AppNavGroup[] = [
   {
-    title: "运营总览",
+    title: "统计",
     items: [
       {
         href: "/",
-        label: "工作台",
-        description: "今日运营概览与异常提醒",
         icon: LayoutDashboard,
+        label: "工作台",
+        roles: ["admin", "teacher", "guardian"],
       },
       {
-        href: "/campuses",
-        label: "校区管理",
-        description: "查看校区容量、班次与服务时段",
-        icon: Building2,
-      },
-      {
-        href: "/students",
-        label: "学生台账",
-        description: "维护学生档案、学校班级与服务状态",
-        icon: Users,
+        href: "/statistics",
+        icon: BarChart3,
+        label: "统计看板",
+        roles: ["admin", "teacher"],
       },
     ],
   },
   {
-    title: "晚辅执行",
+    title: "设置",
     items: [
       {
-        href: "/meal-records",
-        label: "用餐登记",
-        description: "跟踪当天晚辅用餐完成情况",
-        icon: Soup,
+        href: "/teachers",
+        icon: UserCog,
+        label: "教师账号",
+        roles: ["admin"],
       },
       {
-        href: "/homework-records",
-        label: "作业记录",
-        description: "记录学生作业完成与订正状态",
-        icon: BookOpenCheck,
-      },
-      {
-        href: "/daily-homework",
-        label: "每日作业",
-        description: "按学校和班级维护当天作业内容",
-        icon: ClipboardList,
-      },
-      {
-        href: "/service-calendar",
-        label: "服务日历",
-        description: "配置哪一天开放用餐和作业辅导",
-        icon: CalendarRange,
+        href: "/schools",
+        icon: School2,
+        label: "学校",
+        roles: ["admin", "teacher"],
       },
       {
         href: "/guardians",
-        label: "家校同步",
-        description: "管理家长通知与反馈模板",
-        icon: BellRing,
+        icon: Users,
+        label: "监护人",
+        roles: ["admin", "teacher"],
+      },
+      {
+        href: "/students",
+        icon: Users,
+        label: "学生",
+        roles: ["admin", "teacher"],
+      },
+      {
+        href: "/service-calendar",
+        icon: CalendarRange,
+        label: "服务日历",
+        roles: ["admin", "teacher"],
       },
     ],
   },
   {
-    title: "系统配置",
+    title: "记录",
     items: [
       {
-        href: "/home-content",
-        label: "首页配置",
-        description: "配置小程序首页文案、公告与轮播图",
-        icon: GalleryVerticalEnd,
+        href: "/meal-records",
+        icon: Soup,
+        label: "用餐记录",
+        roles: ["admin", "teacher", "guardian"],
       },
       {
-        href: "/integration-guide",
-        label: "接入指引",
-        description: "查看本地、OSS、又拍云与审核配置说明",
-        icon: ScrollText,
+        href: "/homework-records",
+        icon: BookOpenCheck,
+        label: "作业记录",
+        roles: ["admin", "teacher", "guardian"],
       },
       {
-        href: "/settings",
-        label: "基础设置",
-        description: "账号权限、接口地址与业务配置",
-        icon: Settings,
+        href: "/daily-homework",
+        icon: ClipboardList,
+        label: "每日作业",
+        roles: ["admin", "teacher"],
       },
     ],
   },
@@ -116,12 +110,25 @@ export function getPageMeta(pathname: string) {
   if (matched) {
     return {
       title: matched.label,
-      description: matched.description,
+      description: "",
     };
   }
 
   return {
     title: "学栖 · EduNexa",
-    description: "托管机构运营管理底座",
+    description: "",
   };
+}
+
+export function getNavigationByRoles(roles: string[]) {
+  return appNavigation
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => item.roles.some((role) => roles.includes(role))),
+    }))
+    .filter((group) => group.items.length > 0);
+}
+
+export function hasAnyRole(roles: string[], expected: AppRole[]) {
+  return expected.some((role) => roles.includes(role));
 }

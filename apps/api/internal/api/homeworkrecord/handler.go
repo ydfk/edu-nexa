@@ -12,8 +12,6 @@ import (
 )
 
 type homeworkRecordPayload struct {
-	CampusID       string   `json:"campusId"`
-	CampusName     string   `json:"campusName"`
 	ClassName      string   `json:"className"`
 	ImageURLs      []string `json:"imageUrls"`
 	RecordedBy     string   `json:"recordedBy"`
@@ -31,9 +29,6 @@ func List(c *fiber.Ctx) error {
 	var records []model.Record
 	query := db.DB.Order("service_date desc, created_at desc")
 
-	if campusID := c.Query("campusId"); campusID != "" {
-		query = query.Where("campus_id = ?", campusID)
-	}
 	if studentID := c.Query("studentId"); studentID != "" {
 		query = query.Where("student_id = ?", studentID)
 	}
@@ -79,8 +74,6 @@ func Create(c *fiber.Ctx) error {
 	}
 
 	record := model.Record{
-		CampusID:       req.CampusID,
-		CampusName:     req.CampusName,
 		ClassName:      req.ClassName,
 		ImageURLs:      strings.Join(req.ImageURLs, ","),
 		RecordedBy:     req.RecordedBy,
@@ -115,8 +108,6 @@ func Update(c *fiber.Ctx) error {
 		return response.Error(c, err.Error())
 	}
 
-	record.CampusID = req.CampusID
-	record.CampusName = req.CampusName
 	record.ClassName = req.ClassName
 	record.ImageURLs = strings.Join(req.ImageURLs, ",")
 	record.RecordedBy = req.RecordedBy
@@ -138,8 +129,6 @@ func Update(c *fiber.Ctx) error {
 
 func buildHomeworkRecordPayload(item model.Record) fiber.Map {
 	return fiber.Map{
-		"campusId":       item.CampusID,
-		"campusName":     item.CampusName,
 		"className":      item.ClassName,
 		"id":             item.Id,
 		"imageUrls":      splitHomeworkCommaField(item.ImageURLs),

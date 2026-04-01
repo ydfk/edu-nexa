@@ -1,3 +1,11 @@
 {
-  "navigationBarTitleText": "工作台"
+  "navigationBarTitleText": "工作台",
+  "usingComponents": {
+    "van-cell": "@vant/weapp/cell/index",
+    "van-cell-group": "@vant/weapp/cell-group/index",
+    "van-grid": "@vant/weapp/grid/index",
+    "van-grid-item": "@vant/weapp/grid-item/index",
+    "van-notice-bar": "@vant/weapp/notice-bar/index",
+    "van-panel": "@vant/weapp/panel/index"
+  }
 }

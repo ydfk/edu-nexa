@@ -7,6 +7,29 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $weappRoot = Join-Path $repoRoot "apps\\weapp"
 $projectConfigPath = Join-Path $weappRoot "project.config.json"
+$workspaceSettingsPath = Join-Path $repoRoot ".vscode\\settings.json"
+
+function Resolve-WechatDevtoolsPath {
+    param(
+        [string]$ConfiguredPath
+    )
+
+    if (-not [string]::IsNullOrWhiteSpace($ConfiguredPath)) {
+        return $ConfiguredPath.Trim()
+    }
+
+    if (-not (Test-Path $workspaceSettingsPath)) {
+        return ""
+    }
+
+    try {
+        $settings = Get-Content $workspaceSettingsPath -Raw -Encoding UTF8 | ConvertFrom-Json
+        $path = [string]$settings.PSObject.Properties["edunexa.wechatDevtoolsPath"].Value
+        return $path.Trim()
+    } catch {
+        return ""
+    }
+}
 
 function Read-ProjectName {
     if (-not (Test-Path $projectConfigPath)) {
@@ -84,7 +107,8 @@ function Find-WechatDevtoolsInfo {
 }
 
 $projectName = Read-ProjectName
-$wechatDevtoolsInfo = Find-WechatDevtoolsInfo -ConfiguredPath $WechatDevtoolsPath
+$resolvedWechatDevtoolsPath = Resolve-WechatDevtoolsPath -ConfiguredPath $WechatDevtoolsPath
+$wechatDevtoolsInfo = Find-WechatDevtoolsInfo -ConfiguredPath $resolvedWechatDevtoolsPath
 
 if (-not [string]::IsNullOrWhiteSpace($wechatDevtoolsInfo.cli)) {
     Start-Process $wechatDevtoolsInfo.cli -ArgumentList @("open", "--project", $weappRoot) | Out-Null
@@ -104,10 +128,10 @@ Write-Host "  1. Import the weapp root in WeChat DevTools"
 Write-Host "  2. Disable domain check in DevTools when needed"
 Write-Host "  3. Start backend services manually when needed"
 
-if (-not [string]::IsNullOrWhiteSpace($WechatDevtoolsPath) -and [string]::IsNullOrWhiteSpace($wechatDevtoolsInfo.cli) -and [string]::IsNullOrWhiteSpace($wechatDevtoolsInfo.app)) {
+if (-not [string]::IsNullOrWhiteSpace($resolvedWechatDevtoolsPath) -and [string]::IsNullOrWhiteSpace($wechatDevtoolsInfo.cli) -and [string]::IsNullOrWhiteSpace($wechatDevtoolsInfo.app)) {
     Write-Host ""
     Write-Host "Configured WeChat DevTools path is invalid:" -ForegroundColor DarkYellow
-    Write-Host "  $WechatDevtoolsPath"
+    Write-Host "  $resolvedWechatDevtoolsPath"
     Write-Host "Check .vscode/settings.json -> edunexa.wechatDevtoolsPath."
 } elseif (-not [string]::IsNullOrWhiteSpace($wechatDevtoolsInfo.cli)) {
     Write-Host ""

@@ -1,0 +1,16 @@
+{
+  "name": "@edunexa/weapp",
+  "private": true,
+  "description": "EduNexa 微信小程序工程",
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@vant/weapp": "^1.11.7"
+  },
+  "devDependencies": {
+    "@types/node": "^24.6.0",
+    "miniprogram-api-typings": "^4.0.8",
+    "typescript": "^5.9.3"
+  }
+}

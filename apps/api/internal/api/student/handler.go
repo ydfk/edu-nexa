@@ -1,8 +1,9 @@
 package student
 
 import (
+	"strings"
+
 	"github.com/ydfk/edu-nexa/apps/api/internal/api/response"
-	campusModel "github.com/ydfk/edu-nexa/apps/api/internal/model/campus"
 	model "github.com/ydfk/edu-nexa/apps/api/internal/model/student"
 	studentserviceModel "github.com/ydfk/edu-nexa/apps/api/internal/model/studentservice"
 	"github.com/ydfk/edu-nexa/apps/api/pkg/db"
@@ -11,12 +12,15 @@ import (
 )
 
 type studentPayload struct {
-	CampusID      string `json:"campusId"`
+	ClassID       string `json:"classId"`
 	ClassName     string `json:"className"`
 	Grade         string `json:"grade"`
+	GradeID       string `json:"gradeId"`
+	GuardianID    string `json:"guardianId"`
 	GuardianName  string `json:"guardianName"`
 	GuardianPhone string `json:"guardianPhone"`
 	Name          string `json:"name"`
+	SchoolID      string `json:"schoolId"`
 	SchoolName    string `json:"schoolName"`
 	Status        string `json:"status"`
 }
@@ -25,19 +29,32 @@ func List(c *fiber.Ctx) error {
 	var students []model.Student
 	query := db.DB.Order("created_at desc")
 
-	if campusID := c.Query("campusId"); campusID != "" {
-		query = query.Where("campus_id = ?", campusID)
+	if keyword := strings.TrimSpace(c.Query("keyword")); keyword != "" {
+		query = query.Where(
+			"name LIKE ? OR school_name LIKE ? OR class_name LIKE ? OR guardian_name LIKE ? OR guardian_phone LIKE ?",
+			"%"+keyword+"%",
+			"%"+keyword+"%",
+			"%"+keyword+"%",
+			"%"+keyword+"%",
+			"%"+keyword+"%",
+		)
 	}
-	if schoolName := c.Query("schoolName"); schoolName != "" {
-		query = query.Where("school_name = ?", schoolName)
+	if schoolID := strings.TrimSpace(c.Query("schoolId")); schoolID != "" {
+		query = query.Where("school_id = ?", schoolID)
 	}
-	if className := c.Query("className"); className != "" {
-		query = query.Where("class_name = ?", className)
+	if classID := strings.TrimSpace(c.Query("classId")); classID != "" {
+		query = query.Where("class_id = ?", classID)
 	}
-	if guardianPhone := c.Query("guardianPhone"); guardianPhone != "" {
+	if gradeID := strings.TrimSpace(c.Query("gradeId")); gradeID != "" {
+		query = query.Where("grade_id = ?", gradeID)
+	}
+	if guardianID := strings.TrimSpace(c.Query("guardianId")); guardianID != "" {
+		query = query.Where("guardian_id = ?", guardianID)
+	}
+	if guardianPhone := strings.TrimSpace(c.Query("guardianPhone")); guardianPhone != "" {
 		query = query.Where("guardian_phone = ?", guardianPhone)
 	}
-	if status := c.Query("status"); status != "" {
+	if status := strings.TrimSpace(c.Query("status")); status != "" {
 		query = query.Where("status = ?", status)
 	}
 
@@ -51,7 +68,6 @@ func List(c *fiber.Ctx) error {
 	}
 
 	serviceMap := make(map[string]studentserviceModel.Plan)
-	campusIDs := make([]string, 0, len(students))
 	if len(studentIDs) > 0 {
 		var plans []studentserviceModel.Plan
 		if err := db.DB.
@@ -66,26 +82,14 @@ func List(c *fiber.Ctx) error {
 			}
 		}
 	}
-	for _, item := range students {
-		campusIDs = append(campusIDs, item.CampusID)
-	}
-
-	campusNameMap := make(map[string]string)
-	if len(campusIDs) > 0 {
-		var campuses []campusModel.Campus
-		if err := db.DB.Where("id IN ?", campusIDs).Find(&campuses).Error; err == nil {
-			for _, campus := range campuses {
-				campusNameMap[campus.Id.String()] = campus.Name
-			}
-		}
-	}
 
 	items := make([]fiber.Map, 0, len(students))
 	for _, item := range students {
 		plan, ok := serviceMap[item.Id.String()]
-		serviceDate := fiber.Map{}
+		serviceSummary := fiber.Map{}
 		if ok {
-			serviceDate = fiber.Map{
+			serviceSummary = fiber.Map{
+				"paymentAmount":    plan.PaymentAmount,
 				"paymentStatus":    plan.PaymentStatus,
 				"paidAt":           plan.PaidAt,
 				"serviceEndDate":   plan.ServiceEndDate,
@@ -94,16 +98,18 @@ func List(c *fiber.Ctx) error {
 		}
 
 		items = append(items, fiber.Map{
-			"campusId":       item.CampusID,
-			"campusName":     campusNameMap[item.CampusID],
+			"classId":        item.ClassID,
 			"className":      item.ClassName,
 			"grade":          item.Grade,
+			"gradeId":        item.GradeID,
+			"guardianId":     item.GuardianID,
 			"guardianName":   item.GuardianName,
 			"guardianPhone":  item.GuardianPhone,
 			"id":             item.Id,
 			"name":           item.Name,
+			"schoolId":       item.SchoolID,
 			"schoolName":     item.SchoolName,
-			"serviceSummary": serviceDate,
+			"serviceSummary": serviceSummary,
 			"status":         item.Status,
 		})
 	}
@@ -117,18 +123,21 @@ func Create(c *fiber.Ctx) error {
 		return response.Error(c, "参数不正确")
 	}
 
-	if req.Name == "" || req.CampusID == "" {
-		return response.Error(c, "学生姓名和校区不能为空")
+	if strings.TrimSpace(req.Name) == "" {
+		return response.Error(c, "学生姓名不能为空")
 	}
 
 	student := model.Student{
-		CampusID:      req.CampusID,
-		ClassName:     req.ClassName,
-		Grade:         req.Grade,
-		GuardianName:  req.GuardianName,
-		GuardianPhone: req.GuardianPhone,
-		Name:          req.Name,
-		SchoolName:    req.SchoolName,
+		ClassID:       strings.TrimSpace(req.ClassID),
+		ClassName:     strings.TrimSpace(req.ClassName),
+		Grade:         strings.TrimSpace(req.Grade),
+		GradeID:       strings.TrimSpace(req.GradeID),
+		GuardianID:    strings.TrimSpace(req.GuardianID),
+		GuardianName:  strings.TrimSpace(req.GuardianName),
+		GuardianPhone: strings.TrimSpace(req.GuardianPhone),
+		Name:          strings.TrimSpace(req.Name),
+		SchoolID:      strings.TrimSpace(req.SchoolID),
+		SchoolName:    strings.TrimSpace(req.SchoolName),
 		Status:        defaultStudentStatus(req.Status),
 	}
 
@@ -150,13 +159,16 @@ func Update(c *fiber.Ctx) error {
 		return response.Error(c, "学生不存在")
 	}
 
-	student.CampusID = req.CampusID
-	student.ClassName = req.ClassName
-	student.Grade = req.Grade
-	student.GuardianName = req.GuardianName
-	student.GuardianPhone = req.GuardianPhone
-	student.Name = req.Name
-	student.SchoolName = req.SchoolName
+	student.ClassID = strings.TrimSpace(req.ClassID)
+	student.ClassName = strings.TrimSpace(req.ClassName)
+	student.Grade = strings.TrimSpace(req.Grade)
+	student.GradeID = strings.TrimSpace(req.GradeID)
+	student.GuardianID = strings.TrimSpace(req.GuardianID)
+	student.GuardianName = strings.TrimSpace(req.GuardianName)
+	student.GuardianPhone = strings.TrimSpace(req.GuardianPhone)
+	student.Name = strings.TrimSpace(req.Name)
+	student.SchoolID = strings.TrimSpace(req.SchoolID)
+	student.SchoolName = strings.TrimSpace(req.SchoolName)
 	student.Status = defaultStudentStatus(req.Status)
 
 	if err := db.DB.Save(&student).Error; err != nil {
@@ -167,9 +179,9 @@ func Update(c *fiber.Ctx) error {
 }
 
 func defaultStudentStatus(status string) string {
-	if status == "" {
+	if strings.TrimSpace(status) == "" {
 		return "active"
 	}
 
-	return status
+	return strings.TrimSpace(status)
 }

@@ -9,7 +9,6 @@ import (
 )
 
 type teacherPayload struct {
-	CampusID    string `json:"campusId"`
 	Description string `json:"description"`
 	Name        string `json:"name"`
 	Phone       string `json:"phone"`
@@ -22,9 +21,6 @@ func List(c *fiber.Ctx) error {
 	var teachers []model.Profile
 	query := db.DB.Order("created_at desc")
 
-	if campusID := c.Query("campusId"); campusID != "" {
-		query = query.Where("campus_id = ?", campusID)
-	}
 	if phone := c.Query("phone"); phone != "" {
 		query = query.Where("phone = ?", phone)
 	}
@@ -45,12 +41,11 @@ func Create(c *fiber.Ctx) error {
 		return response.Error(c, "参数不正确")
 	}
 
-	if req.CampusID == "" || req.Name == "" || req.Phone == "" {
-		return response.Error(c, "校区、教师姓名和手机号不能为空")
+	if req.Name == "" || req.Phone == "" {
+		return response.Error(c, "教师姓名和手机号不能为空")
 	}
 
 	teacher := model.Profile{
-		CampusID:    req.CampusID,
 		Description: req.Description,
 		Name:        req.Name,
 		Phone:       req.Phone,
@@ -77,7 +72,6 @@ func Update(c *fiber.Ctx) error {
 		return response.Error(c, "教师不存在")
 	}
 
-	teacher.CampusID = req.CampusID
 	teacher.Description = req.Description
 	teacher.Name = req.Name
 	teacher.Phone = req.Phone

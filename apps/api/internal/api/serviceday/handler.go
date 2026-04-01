@@ -1,6 +1,8 @@
 package serviceday
 
 import (
+	"strings"
+
 	"github.com/ydfk/edu-nexa/apps/api/internal/api/response"
 	model "github.com/ydfk/edu-nexa/apps/api/internal/model/serviceday"
 	"github.com/ydfk/edu-nexa/apps/api/pkg/db"
@@ -9,27 +11,28 @@ import (
 )
 
 type dayPayload struct {
-	CampusID           string `json:"campusId"`
-	HasHomeworkService bool   `json:"hasHomeworkService"`
-	HasMealService     bool   `json:"hasMealService"`
-	Remark             string `json:"remark"`
-	ServiceDate        string `json:"serviceDate"`
+	HasHomeworkService        bool   `json:"hasHomeworkService"`
+	HasMealService            bool   `json:"hasMealService"`
+	HasLunchService           bool   `json:"hasLunchService"`
+	HasDinnerService          bool   `json:"hasDinnerService"`
+	HasDaytimeHomeworkService bool   `json:"hasDaytimeHomeworkService"`
+	HasEveningHomeworkService bool   `json:"hasEveningHomeworkService"`
+	WorkHours                 string `json:"workHours"`
+	Remark                    string `json:"remark"`
+	ServiceDate               string `json:"serviceDate"`
 }
 
 func List(c *fiber.Ctx) error {
 	var days []model.Day
 	query := db.DB.Order("service_date desc, created_at desc")
 
-	if campusID := c.Query("campusId"); campusID != "" {
-		query = query.Where("campus_id = ?", campusID)
-	}
-	if serviceDate := c.Query("serviceDate"); serviceDate != "" {
+	if serviceDate := strings.TrimSpace(c.Query("serviceDate")); serviceDate != "" {
 		query = query.Where("service_date = ?", serviceDate)
 	}
-	if dateFrom := c.Query("dateFrom"); dateFrom != "" {
+	if dateFrom := strings.TrimSpace(c.Query("dateFrom")); dateFrom != "" {
 		query = query.Where("service_date >= ?", dateFrom)
 	}
-	if dateTo := c.Query("dateTo"); dateTo != "" {
+	if dateTo := strings.TrimSpace(c.Query("dateTo")); dateTo != "" {
 		query = query.Where("service_date <= ?", dateTo)
 	}
 
@@ -46,16 +49,20 @@ func Create(c *fiber.Ctx) error {
 		return response.Error(c, "参数不正确")
 	}
 
-	if req.CampusID == "" || req.ServiceDate == "" {
-		return response.Error(c, "校区和日期不能为空")
+	if strings.TrimSpace(req.ServiceDate) == "" {
+		return response.Error(c, "日期不能为空")
 	}
 
 	day := model.Day{
-		CampusID:           req.CampusID,
-		HasHomeworkService: req.HasHomeworkService,
-		HasMealService:     req.HasMealService,
-		Remark:             req.Remark,
-		ServiceDate:        req.ServiceDate,
+		HasHomeworkService:        mergeHomeworkService(req),
+		HasMealService:            mergeMealService(req),
+		HasLunchService:           req.HasLunchService,
+		HasDinnerService:          req.HasDinnerService,
+		HasDaytimeHomeworkService: req.HasDaytimeHomeworkService,
+		HasEveningHomeworkService: req.HasEveningHomeworkService,
+		WorkHours:                 strings.TrimSpace(req.WorkHours),
+		Remark:                    strings.TrimSpace(req.Remark),
+		ServiceDate:               strings.TrimSpace(req.ServiceDate),
 	}
 
 	if err := db.DB.Create(&day).Error; err != nil {
@@ -76,15 +83,35 @@ func Update(c *fiber.Ctx) error {
 		return response.Error(c, "服务日历不存在")
 	}
 
-	day.CampusID = req.CampusID
-	day.HasHomeworkService = req.HasHomeworkService
-	day.HasMealService = req.HasMealService
-	day.Remark = req.Remark
-	day.ServiceDate = req.ServiceDate
+	day.HasHomeworkService = mergeHomeworkService(req)
+	day.HasMealService = mergeMealService(req)
+	day.HasLunchService = req.HasLunchService
+	day.HasDinnerService = req.HasDinnerService
+	day.HasDaytimeHomeworkService = req.HasDaytimeHomeworkService
+	day.HasEveningHomeworkService = req.HasEveningHomeworkService
+	day.WorkHours = strings.TrimSpace(req.WorkHours)
+	day.Remark = strings.TrimSpace(req.Remark)
+	day.ServiceDate = strings.TrimSpace(req.ServiceDate)
 
 	if err := db.DB.Save(&day).Error; err != nil {
 		return response.Error(c, "更新服务日历失败")
 	}
 
 	return response.Success(c, day)
+}
+
+func mergeMealService(req dayPayload) bool {
+	if req.HasLunchService || req.HasDinnerService {
+		return true
+	}
+
+	return req.HasMealService
+}
+
+func mergeHomeworkService(req dayPayload) bool {
+	if req.HasDaytimeHomeworkService || req.HasEveningHomeworkService {
+		return true
+	}
+
+	return req.HasHomeworkService
 }

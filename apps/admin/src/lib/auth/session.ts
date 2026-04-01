@@ -2,7 +2,7 @@ import { useSyncExternalStore } from "react";
 
 const sessionStorageKey = "edunexa.admin.session.v1";
 const sessionEventName = "edunexa-admin-session-change";
-const adminRoles = new Set(["admin", "teacher"]);
+const backofficeRoles = new Set(["admin", "teacher", "guardian"]);
 
 export type AdminSessionUser = {
   id: string;
@@ -80,12 +80,20 @@ export function clearAdminSession() {
   notifySessionChanged();
 }
 
-export function hasAdminAccess(session: AdminSession) {
+export function hasBackofficeAccess(session: AdminSession) {
   if (!session.token || !session.user) {
     return false;
   }
 
-  return session.user.roles.some((role) => adminRoles.has(role));
+  return session.user.roles.some((role) => backofficeRoles.has(role));
+}
+
+export function hasAnySessionRole(session: AdminSession, roles: string[]) {
+  if (!session.token || !session.user) {
+    return false;
+  }
+
+  return session.user.roles.some((role) => roles.includes(role));
 }
 
 function subscribeSession(onStoreChange: () => void) {

@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { loginWithPassword } from "@/lib/api/auth";
 import {
-  hasAdminAccess,
+  hasBackofficeAccess,
   saveAdminSession,
   type AdminSession,
 } from "@/lib/auth/session";
@@ -41,7 +41,7 @@ export default function LoginPage() {
         user: payload.user,
       };
 
-      if (!hasAdminAccess(session)) {
+      if (!hasBackofficeAccess(session)) {
         toast.error("当前账号没有管理端权限");
         return;
       }
@@ -72,9 +72,6 @@ export default function LoginPage() {
             <ShieldCheck className="size-5" />
           </div>
           <CardTitle className="text-2xl">管理端密码登录</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            管理员、教师等后台角色统一使用手机号 + 密码登录。
-          </p>
         </CardHeader>
         <CardContent>
           <form className="space-y-5" onSubmit={handleSubmit}>
@@ -98,9 +95,6 @@ export default function LoginPage() {
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
               />
-            </div>
-            <div className="rounded-2xl border border-dashed p-4 text-sm text-muted-foreground">
-              小程序端不复用这里的密码流程，后续单独走微信登录态 + 获取手机号。
             </div>
             <Button className="w-full" disabled={submitting} type="submit">
               {submitting ? "登录中..." : "登录"}

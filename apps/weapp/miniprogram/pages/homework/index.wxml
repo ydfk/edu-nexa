@@ -1,142 +1,197 @@
 <view class="page">
-  <view class="hero">
-    <view class="hero-title">
-      {{canManage ? "机构端作业记录" : activeRole === "guardian" ? "家长端作业查看" : "先登录查看作业"}}
-    </view>
-    <view class="hero-subtitle">
-      {{canManage ? "按学校、班级和学生维护当天作业反馈。" : "按日期查看孩子的作业内容和完成情况。"}}
-    </view>
-  </view>
+  <van-cell-group inset>
+    <van-cell
+      title="日期"
+      value="{{selectedDate}}"
+      is-link
+      bind:click="handleOpenDateCalendar"
+    />
+  </van-cell-group>
 
-  <view class="section">
-    <view class="section-title">日期筛选</view>
-    <view class="toolbar">
-      <button class="mini-button" data-offset="-1" bindtap="handleShiftDate">前一天</button>
-      <view class="date-chip">{{selectedDate}}</view>
-      <button class="mini-button" data-offset="1" bindtap="handleShiftDate">后一天</button>
-    </view>
-  </view>
+  <van-tabs
+    wx:if="{{canManage}}"
+    custom-class="block-gap"
+    active="{{managerMode}}"
+    bind:change="handleManagerModeChange"
+  >
+    <van-tab title="每日作业" name="assignment" />
+    <van-tab title="完成情况" name="feedback" />
+  </van-tabs>
 
-  <view class="section" wx:if="{{activeRole === 'guardian' && students.length > 0}}">
-    <view class="section-title">孩子切换</view>
-    <scroll-view class="chip-scroll" scroll-x>
-      <view class="chip-row">
-        <block wx:for="{{students}}" wx:key="id">
-          <view
-            class="student-chip {{selectedStudentId === item.id ? 'student-chip-active' : ''}}"
-            data-student-id="{{item.id}}"
-            bindtap="handleSelectStudent"
-          >
-            {{item.name}}
-          </view>
-        </block>
-      </view>
-    </scroll-view>
-  </view>
+  <van-tabs
+    wx:if="{{canManage && managerMode === 'assignment' && assignments.length > 0}}"
+    custom-class="block-gap"
+    active="{{activeAssignmentTab}}"
+    swipeable
+    animated
+    bind:change="handleAssignmentTabChange"
+  >
+    <block wx:for="{{assignments}}" wx:key="id">
+      <van-tab title="{{item.className || item.schoolName}}" />
+    </block>
+  </van-tabs>
 
-  <view class="section" wx:if="{{assignments.length > 0}}">
-    <view class="section-title">
-      {{activeRole === "teacher" ? "今日作业模板" : "今日老师布置"}}
-    </view>
-    <view class="list">
-      <block wx:for="{{assignments}}" wx:key="id">
-        <view
-          class="list-item {{canManage ? 'is-clickable' : ''}}"
-          data-assignment-id="{{item.id}}"
-          bindtap="handleSelectAssignment"
-        >
-          <view class="row-between">
-            <view class="list-title">{{item.schoolName}} · {{item.className}}</view>
-            <view class="tag">当天作业</view>
-          </view>
-          <view class="list-meta">{{item.content}}</view>
-          <view class="list-meta" wx:if="{{item.remark}}">{{item.remark}}</view>
-        </view>
-      </block>
-    </view>
-  </view>
-
-  <view class="section" wx:if="{{canManage && assignmentDraft}}">
-    <view class="section-title">编辑每日作业</view>
-    <view class="list-item">
-      <view class="list-title">{{assignmentDraft.schoolName}} · {{assignmentDraft.className}}</view>
-      <textarea
-        class="editor-textarea"
-        placeholder="填写当天老师统一布置的作业内容"
+  <van-panel
+    wx:if="{{canManage && managerMode === 'assignment' && assignmentDraft}}"
+    custom-class="block-gap"
+    title="{{assignmentDraft.schoolName}}"
+    desc="{{assignmentDraft.className}}"
+    status="{{assignmentDraft.studentCount}}人"
+  >
+    <van-cell-group border="{{false}}">
+      <van-field
+        label="作业"
+        type="textarea"
+        autosize
         value="{{assignmentDraft.content}}"
-        bindinput="handleAssignmentContentInput"
+        placeholder="作业"
+        bind:change="handleAssignmentContentInput"
       />
-      <textarea
-        class="editor-textarea compact"
-        placeholder="补充说明"
+      <van-field
+        label="备注"
+        type="textarea"
+        autosize
         value="{{assignmentDraft.remark}}"
-        bindinput="handleAssignmentRemarkInput"
+        placeholder="备注"
+        bind:change="handleAssignmentRemarkInput"
       />
-      <button class="action-button secondary" bindtap="handleSaveAssignment">保存每日作业</button>
-    </view>
-  </view>
+    </van-cell-group>
+  </van-panel>
 
-  <view class="section">
-    <view class="section-title">
-      {{canManage ? "学生作业反馈" : "当日作业反馈"}}
-    </view>
-    <view class="list" wx:if="{{records.length > 0}}">
-      <block wx:for="{{records}}" wx:key="id">
-        <view
-          class="list-item {{canManage ? 'is-clickable' : ''}}"
-          data-record-id="{{item.id}}"
-          bindtap="handleSelectHomeworkRecord"
-        >
-          <view class="row-between">
-            <view class="list-title">{{item.studentName}}</view>
-            <view class="tag">{{item.statusLabel}}</view>
-          </view>
-          <view class="list-meta">{{item.schoolName}} · {{item.className}}</view>
-          <view class="list-meta">{{item.assignmentContent}}</view>
-          <view class="list-meta">{{item.remark}}</view>
-          <view class="image-grid" wx:if="{{item.imageUrls && item.imageUrls.length > 0}}">
-            <block wx:for="{{item.imageUrls}}" wx:key="*this">
-              <image class="record-image" mode="aspectFill" src="{{item}}" />
-            </block>
-          </view>
-        </view>
-      </block>
-    </view>
-    <view class="empty-card" wx:else>当前日期还没有作业反馈。</view>
-  </view>
+  <van-tabs
+    wx:if="{{(!canManage || managerMode === 'feedback') && students.length > 0}}"
+    custom-class="block-gap"
+    active="{{activeStudentTab}}"
+    swipeable
+    animated
+    bind:change="handleStudentTabChange"
+  >
+    <block wx:for="{{students}}" wx:key="id">
+      <van-tab title="{{item.name}}" />
+    </block>
+  </van-tabs>
 
-  <view class="section" wx:if="{{canManage && homeworkEditorDraft}}">
-    <view class="section-title">编辑学生反馈</view>
-    <view class="list-item">
-      <view class="list-title">{{homeworkEditorDraft.studentName}}</view>
-      <view class="list-meta">{{homeworkEditorDraft.schoolName}} · {{homeworkEditorDraft.className}}</view>
-      <picker range="{{statusOptions}}" range-key="label" value="{{homeworkEditorDraft.statusIndex}}" bindchange="handleHomeworkStatusChange">
-        <view class="picker-field">当前状态：{{statusOptions[homeworkEditorDraft.statusIndex].label}}</view>
-      </picker>
-      <textarea
-        class="editor-textarea"
-        placeholder="填写作业反馈"
+  <van-panel
+    wx:if="{{(!canManage || managerMode === 'feedback') && currentRecord}}"
+    custom-class="block-gap"
+    title="{{currentRecord.studentName}}"
+    desc="{{currentRecord.schoolName}} {{currentRecord.className}}"
+    status="{{currentRecord.statusLabel}}"
+  >
+    <van-cell-group border="{{false}}">
+      <van-cell title="每日作业" value="{{currentRecord.assignmentContent ? '已录入' : '-'}}" />
+      <van-field
+        wx:if="{{currentRecord.assignmentContent}}"
+        label="内容"
+        readonly
+        type="textarea"
+        autosize
+        value="{{currentRecord.assignmentContent}}"
+      />
+      <van-field
+        wx:if="{{currentRecord.assignmentRemark}}"
+        label="备注"
+        readonly
+        type="textarea"
+        autosize
+        value="{{currentRecord.assignmentRemark}}"
+      />
+    </van-cell-group>
+  </van-panel>
+
+  <view wx:if="{{canManage && managerMode === 'feedback' && homeworkEditorDraft}}">
+    <van-radio-group
+      custom-class="block-gap"
+      value="{{homeworkEditorDraft.status}}"
+      bind:change="handleHomeworkStatusChange"
+    >
+      <van-cell-group inset>
+        <van-cell clickable data-name="pending" bind:click="handleHomeworkStatusChange">
+          <view slot="title">待处理</view>
+          <van-radio name="pending" slot="right-icon" />
+        </van-cell>
+        <van-cell clickable data-name="completed" bind:click="handleHomeworkStatusChange">
+          <view slot="title">已完成</view>
+          <van-radio name="completed" slot="right-icon" />
+        </van-cell>
+        <van-cell clickable data-name="partial" bind:click="handleHomeworkStatusChange">
+          <view slot="title">完成一部分</view>
+          <van-radio name="partial" slot="right-icon" />
+        </van-cell>
+      </van-cell-group>
+    </van-radio-group>
+
+    <van-cell-group custom-class="block-gap" inset>
+      <van-field
+        label="备注"
+        type="textarea"
+        autosize
         value="{{homeworkEditorDraft.remark}}"
-        bindinput="handleHomeworkRemarkInput"
+        placeholder="备注"
+        bind:change="handleHomeworkRemarkInput"
       />
-      <view class="image-grid" wx:if="{{homeworkEditorDraft.imageUrls && homeworkEditorDraft.imageUrls.length > 0}}">
-        <block wx:for="{{homeworkEditorDraft.imageUrls}}" wx:key="*this">
-          <view class="image-card">
-            <image class="record-image" mode="aspectFill" src="{{item}}" />
-            <view
-              class="image-remove"
-              data-image-url="{{item}}"
-              bindtap="handleRemoveHomeworkImage"
-            >
-              删除
-            </view>
-          </view>
-        </block>
-      </view>
-      <button class="action-button secondary" loading="{{uploadingImages}}" bindtap="handleChooseHomeworkImages">
-        {{uploadingImages ? "上传中..." : "上传作业图片"}}
-      </button>
-      <button class="action-button" bindtap="handleSaveHomeworkRecord">保存作业反馈</button>
-    </view>
+    </van-cell-group>
+
+    <van-uploader
+      custom-class="block-gap uploader-block"
+      file-list="{{homeworkEditorDraft.fileList}}"
+      multiple
+      max-count="3"
+      preview-full-image
+      bind:after-read="handleAfterReadImage"
+      bind:delete="handleDeleteImage"
+    />
+
+    <van-submit-bar
+      button-text="保存"
+      custom-class="submit-bar"
+      safe-area-inset-bottom
+      bind:submit="handleSaveHomeworkRecord"
+    />
   </view>
+
+  <van-cell-group
+    wx:if="{{!canManage && currentRecord}}"
+    custom-class="block-gap"
+    inset
+  >
+    <van-field label="完成情况" readonly value="{{currentRecord.statusLabel}}" />
+    <van-field
+      label="备注"
+      readonly
+      type="textarea"
+      autosize
+      value="{{currentRecord.remark || '-'}}"
+    />
+  </van-cell-group>
+
+  <van-uploader
+    wx:if="{{!canManage && currentRecord && currentRecord.fileList.length > 0}}"
+    custom-class="block-gap uploader-block"
+    file-list="{{currentRecord.fileList}}"
+    preview-full-image
+    show-upload="{{false}}"
+    deletable="{{false}}"
+  />
+
+  <view wx:if="{{canManage && managerMode === 'assignment' && assignmentDraft}}">
+    <van-submit-bar
+      button-text="保存"
+      custom-class="submit-bar"
+      safe-area-inset-bottom
+      bind:submit="handleSaveAssignment"
+    />
+  </view>
+
+  <view class="block-gap" wx:if="{{students.length === 0 && assignments.length === 0}}">
+    <van-empty description="无" />
+  </view>
+
+  <van-calendar
+    show="{{showDateCalendar}}"
+    color="#07c160"
+    poppable
+    bind:close="handleCloseDateCalendar"
+    bind:confirm="handleConfirmDate"
+  />
 </view>

@@ -1,6 +1,8 @@
 package studentservice
 
 import (
+	"strings"
+
 	"github.com/ydfk/edu-nexa/apps/api/internal/api/response"
 	model "github.com/ydfk/edu-nexa/apps/api/internal/model/studentservice"
 	"github.com/ydfk/edu-nexa/apps/api/pkg/db"
@@ -9,26 +11,23 @@ import (
 )
 
 type planPayload struct {
-	CampusID         string `json:"campusId"`
-	PaidAt           string `json:"paidAt"`
-	PaymentStatus    string `json:"paymentStatus"`
-	Remark           string `json:"remark"`
-	ServiceEndDate   string `json:"serviceEndDate"`
-	ServiceStartDate string `json:"serviceStartDate"`
-	StudentID        string `json:"studentId"`
+	PaymentAmount    float64 `json:"paymentAmount"`
+	PaidAt           string  `json:"paidAt"`
+	PaymentStatus    string  `json:"paymentStatus"`
+	Remark           string  `json:"remark"`
+	ServiceEndDate   string  `json:"serviceEndDate"`
+	ServiceStartDate string  `json:"serviceStartDate"`
+	StudentID        string  `json:"studentId"`
 }
 
 func List(c *fiber.Ctx) error {
 	var plans []model.Plan
 	query := db.DB.Order("service_end_date desc, created_at desc")
 
-	if studentID := c.Query("studentId"); studentID != "" {
+	if studentID := strings.TrimSpace(c.Query("studentId")); studentID != "" {
 		query = query.Where("student_id = ?", studentID)
 	}
-	if campusID := c.Query("campusId"); campusID != "" {
-		query = query.Where("campus_id = ?", campusID)
-	}
-	if paymentStatus := c.Query("paymentStatus"); paymentStatus != "" {
+	if paymentStatus := strings.TrimSpace(c.Query("paymentStatus")); paymentStatus != "" {
 		query = query.Where("payment_status = ?", paymentStatus)
 	}
 
@@ -45,18 +44,18 @@ func Create(c *fiber.Ctx) error {
 		return response.Error(c, "参数不正确")
 	}
 
-	if req.StudentID == "" || req.CampusID == "" {
-		return response.Error(c, "学生和校区不能为空")
+	if strings.TrimSpace(req.StudentID) == "" {
+		return response.Error(c, "学生不能为空")
 	}
 
 	plan := model.Plan{
-		CampusID:         req.CampusID,
-		PaidAt:           req.PaidAt,
+		PaymentAmount:    req.PaymentAmount,
+		PaidAt:           strings.TrimSpace(req.PaidAt),
 		PaymentStatus:    defaultPaymentStatus(req.PaymentStatus),
-		Remark:           req.Remark,
-		ServiceEndDate:   req.ServiceEndDate,
-		ServiceStartDate: req.ServiceStartDate,
-		StudentID:        req.StudentID,
+		Remark:           strings.TrimSpace(req.Remark),
+		ServiceEndDate:   strings.TrimSpace(req.ServiceEndDate),
+		ServiceStartDate: strings.TrimSpace(req.ServiceStartDate),
+		StudentID:        strings.TrimSpace(req.StudentID),
 	}
 
 	if err := db.DB.Create(&plan).Error; err != nil {
@@ -77,13 +76,13 @@ func Update(c *fiber.Ctx) error {
 		return response.Error(c, "服务计划不存在")
 	}
 
-	plan.CampusID = req.CampusID
-	plan.PaidAt = req.PaidAt
+	plan.PaymentAmount = req.PaymentAmount
+	plan.PaidAt = strings.TrimSpace(req.PaidAt)
 	plan.PaymentStatus = defaultPaymentStatus(req.PaymentStatus)
-	plan.Remark = req.Remark
-	plan.ServiceEndDate = req.ServiceEndDate
-	plan.ServiceStartDate = req.ServiceStartDate
-	plan.StudentID = req.StudentID
+	plan.Remark = strings.TrimSpace(req.Remark)
+	plan.ServiceEndDate = strings.TrimSpace(req.ServiceEndDate)
+	plan.ServiceStartDate = strings.TrimSpace(req.ServiceStartDate)
+	plan.StudentID = strings.TrimSpace(req.StudentID)
 
 	if err := db.DB.Save(&plan).Error; err != nil {
 		return response.Error(c, "更新服务计划失败")
@@ -93,9 +92,9 @@ func Update(c *fiber.Ctx) error {
 }
 
 func defaultPaymentStatus(status string) string {
-	if status == "" {
+	if strings.TrimSpace(status) == "" {
 		return "unpaid"
 	}
 
-	return status
+	return strings.TrimSpace(status)
 }

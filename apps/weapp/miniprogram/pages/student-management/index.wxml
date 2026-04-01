@@ -1,81 +1,178 @@
 <view class="page">
-  <view class="hero">
-    <view class="hero-title">学生与缴费管理</view>
-    <view class="hero-subtitle">
-      {{canEdit ? "维护学生、监护人和服务有效期。" : "当前角色没有学生管理权限。"}}
-    </view>
+  <van-cell-group inset>
+    <van-cell
+      wx:if="{{canEdit}}"
+      title="新增学生"
+      is-link
+      bind:click="handleCreateStudent"
+    />
+  </van-cell-group>
+
+  <van-tabs
+    wx:if="{{students.length > 0}}"
+    custom-class="block-gap"
+    active="{{activeStudentTab}}"
+    swipeable
+    animated
+    bind:change="handleStudentTabChange"
+  >
+    <block wx:for="{{students}}" wx:key="id">
+      <van-tab title="{{item.name}}" />
+    </block>
+  </van-tabs>
+
+  <van-panel
+    wx:if="{{!canEdit && students.length > 0}}"
+    custom-class="block-gap"
+    title="{{students[activeStudentTab].name}}"
+    desc="{{students[activeStudentTab].schoolName}} {{students[activeStudentTab].className}}"
+  >
+    <van-cell-group border="{{false}}">
+      <van-cell title="校区" value="{{students[activeStudentTab].campusName || '-'}}" />
+      <van-cell title="监护人" value="{{students[activeStudentTab].guardianName || '-'}}" />
+      <van-cell title="手机号" value="{{students[activeStudentTab].guardianPhone || '-'}}" />
+    </van-cell-group>
+  </van-panel>
+
+  <view class="block-gap" wx:if="{{students.length === 0 && !canEdit}}">
+    <van-empty description="无" />
   </view>
 
-  <view class="section" wx:if="{{students.length > 0}}">
-    <view class="row-between">
-      <view class="section-title">学生列表</view>
-      <button class="mini-button" wx:if="{{canEdit}}" bindtap="handleCreateStudent">新增学生</button>
-    </view>
-    <scroll-view class="chip-scroll" scroll-x>
-      <view class="chip-row">
-        <block wx:for="{{students}}" wx:key="id">
-          <view
-            class="student-chip {{selectedStudentId === item.id ? 'student-chip-active' : ''}}"
-            data-student-id="{{item.id}}"
-            bindtap="handleSelectStudent"
-          >
-            {{item.name}}
-          </view>
-        </block>
-      </view>
-    </scroll-view>
-  </view>
+  <view wx:if="{{canEdit && draft && serviceDraft}}">
+    <van-cell-group custom-class="block-gap" inset>
+      <van-cell
+        title="校区"
+        value="{{campuses[draft.campusIndex] ? campuses[draft.campusIndex].name : '-'}}"
+        is-link
+        bind:click="handleOpenCampusPicker"
+      />
+      <van-field
+        label="姓名"
+        value="{{draft.name}}"
+        data-field="name"
+        placeholder="姓名"
+        bind:change="handleFieldInput"
+      />
+      <van-field
+        label="学校"
+        value="{{draft.schoolName}}"
+        data-field="schoolName"
+        placeholder="学校"
+        bind:change="handleFieldInput"
+      />
+      <van-field
+        label="班级"
+        value="{{draft.className}}"
+        data-field="className"
+        placeholder="班级"
+        bind:change="handleFieldInput"
+      />
+      <van-field
+        label="年级"
+        value="{{draft.grade}}"
+        data-field="grade"
+        placeholder="年级"
+        bind:change="handleFieldInput"
+      />
+      <van-field
+        label="监护人"
+        value="{{draft.guardianName}}"
+        data-field="guardianName"
+        placeholder="监护人"
+        bind:change="handleFieldInput"
+      />
+      <van-field
+        label="手机号"
+        type="number"
+        value="{{draft.guardianPhone}}"
+        data-field="guardianPhone"
+        placeholder="手机号"
+        bind:change="handleFieldInput"
+      />
+    </van-cell-group>
 
-  <view class="section" wx:elif="{{canEdit}}">
-    <view class="row-between">
-      <view class="section-title">学生列表</view>
-      <button class="mini-button" bindtap="handleCreateStudent">新增学生</button>
-    </view>
-    <view class="empty-card">当前还没有学生，先新增第一位学生。</view>
-  </view>
+    <van-radio-group
+      custom-class="block-gap"
+      value="{{serviceDraft.paymentStatus}}"
+      bind:change="handlePaymentStatusChange"
+    >
+      <van-cell-group inset>
+        <van-cell clickable data-name="paid" bind:click="handlePaymentStatusChange">
+          <view slot="title">已缴费</view>
+          <van-radio name="paid" slot="right-icon" />
+        </van-cell>
+        <van-cell clickable data-name="unpaid" bind:click="handlePaymentStatusChange">
+          <view slot="title">待缴费</view>
+          <van-radio name="unpaid" slot="right-icon" />
+        </van-cell>
+        <van-cell clickable data-name="paused" bind:click="handlePaymentStatusChange">
+          <view slot="title">已暂停</view>
+          <van-radio name="paused" slot="right-icon" />
+        </van-cell>
+      </van-cell-group>
+    </van-radio-group>
 
-  <view class="section" wx:if="{{canEdit && draft}}">
-    <view class="section-title">学生资料</view>
-    <view class="list-item">
-      <picker range="{{campuses}}" range-key="name" value="{{draft.campusIndex}}" bindchange="handleCampusChange">
-        <view class="picker-field">
-          所属校区：{{campuses[draft.campusIndex] ? campuses[draft.campusIndex].name : "请选择"}}
-        </view>
-      </picker>
-      <input class="picker-field" placeholder="学生姓名" value="{{draft.name}}" data-field="name" bindinput="handleFieldInput" />
-      <input class="picker-field" placeholder="学校名称" value="{{draft.schoolName}}" data-field="schoolName" bindinput="handleFieldInput" />
-      <input class="picker-field" placeholder="班级名称" value="{{draft.className}}" data-field="className" bindinput="handleFieldInput" />
-      <input class="picker-field" placeholder="年级" value="{{draft.grade}}" data-field="grade" bindinput="handleFieldInput" />
-      <input class="picker-field" placeholder="监护人姓名" value="{{draft.guardianName}}" data-field="guardianName" bindinput="handleFieldInput" />
-      <input class="picker-field" placeholder="监护人手机号" type="number" value="{{draft.guardianPhone}}" data-field="guardianPhone" bindinput="handleFieldInput" />
-    </view>
-  </view>
-
-  <view class="section" wx:if="{{canEdit && serviceDraft}}">
-    <view class="section-title">缴费与服务期</view>
-    <view class="list-item">
-      <picker range="{{paymentStatusOptions}}" range-key="label" value="{{serviceDraft.paymentStatusIndex}}" bindchange="handlePaymentStatusChange">
-        <view class="picker-field">
-          缴费状态：{{paymentStatusOptions[serviceDraft.paymentStatusIndex].label}}
-        </view>
-      </picker>
-      <picker mode="date" value="{{serviceDraft.paidAt}}" data-field="paidAt" bindchange="handleServiceDateChange">
-        <view class="picker-field">缴费时间：{{serviceDraft.paidAt || "请选择"}}</view>
-      </picker>
-      <picker mode="date" value="{{serviceDraft.serviceStartDate}}" data-field="serviceStartDate" bindchange="handleServiceDateChange">
-        <view class="picker-field">服务开始：{{serviceDraft.serviceStartDate || "请选择"}}</view>
-      </picker>
-      <picker mode="date" value="{{serviceDraft.serviceEndDate}}" data-field="serviceEndDate" bindchange="handleServiceDateChange">
-        <view class="picker-field">服务结束：{{serviceDraft.serviceEndDate || "请选择"}}</view>
-      </picker>
-      <textarea
-        class="editor-textarea compact"
-        placeholder="备注，例如月度托管、待续费"
+    <van-cell-group custom-class="block-gap" inset>
+      <van-cell
+        title="缴费时间"
+        value="{{serviceDraft.paidAt || '-'}}"
+        is-link
+        data-field="paidAt"
+        bind:click="handleOpenDateCalendar"
+      />
+      <van-cell
+        title="开始日期"
+        value="{{serviceDraft.serviceStartDate || '-'}}"
+        is-link
+        data-field="serviceStartDate"
+        bind:click="handleOpenDateCalendar"
+      />
+      <van-cell
+        title="结束日期"
+        value="{{serviceDraft.serviceEndDate || '-'}}"
+        is-link
+        data-field="serviceEndDate"
+        bind:click="handleOpenDateCalendar"
+      />
+      <van-field
+        label="备注"
+        type="textarea"
+        autosize
         value="{{serviceDraft.remark}}"
         data-field="remark"
-        bindinput="handleServiceFieldInput"
+        placeholder="备注"
+        bind:change="handleServiceFieldInput"
       />
-      <button class="action-button" bindtap="handleSave">保存学生与缴费信息</button>
-    </view>
+    </van-cell-group>
+
+    <van-submit-bar
+      button-text="保存"
+      custom-class="submit-bar"
+      safe-area-inset-bottom
+      bind:submit="handleSave"
+    />
   </view>
+
+  <van-popup
+    show="{{showCampusPicker}}"
+    position="bottom"
+    round
+    bind:close="handleCloseCampusPicker"
+  >
+    <van-picker
+      columns="{{campusColumns}}"
+      show-toolbar
+      value-key="text"
+      bind:cancel="handleCloseCampusPicker"
+      bind:confirm="handleConfirmCampus"
+    />
+  </van-popup>
+
+  <van-calendar
+    show="{{showDateCalendar}}"
+    color="#07c160"
+    poppable
+    bind:close="handleCloseDateCalendar"
+    bind:confirm="handleConfirmDate"
+  />
 </view>

@@ -15,23 +15,23 @@ export type HomeConfig = {
 };
 
 const defaultHomeConfig: HomeConfig = {
-  announcement: "首页介绍、图片和公告都可以在后台统一配置。",
+  announcement: "",
   banners: [
     {
-      id: "banner-campus",
-      image: "/assets/intro-campus.svg",
-      subtitle: "首页介绍、图片和公告都可以在后台统一配置。",
-      title: "机构介绍和服务说明先在首页讲清楚",
+      id: "banner-service",
+      image: "",
+      subtitle: "",
+      title: "",
     },
     {
       id: "banner-feedback",
-      image: "/assets/intro-feedback.svg",
-      subtitle: "教师记录，监护人按日期查看，多学生家庭支持切换。",
-      title: "晚辅用餐和作业反馈是当前两条主链路",
+      image: "",
+      subtitle: "",
+      title: "",
     },
   ],
-  heroSubtitle: "首页介绍、用餐反馈、作业反馈都围绕晚辅主链路展开。",
-  heroTitle: "教师记录，监护人查看。",
+  heroSubtitle: "",
+  heroTitle: "",
 };
 
 let mockHomeConfig = cloneHomeConfig(defaultHomeConfig);

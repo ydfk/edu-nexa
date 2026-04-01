@@ -1,3 +1,17 @@
 .page {
-  padding-bottom: 48rpx;
+  padding-bottom: 56rpx;
+}
+
+.block-gap {
+  margin-top: 24rpx;
+}
+
+.uploader-block {
+  padding: 0 16rpx;
+  box-sizing: border-box;
+}
+
+.submit-bar {
+  position: sticky;
+  bottom: 0;
 }

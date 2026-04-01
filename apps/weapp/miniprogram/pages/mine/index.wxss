@@ -1,3 +1,16 @@
 .page {
-  padding-bottom: 48rpx;
+  padding-bottom: 56rpx;
+}
+
+.block-gap {
+  margin-top: 24rpx;
+}
+
+.block-gap-sm {
+  margin-top: 16rpx;
+}
+
+.full-button {
+  width: 100%;
+  margin: 0 !important;
 }
