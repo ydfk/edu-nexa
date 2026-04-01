@@ -12,4 +12,6 @@ func RegisterUnProtectedRoutes(router *fiber.App) {
 func RegisterRoutes(router fiber.Router) {
 	grp := router.Group("/auth")
 	grp.Get("/profile", Profile)
+	grp.Put("/profile", UpdateProfile)
+	grp.Post("/change-password", ChangePassword)
 }

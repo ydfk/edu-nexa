@@ -49,7 +49,7 @@ export const appNavigation: AppNavGroup[] = [
       {
         href: "/teachers",
         icon: UserCog,
-        label: "教师账号",
+        label: "教师管理",
         roles: ["admin"],
       },
       {
@@ -61,7 +61,7 @@ export const appNavigation: AppNavGroup[] = [
       {
         href: "/guardians",
         icon: Users,
-        label: "监护人",
+        label: "家长管理",
         roles: ["admin", "teacher"],
       },
       {
@@ -115,7 +115,7 @@ export function getPageMeta(pathname: string) {
   }
 
   return {
-    title: "学栖 · EduNexa",
+    title: "EduNexa",
     description: "",
   };
 }

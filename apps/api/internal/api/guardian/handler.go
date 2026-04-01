@@ -33,7 +33,7 @@ func List(c *fiber.Ctx) error {
 	}
 
 	if err := query.Find(&bindings).Error; err != nil {
-		return response.Error(c, "查询监护人关系失败")
+		return response.Error(c, "查询家长关系失败")
 	}
 
 	return response.Success(c, bindings)
@@ -46,7 +46,7 @@ func Create(c *fiber.Ctx) error {
 	}
 
 	if req.StudentID == "" || req.GuardianName == "" || req.GuardianPhone == "" {
-		return response.Error(c, "学生、监护人姓名和手机号不能为空")
+		return response.Error(c, "学生、家长姓名和手机号不能为空")
 	}
 
 	binding := model.Binding{
@@ -60,7 +60,7 @@ func Create(c *fiber.Ctx) error {
 	}
 
 	if err := db.DB.Create(&binding).Error; err != nil {
-		return response.Error(c, "创建监护人关系失败")
+		return response.Error(c, "创建家长关系失败")
 	}
 
 	return response.Success(c, binding)
@@ -74,7 +74,7 @@ func Update(c *fiber.Ctx) error {
 
 	var binding model.Binding
 	if err := db.DB.First(&binding, "id = ?", c.Params("id")).Error; err != nil {
-		return response.Error(c, "监护人关系不存在")
+		return response.Error(c, "家长关系不存在")
 	}
 
 	binding.GuardianName = req.GuardianName
@@ -86,7 +86,7 @@ func Update(c *fiber.Ctx) error {
 	binding.StudentID = req.StudentID
 
 	if err := db.DB.Save(&binding).Error; err != nil {
-		return response.Error(c, "更新监护人关系失败")
+		return response.Error(c, "更新家长关系失败")
 	}
 
 	return response.Success(c, binding)

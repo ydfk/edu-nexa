@@ -1,16 +1,10 @@
 import {
   BarChart3,
   BookOpenCheck,
-  Bug,
   CalendarRange,
   ClipboardList,
-  FileX,
-  GraduationCap,
   LayoutDashboard,
-  Lock,
-  Palette,
   School2,
-  ServerOff,
   Settings,
   Soup,
   UserCog,
@@ -35,9 +29,6 @@ export function buildSidebarData(
       avatar: "",
       roles,
     },
-    teams: [
-      { name: "学栖 · EduNexa", logo: GraduationCap, plan: "管理后台" },
-    ],
     navGroups: [
       {
         title: "概览",
@@ -52,12 +43,12 @@ export function buildSidebarData(
         title: "管理",
         items: [
           ...(isAdmin
-            ? [{ title: "教师账号", url: "/teachers", icon: UserCog }]
+            ? [{ title: "教师管理", url: "/teachers", icon: UserCog }]
             : []),
           ...(isAdminOrTeacher
             ? [
                 { title: "学校管理", url: "/schools", icon: School2 },
-                { title: "监护人", url: "/guardians", icon: Users },
+                { title: "家长管理", url: "/guardians", icon: Users },
                 { title: "学生管理", url: "/students", icon: Users },
               ]
             : []),
@@ -80,25 +71,12 @@ export function buildSidebarData(
         ],
       },
       {
-        title: "其他",
+        title: "设置",
         items: [
-          {
-            title: "系统设置",
-            icon: Settings,
-            items: [
-              { title: "个人资料", url: "/settings", icon: UserCog },
-              { title: "外观设置", url: "/settings/appearance", icon: Palette },
-            ],
-          },
-          {
-            title: "错误页面",
-            icon: Bug,
-            items: [
-              { title: "访问限制", url: "/errors/unauthorized", icon: Lock },
-              { title: "页面不存在", url: "/errors/not-found", icon: FileX },
-              { title: "服务器错误", url: "/errors/server-error", icon: ServerOff },
-            ],
-          },
+          { title: "个人设置", url: "/settings", icon: UserCog },
+          ...(isAdmin
+            ? [{ title: "系统设置", url: "/settings/system", icon: Settings }]
+            : []),
         ],
       },
     ].filter((group) => group.items.length > 0),

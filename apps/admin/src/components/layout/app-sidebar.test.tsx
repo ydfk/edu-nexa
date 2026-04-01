@@ -27,8 +27,9 @@ test("shows product navigation entries", () => {
 
   expect(screen.getByText("工作台")).toBeInTheDocument();
   expect(screen.getByText("统计看板")).toBeInTheDocument();
-  expect(screen.getByText("教师账号")).toBeInTheDocument();
+  expect(screen.getByText("教师管理")).toBeInTheDocument();
   expect(screen.getByText("学校管理")).toBeInTheDocument();
+  expect(screen.getByText("家长管理")).toBeInTheDocument();
   expect(screen.getByText("用餐记录")).toBeInTheDocument();
   expect(screen.getByText("每日作业")).toBeInTheDocument();
 });

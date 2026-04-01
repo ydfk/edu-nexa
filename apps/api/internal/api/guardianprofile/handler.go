@@ -30,7 +30,7 @@ func List(c *fiber.Ctx) error {
 	}
 
 	if err := query.Find(&items).Error; err != nil {
-		return response.Error(c, "查询监护人失败")
+		return response.Error(c, "查询家长失败")
 	}
 
 	return response.Success(c, items)
@@ -42,7 +42,12 @@ func Create(c *fiber.Ctx) error {
 		return response.Error(c, "参数不正确")
 	}
 	if strings.TrimSpace(req.Name) == "" || strings.TrimSpace(req.Phone) == "" {
-		return response.Error(c, "监护人姓名和手机号不能为空")
+		return response.Error(c, "家长姓名和手机号不能为空")
+	}
+	if exists, err := existsPhone(strings.TrimSpace(req.Phone), ""); err != nil {
+		return response.Error(c, "校验家长手机号失败")
+	} else if exists {
+		return response.Error(c, "家长手机号已存在")
 	}
 
 	item := model.Profile{
@@ -53,7 +58,7 @@ func Create(c *fiber.Ctx) error {
 		Status:       defaultGuardianStatus(req.Status),
 	}
 	if err := db.DB.Create(&item).Error; err != nil {
-		return response.Error(c, "创建监护人失败")
+		return response.Error(c, "创建家长失败")
 	}
 
 	return response.Success(c, item)
@@ -64,10 +69,18 @@ func Update(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		return response.Error(c, "参数不正确")
 	}
+	if strings.TrimSpace(req.Name) == "" || strings.TrimSpace(req.Phone) == "" {
+		return response.Error(c, "家长姓名和手机号不能为空")
+	}
 
 	var item model.Profile
 	if err := db.DB.First(&item, "id = ?", c.Params("id")).Error; err != nil {
-		return response.Error(c, "监护人不存在")
+		return response.Error(c, "家长不存在")
+	}
+	if exists, err := existsPhone(strings.TrimSpace(req.Phone), c.Params("id")); err != nil {
+		return response.Error(c, "校验家长手机号失败")
+	} else if exists {
+		return response.Error(c, "家长手机号已存在")
 	}
 
 	item.Name = strings.TrimSpace(req.Name)
@@ -76,7 +89,7 @@ func Update(c *fiber.Ctx) error {
 	item.Remark = strings.TrimSpace(req.Remark)
 	item.Status = defaultGuardianStatus(req.Status)
 	if err := db.DB.Save(&item).Error; err != nil {
-		return response.Error(c, "更新监护人失败")
+		return response.Error(c, "更新家长失败")
 	}
 
 	return response.Success(c, item)
@@ -88,4 +101,18 @@ func defaultGuardianStatus(status string) string {
 	}
 
 	return strings.TrimSpace(status)
+}
+
+func existsPhone(phone string, currentID string) (bool, error) {
+	var count int64
+	query := db.DB.Model(&model.Profile{}).Where("phone = ?", phone)
+	if currentID != "" {
+		query = query.Where("id <> ?", currentID)
+	}
+
+	if err := query.Count(&count).Error; err != nil {
+		return false, err
+	}
+
+	return count > 0, nil
 }

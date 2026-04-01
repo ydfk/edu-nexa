@@ -68,6 +68,9 @@ func Create(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		return response.Error(c, "参数不正确")
 	}
+	req.DisplayName = strings.TrimSpace(req.DisplayName)
+	req.Phone = strings.TrimSpace(req.Phone)
+	req.Roles = normalizeRoles(req.Roles)
 
 	if req.Phone == "" || req.Password == "" || len(req.Roles) == 0 {
 		return response.Error(c, "手机号、密码和角色不能为空")
@@ -158,16 +161,7 @@ func splitRoles(raw string) []string {
 }
 
 func joinRoles(roles []string) string {
-	items := make([]string, 0, len(roles))
-	for _, role := range roles {
-		trimmed := strings.TrimSpace(role)
-		if trimmed == "" {
-			continue
-		}
-		items = append(items, trimmed)
-	}
-
-	return strings.Join(items, ",")
+	return strings.Join(normalizeRoles(roles), ",")
 }
 
 func hasRole(raw string, expected string) bool {
@@ -178,4 +172,22 @@ func hasRole(raw string, expected string) bool {
 	}
 
 	return false
+}
+
+func normalizeRoles(roles []string) []string {
+	items := make([]string, 0, len(roles))
+	seen := make(map[string]struct{}, len(roles))
+	for _, role := range roles {
+		trimmed := strings.TrimSpace(role)
+		if trimmed == "" {
+			continue
+		}
+		if _, ok := seen[trimmed]; ok {
+			continue
+		}
+		seen[trimmed] = struct{}{}
+		items = append(items, trimmed)
+	}
+
+	return items
 }

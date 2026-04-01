@@ -14,8 +14,9 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { CircleCheck, CirclePause, UserPen, UserPlus } from "lucide-react";
+import { AlertTriangle, CircleCheck, CirclePause, UserPen, UserPlus } from "lucide-react";
 import { toast } from "sonner";
+import { NameReminderAlert } from "@/components/domain/name-reminder-alert";
 import {
   DataTableColumnHeader,
   DataTablePagination,
@@ -23,6 +24,7 @@ import {
 } from "@/components/data-table";
 import { LongText } from "@/components/long-text";
 import { PageContent } from "@/components/page-content";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -41,6 +43,16 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { findSimilarNames, hasExactName } from "@/lib/name-check";
+import {
+  emptyRelationshipValue,
+  parentRelationshipOptions,
+} from "@/lib/parent-relationships";
+import {
+  fetchGuardianProfiles,
+  saveGuardianProfile,
+  type GuardianProfileItem,
+} from "@/lib/server-data";
 import {
   Select,
   SelectContent,
@@ -58,15 +70,6 @@ import {
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import useDialogState from "@/hooks/use-dialog-state";
-import {
-  fetchGuardianProfiles,
-  saveGuardianProfile,
-  type GuardianProfileItem,
-} from "@/lib/server-data";
-
-// ---------------------------------------------------------------------------
-// Constants & types
-// ---------------------------------------------------------------------------
 
 type GuardianDialogType = "create" | "edit";
 
@@ -89,33 +92,28 @@ const initialForm = {
   status: "active",
 };
 
-// ---------------------------------------------------------------------------
-// Context – dialog state provider (shadcn-admin pattern)
-// ---------------------------------------------------------------------------
-
 type GuardiansContextValue = {
-  open: GuardianDialogType | null;
-  setOpen: (value: GuardianDialogType | null) => void;
   currentItem: GuardianProfileItem | null;
+  open: GuardianDialogType | null;
   setCurrentItem: (item: GuardianProfileItem | null) => void;
+  setOpen: (value: GuardianDialogType | null) => void;
 };
 
 const GuardiansContext = createContext<GuardiansContextValue | null>(null);
 
 function useGuardians() {
   const ctx = useContext(GuardiansContext);
-  if (!ctx) throw new Error("useGuardians must be used within GuardiansProvider");
+  if (!ctx) {
+    throw new Error("useGuardians must be used within GuardiansProvider");
+  }
+
   return ctx;
 }
-
-// ---------------------------------------------------------------------------
-// Column definitions
-// ---------------------------------------------------------------------------
 
 const columns: ColumnDef<GuardianProfileItem>[] = [
   {
     accessorKey: "name",
-    header: ({ column }) => <DataTableColumnHeader column={column} title="监护人" />,
+    header: ({ column }) => <DataTableColumnHeader column={column} title="家长" />,
     cell: ({ row }) => <div className="font-medium">{row.getValue("name")}</div>,
   },
   {
@@ -150,7 +148,8 @@ const columns: ColumnDef<GuardianProfileItem>[] = [
   {
     id: "actions",
     cell: function ActionsCell({ row }) {
-      const { setOpen, setCurrentItem } = useGuardians();
+      const { setCurrentItem, setOpen } = useGuardians();
+
       return (
         <DropdownMenu modal={false}>
           <DropdownMenuTrigger asChild>
@@ -170,9 +169,7 @@ const columns: ColumnDef<GuardianProfileItem>[] = [
               编辑
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onSelect={() => navigator.clipboard.writeText(row.original.id)}
-            >
+            <DropdownMenuItem onSelect={() => navigator.clipboard.writeText(row.original.id)}>
               复制 ID
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -184,16 +181,14 @@ const columns: ColumnDef<GuardianProfileItem>[] = [
   },
 ];
 
-// ---------------------------------------------------------------------------
-// Guardian form dialog
-// ---------------------------------------------------------------------------
-
 function GuardianFormDialog({
+  items,
   onSaved,
 }: {
+  items: GuardianProfileItem[];
   onSaved: () => void;
 }) {
-  const { open, setOpen, currentItem } = useGuardians();
+  const { currentItem, open, setOpen } = useGuardians();
   const isEdit = open === "edit";
   const isOpen = open === "create" || open === "edit";
 
@@ -215,9 +210,19 @@ function GuardianFormDialog({
     }
   }, [open, currentItem, isEdit]);
 
+  const exactDuplicate = hasExactName(items, form.name, form.id);
+  const similarItems = findSimilarNames(items, form.name, form.id);
+  const phoneExists = items.some(
+    (item) => item.id !== form.id && item.phone.trim() === form.phone.trim(),
+  );
+
   async function handleSave() {
     if (!form.name.trim() || !form.phone.trim()) {
-      toast.error("监护人姓名和手机号不能为空");
+      toast.error("家长姓名和手机号不能为空");
+      return;
+    }
+    if (phoneExists) {
+      toast.error("家长手机号已存在");
       return;
     }
 
@@ -245,7 +250,7 @@ function GuardianFormDialog({
     <Dialog open={isOpen} onOpenChange={() => setOpen(null)}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{isEdit ? "编辑监护人" : "新增监护人"}</DialogTitle>
+          <DialogTitle>{isEdit ? "编辑家长" : "新增家长"}</DialogTitle>
         </DialogHeader>
         <div className="grid gap-4 py-2">
           <div className="grid gap-2">
@@ -258,6 +263,7 @@ function GuardianFormDialog({
               }
             />
           </div>
+          <NameReminderAlert exact={exactDuplicate} label="家长" similarItems={similarItems} />
           <div className="grid gap-2">
             <Label htmlFor="guardian-phone">手机号</Label>
             <Input
@@ -268,15 +274,36 @@ function GuardianFormDialog({
               }
             />
           </div>
+          {phoneExists ? (
+            <Alert variant="destructive">
+              <AlertTriangle className="size-4" />
+              <AlertTitle>手机号已存在</AlertTitle>
+              <AlertDescription>当前手机号已被其他家长使用。</AlertDescription>
+            </Alert>
+          ) : null}
           <div className="grid gap-2">
-            <Label htmlFor="guardian-relationship">关系</Label>
-            <Input
-              id="guardian-relationship"
-              value={form.relationship}
-              onChange={(event) =>
-                setForm((current) => ({ ...current, relationship: event.target.value }))
+            <Label>关系</Label>
+            <Select
+              value={form.relationship || emptyRelationshipValue}
+              onValueChange={(value) =>
+                setForm((current) => ({
+                  ...current,
+                  relationship: value === emptyRelationshipValue ? "" : value,
+                }))
               }
-            />
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="可不填写" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={emptyRelationshipValue}>不填写</SelectItem>
+                {parentRelationshipOptions.map((item) => (
+                  <SelectItem key={item} value={item}>
+                    {item}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="grid gap-2">
             <Label>状态</Label>
@@ -307,7 +334,7 @@ function GuardianFormDialog({
           </div>
         </div>
         <DialogFooter>
-          <Button disabled={saving} onClick={handleSave}>
+          <Button disabled={saving || phoneExists} onClick={handleSave}>
             {saving ? "保存中..." : "保存"}
           </Button>
         </DialogFooter>
@@ -315,10 +342,6 @@ function GuardianFormDialog({
     </Dialog>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Page component
-// ---------------------------------------------------------------------------
 
 export default function GuardiansPage() {
   const [open, setOpen] = useDialogState<GuardianDialogType>();
@@ -364,35 +387,32 @@ export default function GuardiansPage() {
       const keyword = filterValue.toLowerCase();
       return [row.original.name, row.original.phone, row.original.relationship]
         .filter(Boolean)
-        .some((v) => v.toLowerCase().includes(keyword));
+        .some((value) => value.toLowerCase().includes(keyword));
     },
   });
 
   const contextValue = useMemo<GuardiansContextValue>(
-    () => ({ open, setOpen, currentItem, setCurrentItem }),
-    [open, setOpen, currentItem],
+    () => ({ currentItem, open, setCurrentItem, setOpen }),
+    [currentItem, open, setOpen],
   );
 
   return (
     <GuardiansContext.Provider value={contextValue}>
       <PageContent>
-        {/* Title section */}
         <div className="mb-2 flex flex-wrap items-center justify-between gap-x-4 space-y-2">
           <div>
-            <h2 className="text-2xl font-bold tracking-tight">监护人</h2>
-            <p className="text-muted-foreground">管理学生监护人信息</p>
+            <h2 className="text-2xl font-bold tracking-tight">家长管理</h2>
+            <p className="text-muted-foreground">管理学生家长信息</p>
           </div>
           <Button className="space-x-1" onClick={() => setOpen("create")}>
-            <span>新增监护人</span> <UserPlus size={18} />
+            <span>新增家长</span>
+            <UserPlus size={18} />
           </Button>
         </div>
 
-        {/* Data table */}
         <div className="-mx-4 flex-1 overflow-auto px-4 py-1 lg:flex-row lg:space-x-12 lg:space-y-0">
           {loading ? (
-            <div className="py-8 text-center text-sm text-muted-foreground">
-              加载中…
-            </div>
+            <div className="py-8 text-center text-sm text-muted-foreground">加载中…</div>
           ) : (
             <div className="space-y-4">
               <DataTableToolbar
@@ -402,10 +422,10 @@ export default function GuardiansPage() {
                   {
                     columnId: "status",
                     title: "状态",
-                    options: statusOptions.map((o) => ({
-                      label: o.label,
-                      value: o.value,
-                      icon: o.icon,
+                    options: statusOptions.map((item) => ({
+                      label: item.label,
+                      value: item.value,
+                      icon: item.icon,
                     })),
                   },
                 ]}
@@ -420,17 +440,14 @@ export default function GuardiansPage() {
                           <TableHead key={header.id} colSpan={header.colSpan}>
                             {header.isPlaceholder
                               ? null
-                              : flexRender(
-                                  header.column.columnDef.header,
-                                  header.getContext(),
-                                )}
+                              : flexRender(header.column.columnDef.header, header.getContext())}
                           </TableHead>
                         ))}
                       </TableRow>
                     ))}
                   </TableHeader>
                   <TableBody>
-                    {table.getRowModel().rows?.length ? (
+                    {table.getRowModel().rows.length ? (
                       table.getRowModel().rows.map((row) => (
                         <TableRow key={row.id} className="group/row">
                           {row.getVisibleCells().map((cell) => (
@@ -438,20 +455,14 @@ export default function GuardiansPage() {
                               key={cell.id}
                               className="bg-background group-hover/row:bg-muted"
                             >
-                              {flexRender(
-                                cell.column.columnDef.cell,
-                                cell.getContext(),
-                              )}
+                              {flexRender(cell.column.columnDef.cell, cell.getContext())}
                             </TableCell>
                           ))}
                         </TableRow>
                       ))
                     ) : (
                       <TableRow>
-                        <TableCell
-                          colSpan={columns.length}
-                          className="h-24 text-center"
-                        >
+                        <TableCell colSpan={columns.length} className="h-24 text-center">
                           暂无数据
                         </TableCell>
                       </TableRow>
@@ -465,8 +476,7 @@ export default function GuardiansPage() {
           )}
         </div>
 
-        {/* Dialogs */}
-        <GuardianFormDialog onSaved={loadData} />
+        <GuardianFormDialog items={items} onSaved={loadData} />
       </PageContent>
     </GuardiansContext.Provider>
   );

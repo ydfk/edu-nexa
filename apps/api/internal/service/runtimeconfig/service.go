@@ -2,6 +2,7 @@ package runtimeconfig
 
 import (
 	"errors"
+	"strings"
 
 	model "github.com/ydfk/edu-nexa/apps/api/internal/model/runtimeconfig"
 	"github.com/ydfk/edu-nexa/apps/api/pkg/config"
@@ -12,6 +13,7 @@ import (
 const runtimeScene = "app-runtime"
 
 type Snapshot struct {
+	SystemNamePrefix    string `json:"systemNamePrefix"`
 	ImageSecurityEnable bool   `json:"imageSecurityEnable"`
 	ImageSecurityStrict bool   `json:"imageSecurityStrict"`
 	Scene               string `json:"scene"`
@@ -27,6 +29,7 @@ func GetSnapshot() (*Snapshot, error) {
 	}
 
 	return &Snapshot{
+		SystemNamePrefix:    normalizeSystemNamePrefix(record.SystemNamePrefix),
 		ImageSecurityEnable: record.ImageSecurityEnable,
 		ImageSecurityStrict: record.ImageSecurityStrict,
 		Scene:               record.Scene,
@@ -42,6 +45,7 @@ func SaveSnapshot(snapshot *Snapshot) (*Snapshot, error) {
 		return nil, err
 	}
 
+	record.SystemNamePrefix = normalizeSystemNamePrefix(snapshot.SystemNamePrefix)
 	record.ImageSecurityEnable = snapshot.ImageSecurityEnable
 	record.ImageSecurityStrict = snapshot.ImageSecurityStrict
 	record.TextSecurityEnable = snapshot.TextSecurityEnable
@@ -87,4 +91,8 @@ func normalizeProvider(provider string) string {
 	default:
 		return "local"
 	}
+}
+
+func normalizeSystemNamePrefix(prefix string) string {
+	return strings.TrimSpace(prefix)
 }

@@ -22,9 +22,8 @@ import TeachersPage from "@/pages/teachers";
 import LoginPage from "@/pages/login";
 import NotFoundPage from "@/pages/errors/not-found";
 import ForbiddenPage from "@/pages/errors/forbidden";
-import ServerErrorPage from "@/pages/errors/server-error";
 import SettingsProfilePage from "@/pages/settings/index";
-import SettingsAppearancePage from "@/pages/settings/appearance";
+import SettingsSystemPage from "@/pages/settings/system";
 import { PageContent } from "@/components/page-content";
 import "./index.css";
 
@@ -113,11 +112,14 @@ const router = createBrowserRouter([
           },
           // 设置页面
           { path: "settings", element: <SettingsProfilePage /> },
-          { path: "settings/appearance", element: <SettingsAppearancePage /> },
-          // 错误示例页面（已登录状态下查看）
-          { path: "errors/not-found", element: <PageContent><NotFoundPage /></PageContent> },
-          { path: "errors/forbidden", element: <PageContent><ForbiddenPage /></PageContent> },
-          { path: "errors/server-error", element: <PageContent><ServerErrorPage /></PageContent> },
+          {
+            path: "settings/system",
+            element: (
+              <RequireRoles allowedRoles={["admin"]}>
+                <SettingsSystemPage />
+              </RequireRoles>
+            ),
+          },
           // 未匹配路由 → 404
           { path: "*", element: <PageContent><NotFoundPage /></PageContent> },
         ],

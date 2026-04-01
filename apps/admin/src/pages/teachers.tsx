@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { DotsHorizontalIcon } from "@radix-ui/react-icons";
 import {
   type ColumnDef,
@@ -13,10 +13,16 @@ import {
 } from "@tanstack/react-table";
 import { KeyRound, UserPlus } from "lucide-react";
 import { toast } from "sonner";
-import { DataTableColumnHeader, DataTablePagination, DataTableToolbar } from "@/components/data-table";
+import { NameReminderAlert } from "@/components/domain/name-reminder-alert";
+import {
+  DataTableColumnHeader,
+  DataTablePagination,
+  DataTableToolbar,
+} from "@/components/data-table";
 import { PageContent } from "@/components/page-content";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -42,37 +48,53 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { cn } from "@/lib/utils";
 import useDialogState from "@/hooks/use-dialog-state";
+import { findSimilarNames, hasExactName } from "@/lib/name-check";
 import {
   createUser,
   fetchUsers,
   resetUserPassword,
   type UserItem,
 } from "@/lib/server-data";
+import { cn } from "@/lib/utils";
 
-// ─── Context ────────────────────────────────────────────────────────────────
 type DialogType = "add" | "reset-password";
 
 type TeachersContextType = {
-  open: DialogType | null;
-  setOpen: (str: DialogType | null) => void;
   currentRow: UserItem | null;
-  setCurrentRow: React.Dispatch<React.SetStateAction<UserItem | null>>;
   reloadData: () => void;
+  setCurrentRow: React.Dispatch<React.SetStateAction<UserItem | null>>;
+  setOpen: (value: DialogType | null) => void;
+  users: UserItem[];
+};
+
+const roleLabelMap: Record<string, string> = {
+  admin: "管理员",
+  teacher: "教师",
+  guardian: "家长",
+};
+
+const initialForm = {
+  displayName: "",
+  isAdmin: false,
+  password: "123456",
+  phone: "",
 };
 
 const TeachersContext = React.createContext<TeachersContextType | null>(null);
 
 function useTeachers() {
   const ctx = React.useContext(TeachersContext);
-  if (!ctx) throw new Error("useTeachers must be used within TeachersProvider");
+  if (!ctx) {
+    throw new Error("useTeachers must be used within TeachersProvider");
+  }
+
   return ctx;
 }
 
-// ─── Columns ────────────────────────────────────────────────────────────────
 function RowActions({ row }: { row: { original: UserItem } }) {
-  const { setOpen, setCurrentRow } = useTeachers();
+  const { setCurrentRow, setOpen } = useTeachers();
+
   return (
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
@@ -117,8 +139,8 @@ const columns: ColumnDef<UserItem>[] = [
     cell: ({ row }) => (
       <div className="flex flex-wrap gap-1">
         {(row.getValue("roles") as string[]).map((role) => (
-          <Badge key={role} variant="outline" className="capitalize">
-            {role}
+          <Badge key={role} variant="outline">
+            {roleLabelMap[role] || role}
           </Badge>
         ))}
       </div>
@@ -131,34 +153,43 @@ const columns: ColumnDef<UserItem>[] = [
   },
 ];
 
-// ─── Add Dialog ─────────────────────────────────────────────────────────────
-const initialForm = { displayName: "", password: "123456", phone: "" };
-
 function AddTeacherDialog({
-  open,
   onOpenChange,
+  open,
 }: {
-  open: boolean;
   onOpenChange: (open: boolean) => void;
+  open: boolean;
 }) {
-  const { reloadData } = useTeachers();
+  const { reloadData, users } = useTeachers();
   const [form, setForm] = useState(initialForm);
   const [saving, setSaving] = useState(false);
 
+  const nameItems = useMemo(
+    () =>
+      users.map((item) => ({
+        id: item.id,
+        name: item.displayName || item.phone,
+      })),
+    [users],
+  );
+  const exactDuplicate = hasExactName(nameItems, form.displayName);
+  const similarItems = findSimilarNames(nameItems, form.displayName);
+
   async function handleSave() {
-    if (!form.phone || !form.password) {
+    if (!form.phone.trim() || !form.password) {
       toast.error("手机号和默认密码不能为空");
       return;
     }
+
     setSaving(true);
     try {
       await createUser({
-        displayName: form.displayName,
+        displayName: form.displayName.trim(),
         password: form.password,
-        phone: form.phone,
-        roles: ["teacher"],
+        phone: form.phone.trim(),
+        roles: form.isAdmin ? ["teacher", "admin"] : ["teacher"],
       });
-      toast.success("教师账号已创建");
+      toast.success("教师已创建");
       setForm(initialForm);
       onOpenChange(false);
       reloadData();
@@ -172,15 +203,17 @@ function AddTeacherDialog({
   return (
     <Dialog
       open={open}
-      onOpenChange={(state) => {
-        if (!state) setForm(initialForm);
-        onOpenChange(state);
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) {
+          setForm(initialForm);
+        }
+        onOpenChange(nextOpen);
       }}
     >
       <DialogContent className="sm:max-w-md">
         <DialogHeader className="text-start">
           <DialogTitle>新增教师</DialogTitle>
-          <DialogDescription>创建新的教师账号，完成后点击保存。</DialogDescription>
+          <DialogDescription>创建教师信息，并可选同步授予管理员权限。</DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-2">
           <div className="grid grid-cols-4 items-center gap-x-4 gap-y-1">
@@ -188,15 +221,27 @@ function AddTeacherDialog({
             <Input
               className="col-span-3"
               value={form.displayName}
-              onChange={(e) => setForm((f) => ({ ...f, displayName: e.target.value }))}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  displayName: event.target.value,
+                }))
+              }
             />
           </div>
+          <NameReminderAlert
+            exact={exactDuplicate}
+            label="教师"
+            similarItems={similarItems}
+          />
           <div className="grid grid-cols-4 items-center gap-x-4 gap-y-1">
             <Label className="text-end">手机号</Label>
             <Input
               className="col-span-3"
               value={form.phone}
-              onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, phone: event.target.value }))
+              }
             />
           </div>
           <div className="grid grid-cols-4 items-center gap-x-4 gap-y-1">
@@ -204,8 +249,27 @@ function AddTeacherDialog({
             <Input
               className="col-span-3"
               value={form.password}
-              onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, password: event.target.value }))
+              }
             />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-x-4 gap-y-1">
+            <Label className="text-end">管理员</Label>
+            <div className="col-span-3 flex items-center gap-3">
+              <Checkbox
+                checked={form.isAdmin}
+                onCheckedChange={(checked) =>
+                  setForm((current) => ({
+                    ...current,
+                    isAdmin: checked === true,
+                  }))
+                }
+              />
+              <span className="text-sm text-muted-foreground">
+                勾选后拥有与默认管理员一致的权限
+              </span>
+            </div>
           </div>
         </div>
         <DialogFooter>
@@ -218,15 +282,14 @@ function AddTeacherDialog({
   );
 }
 
-// ─── Reset Password Dialog ──────────────────────────────────────────────────
 function ResetPasswordDialog({
-  open,
-  onOpenChange,
   currentRow,
+  onOpenChange,
+  open,
 }: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
   currentRow: UserItem;
+  onOpenChange: (open: boolean) => void;
+  open: boolean;
 }) {
   const [password, setPassword] = useState("123456");
   const [saving, setSaving] = useState(false);
@@ -236,6 +299,7 @@ function ResetPasswordDialog({
       toast.error("密码不能为空");
       return;
     }
+
     setSaving(true);
     try {
       await resetUserPassword(currentRow.id, password);
@@ -252,9 +316,11 @@ function ResetPasswordDialog({
   return (
     <Dialog
       open={open}
-      onOpenChange={(state) => {
-        if (!state) setPassword("123456");
-        onOpenChange(state);
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) {
+          setPassword("123456");
+        }
+        onOpenChange(nextOpen);
       }}
     >
       <DialogContent className="sm:max-w-md">
@@ -267,14 +333,14 @@ function ResetPasswordDialog({
         <div className="grid gap-4 py-2">
           <div className="grid grid-cols-4 items-center gap-x-4 gap-y-1">
             <Label className="text-end">手机号</Label>
-            <Input className="col-span-3" value={currentRow.phone} disabled />
+            <Input className="col-span-3" disabled value={currentRow.phone} />
           </div>
           <div className="grid grid-cols-4 items-center gap-x-4 gap-y-1">
             <Label className="text-end">新密码</Label>
             <Input
               className="col-span-3"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(event) => setPassword(event.target.value)}
             />
           </div>
         </div>
@@ -288,7 +354,6 @@ function ResetPasswordDialog({
   );
 }
 
-// ─── Page ───────────────────────────────────────────────────────────────────
 export default function TeachersPage() {
   const [open, setOpen] = useDialogState<DialogType>(null);
   const [currentRow, setCurrentRow] = useState<UserItem | null>(null);
@@ -319,7 +384,7 @@ export default function TeachersPage() {
   const table = useReactTable({
     data,
     columns,
-    state: { sorting, columnVisibility, globalFilter },
+    state: { globalFilter, sorting, columnVisibility },
     onSortingChange: setSorting,
     onColumnVisibilityChange: setColumnVisibility,
     onGlobalFilterChange: setGlobalFilter,
@@ -330,18 +395,25 @@ export default function TeachersPage() {
   });
 
   return (
-    <TeachersContext
-      value={{ open, setOpen, currentRow, setCurrentRow, reloadData: loadData }}
+    <TeachersContext.Provider
+      value={{
+        currentRow,
+        reloadData: loadData,
+        setCurrentRow,
+        setOpen,
+        users: data,
+      }}
     >
       <PageContent>
         <div className="flex flex-1 flex-col gap-4 sm:gap-6">
           <div className="flex flex-wrap items-end justify-between gap-2">
             <div>
-              <h2 className="text-2xl font-bold tracking-tight">教师账号</h2>
-              <p className="text-muted-foreground">管理教师账号及其权限</p>
+              <h2 className="text-2xl font-bold tracking-tight">教师管理</h2>
+              <p className="text-muted-foreground">管理教师及管理员权限</p>
             </div>
             <Button className="space-x-1" onClick={() => setOpen("add")}>
-              <span>新增教师</span> <UserPlus size={18} />
+              <span>新增教师</span>
+              <UserPlus size={18} />
             </Button>
           </div>
 
@@ -358,7 +430,7 @@ export default function TeachersPage() {
                           colSpan={header.colSpan}
                           className={cn(
                             "bg-background group-hover/row:bg-muted",
-                            header.column.columnDef.meta?.className
+                            header.column.columnDef.meta?.className,
                           )}
                         >
                           {header.isPlaceholder
@@ -376,7 +448,7 @@ export default function TeachersPage() {
                         加载中...
                       </TableCell>
                     </TableRow>
-                  ) : table.getRowModel().rows?.length ? (
+                  ) : table.getRowModel().rows.length ? (
                     table.getRowModel().rows.map((row) => (
                       <TableRow key={row.id} className="group/row">
                         {row.getVisibleCells().map((cell) => (
@@ -384,7 +456,7 @@ export default function TeachersPage() {
                             key={cell.id}
                             className={cn(
                               "bg-background group-hover/row:bg-muted",
-                              cell.column.columnDef.meta?.className
+                              cell.column.columnDef.meta?.className,
                             )}
                           >
                             {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -407,23 +479,22 @@ export default function TeachersPage() {
         </div>
       </PageContent>
 
-      {/* Dialogs */}
       <AddTeacherDialog
-        key="teacher-add"
         open={open === "add"}
-        onOpenChange={() => setOpen("add")}
+        onOpenChange={(nextOpen) => setOpen(nextOpen ? "add" : null)}
       />
-      {currentRow && (
+      {currentRow ? (
         <ResetPasswordDialog
-          key={`teacher-reset-${currentRow.id}`}
-          open={open === "reset-password"}
-          onOpenChange={() => {
-            setOpen("reset-password");
-            setTimeout(() => setCurrentRow(null), 500);
-          }}
           currentRow={currentRow}
+          open={open === "reset-password"}
+          onOpenChange={(nextOpen) => {
+            setOpen(nextOpen ? "reset-password" : null);
+            if (!nextOpen) {
+              setTimeout(() => setCurrentRow(null), 300);
+            }
+          }}
         />
-      )}
-    </TeachersContext>
+      ) : null}
+    </TeachersContext.Provider>
   );
 }

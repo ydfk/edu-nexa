@@ -1,4 +1,4 @@
-import { startTransition, useState } from "react";
+import { startTransition, useEffect, useState } from "react";
 import { GraduationCap, ShieldCheck } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -12,6 +12,11 @@ import {
   saveAdminSession,
   type AdminSession,
 } from "@/lib/auth/session";
+import {
+  fetchRuntimeSettings,
+  getSystemBrandParts,
+  getSystemDisplayName,
+} from "@/lib/runtime-settings";
 
 export default function LoginPage() {
   const location = useLocation();
@@ -19,6 +24,25 @@ export default function LoginPage() {
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [systemName, setSystemName] = useState(getSystemDisplayName());
+  const systemBrand = getSystemBrandParts(systemName.replace(" 学栖·EduNexa", ""));
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadRuntimeSettings() {
+      const settings = await fetchRuntimeSettings();
+      if (!cancelled) {
+        setSystemName(getSystemDisplayName(settings.systemNamePrefix));
+      }
+    }
+
+    void loadRuntimeSettings();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -64,7 +88,14 @@ export default function LoginPage() {
           <div className="flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground">
             <GraduationCap className="size-5" />
           </div>
-          <span className="text-lg font-bold">学栖 · EduNexa</span>
+          <div className="flex flex-col leading-tight">
+            <span className="text-lg font-bold">{systemBrand.primary}</span>
+            {systemBrand.secondary ? (
+              <span className="text-xs font-medium text-muted-foreground">
+                {systemBrand.secondary}
+              </span>
+            ) : null}
+          </div>
         </div>
         <div className="relative mt-auto">
           <blockquote className="space-y-2">
@@ -83,7 +114,14 @@ export default function LoginPage() {
             <div className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
               <GraduationCap className="size-4" />
             </div>
-            <span className="font-bold">学栖 · EduNexa</span>
+            <div className="flex flex-col leading-tight">
+              <span className="font-bold">{systemBrand.primary}</span>
+              {systemBrand.secondary ? (
+                <span className="text-[11px] font-medium text-muted-foreground">
+                  {systemBrand.secondary}
+                </span>
+              ) : null}
+            </div>
           </div>
 
           <Card className="border-none shadow-none">

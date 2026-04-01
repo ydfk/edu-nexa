@@ -1,4 +1,4 @@
-import { ChevronsUpDown, LogOut, Palette, UserCircle } from "lucide-react";
+import { ChevronsUpDown, LogOut, UserCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -80,13 +80,7 @@ export function NavUser({ user }: NavUserProps) {
             <DropdownMenuGroup>
               <DropdownMenuItem onClick={() => navigate("/settings")}>
                 <UserCircle />
-                个人资料
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => navigate("/settings/appearance")}
-              >
-                <Palette />
-                外观设置
+                个人设置
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />

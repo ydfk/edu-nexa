@@ -17,12 +17,14 @@ import {
 } from "@tanstack/react-table";
 import { CircleCheck, CirclePause, Pencil, Plus, UserPlus } from "lucide-react";
 import { toast } from "sonner";
+import { NameReminderAlert } from "@/components/domain/name-reminder-alert";
 import {
   DataTableColumnHeader,
   DataTablePagination,
   DataTableToolbar,
 } from "@/components/data-table";
 import { PageContent } from "@/components/page-content";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -57,6 +59,11 @@ import {
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import useDialogState from "@/hooks/use-dialog-state";
+import { findSimilarNames, hasExactName } from "@/lib/name-check";
+import {
+  emptyRelationshipValue,
+  parentRelationshipOptions,
+} from "@/lib/parent-relationships";
 import {
   fetchClasses,
   fetchGrades,
@@ -231,7 +238,7 @@ function createColumns(
     },
     {
       id: "guardian",
-      header: "监护人",
+      header: "家长",
       cell: ({ row }) => (
         <div>
           <p>{row.original.guardianName || "-"}</p>
@@ -374,6 +381,11 @@ function StudentFormDialog() {
       return true;
     });
   }, [classes, form.gradeId, form.schoolId]);
+  const quickGuardianExactDuplicate = hasExactName(guardians, guardianForm.name);
+  const quickGuardianSimilarItems = findSimilarNames(guardians, guardianForm.name);
+  const quickGuardianPhoneExists = guardians.some(
+    (item) => item.phone.trim() === guardianForm.phone.trim(),
+  );
 
   useEffect(() => {
     if (isEdit && currentItem) {
@@ -424,7 +436,7 @@ function StudentFormDialog() {
     const classItem = classes.find((item) => item.id === form.classId);
 
     if (!form.name.trim() || !school || !grade || !guardian) {
-      toast.error("学生、学校、年级、监护人不能为空");
+      toast.error("学生、学校、年级、家长不能为空");
       return;
     }
 
@@ -542,7 +554,10 @@ function StudentFormDialog() {
 
       if (open === "quick-guardian") {
         if (!guardianForm.name.trim() || !guardianForm.phone.trim())
-          throw new Error("监护人姓名和手机号不能为空");
+          throw new Error("家长姓名和手机号不能为空");
+        if (quickGuardianPhoneExists) {
+          throw new Error("家长手机号已存在");
+        }
         const item = await saveGuardianProfile({
           name: guardianForm.name.trim(),
           phone: guardianForm.phone.trim(),
@@ -578,7 +593,7 @@ function StudentFormDialog() {
         : open === "quick-class"
           ? "新增班级"
           : open === "quick-guardian"
-            ? "新增监护人"
+            ? "新增家长"
             : "";
 
   return (
@@ -687,7 +702,7 @@ function StudentFormDialog() {
                 </Select>
               </SelectWithAction>
             </Field>
-            <Field label="监护人">
+            <Field label="家长">
               <SelectWithAction
                 onCreate={() => openQuickDialog("quick-guardian")}
               >
@@ -698,7 +713,7 @@ function StudentFormDialog() {
                   }
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="选择监护人" />
+                    <SelectValue placeholder="选择家长" />
                   </SelectTrigger>
                   <SelectContent>
                     {guardians.map((item) => (
@@ -889,6 +904,11 @@ function StudentFormDialog() {
                   }
                 />
               </div>
+              <NameReminderAlert
+                exact={quickGuardianExactDuplicate}
+                label="家长"
+                similarItems={quickGuardianSimilarItems}
+              />
               <div className="grid gap-2">
                 <Label>手机号</Label>
                 <Input
@@ -898,17 +918,35 @@ function StudentFormDialog() {
                   }
                 />
               </div>
+              {quickGuardianPhoneExists ? (
+                <Alert variant="destructive">
+                  <AlertTitle>手机号已存在</AlertTitle>
+                  <AlertDescription>当前手机号已被其他家长使用。</AlertDescription>
+                </Alert>
+              ) : null}
               <div className="grid gap-2">
                 <Label>关系</Label>
-                <Input
-                  value={guardianForm.relationship}
-                  onChange={(e) =>
+                <Select
+                  value={guardianForm.relationship || emptyRelationshipValue}
+                  onValueChange={(value) =>
                     setGuardianForm((c) => ({
                       ...c,
-                      relationship: e.target.value,
+                      relationship: value === emptyRelationshipValue ? "" : value,
                     }))
                   }
-                />
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="可不填写" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={emptyRelationshipValue}>不填写</SelectItem>
+                    {parentRelationshipOptions.map((item) => (
+                      <SelectItem key={item} value={item}>
+                        {item}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="grid gap-2">
                 <Label>备注</Label>
@@ -922,7 +960,10 @@ function StudentFormDialog() {
             </div>
           ) : null}
           <DialogFooter>
-            <Button disabled={quickSaving} onClick={handleQuickSave}>
+            <Button
+              disabled={quickSaving || (open === "quick-guardian" && quickGuardianPhoneExists)}
+              onClick={handleQuickSave}
+            >
               {quickSaving ? "保存中..." : "保存"}
             </Button>
           </DialogFooter>
@@ -1107,7 +1148,7 @@ export default function StudentsPage() {
             <div className="space-y-4">
               <DataTableToolbar
                 table={table}
-                searchPlaceholder="搜索学生 / 学校 / 班级 / 监护人…"
+                searchPlaceholder="搜索学生 / 学校 / 班级 / 家长…"
                 filters={[
                   {
                     columnId: "status",

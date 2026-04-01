@@ -14,6 +14,15 @@ import (
 
 var generateFromPassword = bcrypt.GenerateFromPassword
 
+type updateProfilePayload struct {
+	DisplayName string `json:"displayName"`
+}
+
+type changePasswordPayload struct {
+	CurrentPassword string `json:"currentPassword"`
+	NewPassword     string `json:"newPassword"`
+}
+
 func Register(c *fiber.Ctx) error {
 	var req struct {
 		DisplayName string   `json:"displayName"`
@@ -100,6 +109,69 @@ func Profile(c *fiber.Ctx) error {
 	}
 
 	return response.Success(c, buildUserPayload(*user))
+}
+
+func UpdateProfile(c *fiber.Ctx) error {
+	user, err := service.CurrentUser(c)
+	if err != nil {
+		return response.Error(c, "用户未找到")
+	}
+
+	var req updateProfilePayload
+	if err := c.BodyParser(&req); err != nil {
+		return response.Error(c, "参数不正确")
+	}
+
+	displayName := strings.TrimSpace(req.DisplayName)
+	if displayName == "" {
+		return response.Error(c, "名称不能为空")
+	}
+
+	user.DisplayName = displayName
+	if err := db.DB.Save(user).Error; err != nil {
+		return response.Error(c, "保存个人设置失败")
+	}
+
+	return response.Success(c, buildUserPayload(*user))
+}
+
+func ChangePassword(c *fiber.Ctx) error {
+	user, err := service.CurrentUser(c)
+	if err != nil {
+		return response.Error(c, "用户未找到")
+	}
+
+	var req changePasswordPayload
+	if err := c.BodyParser(&req); err != nil {
+		return response.Error(c, "参数不正确")
+	}
+
+	currentPassword := strings.TrimSpace(req.CurrentPassword)
+	newPassword := strings.TrimSpace(req.NewPassword)
+	if currentPassword == "" || newPassword == "" {
+		return response.Error(c, "当前密码和新密码不能为空")
+	}
+	if currentPassword == newPassword {
+		return response.Error(c, "新密码不能与当前密码相同")
+	}
+	if user.Password == "" {
+		return response.Error(c, "当前账号未设置密码")
+	}
+	if bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(currentPassword)) != nil {
+		return response.Error(c, "当前密码不正确")
+	}
+
+	hash, err := generateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return response.Error(c, "密码加密失败")
+	}
+
+	user.Password = string(hash)
+	if err := db.DB.Save(user).Error; err != nil {
+		return response.Error(c, "修改密码失败")
+	}
+
+	return response.Success(c, fiber.Map{"success": true})
 }
 
 func WeappPhoneLogin(c *fiber.Ctx) error {

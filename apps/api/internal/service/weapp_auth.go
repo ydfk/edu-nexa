@@ -112,6 +112,6 @@ func defaultDisplayName(role string) string {
 	case "student":
 		return "学生账号"
 	default:
-		return "监护人"
+		return "家长"
 	}
 }

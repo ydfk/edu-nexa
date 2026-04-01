@@ -71,6 +71,14 @@ export function saveAdminSession(session: AdminSession) {
   notifySessionChanged();
 }
 
+export function updateAdminSessionUser(user: AdminSessionUser) {
+  const current = getAdminSessionSnapshot();
+  saveAdminSession({
+    token: current.token,
+    user,
+  });
+}
+
 export function clearAdminSession() {
   if (typeof window === "undefined") {
     return;

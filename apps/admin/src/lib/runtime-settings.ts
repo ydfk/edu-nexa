@@ -4,6 +4,7 @@ export type RuntimeSettings = {
   imageSecurityEnable: boolean;
   imageSecurityStrict: boolean;
   scene: string;
+  systemNamePrefix: string;
   textSecurityEnable: boolean;
   textSecurityStrict: boolean;
   uploadProvider: "local" | "aliyun_oss" | "upyun";
@@ -13,6 +14,7 @@ const defaultSettings: RuntimeSettings = {
   imageSecurityEnable: false,
   imageSecurityStrict: false,
   scene: "app-runtime",
+  systemNamePrefix: "",
   textSecurityEnable: false,
   textSecurityStrict: false,
   uploadProvider: "local",
@@ -65,7 +67,11 @@ export async function saveRuntimeSettings(settings: RuntimeSettings) {
 
     mockRuntimeSettings = normalizeRuntimeSettings(payload.data);
     return cloneRuntimeSettings(mockRuntimeSettings);
-  } catch {
+  } catch (error) {
+    if (session.token) {
+      throw error;
+    }
+
     mockRuntimeSettings = normalized;
     return cloneRuntimeSettings(mockRuntimeSettings);
   }
@@ -85,9 +91,60 @@ function normalizeRuntimeSettings(
     imageSecurityEnable: !!value?.imageSecurityEnable,
     imageSecurityStrict: !!value?.imageSecurityStrict,
     scene: value?.scene || defaultSettings.scene,
+    systemNamePrefix: (value?.systemNamePrefix || "").trim(),
     textSecurityEnable: !!value?.textSecurityEnable,
     textSecurityStrict: !!value?.textSecurityStrict,
     uploadProvider,
+  };
+}
+
+export function getSystemDisplayName(prefix?: string) {
+  const brandSuffix = "学栖·EduNexa";
+  const normalizedPrefix = (prefix || "").trim();
+  if (!normalizedPrefix) {
+    return brandSuffix;
+  }
+  if (
+    normalizedPrefix === brandSuffix ||
+    normalizedPrefix === "学栖" ||
+    normalizedPrefix.toLowerCase() === "edunexa"
+  ) {
+    return brandSuffix;
+  }
+  if (normalizedPrefix.includes(brandSuffix)) {
+    return normalizedPrefix;
+  }
+
+  return `${normalizedPrefix} ${brandSuffix}`;
+}
+
+export function getSystemBrandParts(prefix?: string) {
+  const brandSuffix = "学栖·EduNexa";
+  const normalizedPrefix = (prefix || "").trim();
+
+  if (
+    !normalizedPrefix ||
+    normalizedPrefix === brandSuffix ||
+    normalizedPrefix === "学栖" ||
+    normalizedPrefix.toLowerCase() === "edunexa"
+  ) {
+    return {
+      primary: brandSuffix,
+      secondary: "",
+    };
+  }
+
+  if (normalizedPrefix.includes(brandSuffix)) {
+    const primary = normalizedPrefix.replace(brandSuffix, "").trim();
+    return {
+      primary: primary || brandSuffix,
+      secondary: primary ? brandSuffix : "",
+    };
+  }
+
+  return {
+    primary: normalizedPrefix,
+    secondary: brandSuffix,
   };
 }
 

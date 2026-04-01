@@ -5,12 +5,6 @@ type User = {
   roles: string[];
 };
 
-type Team = {
-  name: string;
-  logo: React.ElementType;
-  plan: string;
-};
-
 type BaseNavItem = {
   title: string;
   badge?: string;
@@ -36,6 +30,5 @@ export type NavGroup = {
 
 export type SidebarData = {
   user: User;
-  teams: Team[];
   navGroups: NavGroup[];
 };

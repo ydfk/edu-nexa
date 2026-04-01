@@ -1,4 +1,7 @@
-import type { AdminSessionUser } from "@/lib/auth/session";
+import {
+  getAdminSessionSnapshot,
+  type AdminSessionUser,
+} from "@/lib/auth/session";
 
 type ApiEnvelope<T> = {
   code: number;
@@ -18,6 +21,11 @@ type LoginInput = {
   password: string;
 };
 
+type ChangePasswordInput = {
+  currentPassword: string;
+  newPassword: string;
+};
+
 const apiBaseURL = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
 
 export async function loginWithPassword(input: LoginInput) {
@@ -30,6 +38,34 @@ export async function loginWithPassword(input: LoginInput) {
   });
 
   return parseEnvelope<LoginResponse>(response);
+}
+
+export async function updateProfile(input: { displayName: string }) {
+  const session = getAdminSessionSnapshot();
+  const response = await fetch(`${apiBaseURL}/api/auth/profile`, {
+    body: JSON.stringify(input),
+    headers: {
+      Authorization: session.token ? `Bearer ${session.token}` : "",
+      "Content-Type": "application/json",
+    },
+    method: "PUT",
+  });
+
+  return parseEnvelope<AdminSessionUser>(response);
+}
+
+export async function changePassword(input: ChangePasswordInput) {
+  const session = getAdminSessionSnapshot();
+  const response = await fetch(`${apiBaseURL}/api/auth/change-password`, {
+    body: JSON.stringify(input),
+    headers: {
+      Authorization: session.token ? `Bearer ${session.token}` : "",
+      "Content-Type": "application/json",
+    },
+    method: "POST",
+  });
+
+  return parseEnvelope<{ success: boolean }>(response);
 }
 
 async function parseEnvelope<T>(response: Response) {
