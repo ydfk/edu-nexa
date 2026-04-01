@@ -1,6 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { DotsHorizontalIcon } from "@radix-ui/react-icons";
 import {
   type ColumnDef,
   type ColumnFiltersState,
@@ -34,12 +33,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -60,6 +53,10 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import useDialogState from "@/hooks/use-dialog-state";
 import { findSimilarNames, hasExactName } from "@/lib/name-check";
+import {
+  getDefaultLoginPassword,
+  getDefaultLoginPasswordHint,
+} from "@/lib/password-rules";
 import {
   emptyRelationshipValue,
   parentRelationshipOptions,
@@ -308,33 +305,24 @@ function createColumns(
       id: "actions",
       cell: function ActionsCell({ row }) {
         const { setOpen, setCurrentItem } = useStudents();
-        return (
-          <DropdownMenu modal={false}>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                className="h-8 w-8 p-0 data-[state=open]:bg-muted"
-              >
-                <DotsHorizontalIcon className="h-4 w-4" />
-                <span className="sr-only">操作菜单</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem
-                onSelect={() => {
-                  setCurrentItem(row.original);
-                  setOpen("edit");
-                }}
-              >
-                <Pencil className="mr-2 h-4 w-4" />
-                编辑
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        );
-      },
-      enableSorting: false,
-      enableHiding: false,
+      return (
+        <div className="flex justify-end gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              setCurrentItem(row.original);
+              setOpen("edit");
+            }}
+          >
+            <Pencil className="mr-2 size-4" />
+            编辑
+          </Button>
+        </div>
+      );
+    },
+    enableSorting: false,
+    enableHiding: false,
     },
   ];
 }
@@ -385,6 +373,14 @@ function StudentFormDialog() {
   const quickGuardianSimilarItems = findSimilarNames(guardians, guardianForm.name);
   const quickGuardianPhoneExists = guardians.some(
     (item) => item.phone.trim() === guardianForm.phone.trim(),
+  );
+  const quickClassExactDuplicate = hasExactName(
+    classes.filter((item) => item.gradeId === classForm.gradeId),
+    classForm.name,
+  );
+  const quickGuardianDefaultPassword = useMemo(
+    () => getDefaultLoginPassword(guardianForm.phone),
+    [guardianForm.phone],
   );
 
   useEffect(() => {
@@ -536,6 +532,9 @@ function StudentFormDialog() {
         const grade = grades.find((i) => i.id === classForm.gradeId);
         if (!school || !grade || !classForm.name.trim())
           throw new Error("学校、年级、班级名称不能为空");
+        if (quickClassExactDuplicate) {
+          throw new Error("当前年级下已存在同名班级");
+        }
         const item = await saveClass({
           gradeId: grade.id,
           gradeName: grade.name,
@@ -890,6 +889,9 @@ function StudentFormDialog() {
                     setClassForm((c) => ({ ...c, name: e.target.value }))
                   }
                 />
+                {quickClassExactDuplicate ? (
+                  <p className="text-sm text-destructive">当前年级下已存在同名班级</p>
+                ) : null}
               </div>
             </div>
           ) : null}
@@ -917,6 +919,13 @@ function StudentFormDialog() {
                     setGuardianForm((c) => ({ ...c, phone: e.target.value }))
                   }
                 />
+              </div>
+              <div className="grid gap-2">
+                <Label>默认密码</Label>
+                <Input readOnly value={quickGuardianDefaultPassword} />
+                <p className="text-sm text-muted-foreground">
+                  {getDefaultLoginPasswordHint(guardianForm.phone)}
+                </p>
               </div>
               {quickGuardianPhoneExists ? (
                 <Alert variant="destructive">
@@ -961,7 +970,11 @@ function StudentFormDialog() {
           ) : null}
           <DialogFooter>
             <Button
-              disabled={quickSaving || (open === "quick-guardian" && quickGuardianPhoneExists)}
+              disabled={
+                quickSaving ||
+                (open === "quick-guardian" && quickGuardianPhoneExists) ||
+                (open === "quick-class" && quickClassExactDuplicate)
+              }
               onClick={handleQuickSave}
             >
               {quickSaving ? "保存中..." : "保存"}

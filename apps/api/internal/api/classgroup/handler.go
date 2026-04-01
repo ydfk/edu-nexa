@@ -53,7 +53,7 @@ func Create(c *fiber.Ctx) error {
 	if strings.TrimSpace(req.Name) == "" {
 		return response.Error(c, "班级名称不能为空")
 	}
-	if err := ensureClassNameUnique(strings.TrimSpace(req.Name), ""); err != nil {
+	if err := ensureClassNameUnique(strings.TrimSpace(req.Name), strings.TrimSpace(req.GradeID), ""); err != nil {
 		return response.Error(c, err.Error())
 	}
 
@@ -85,7 +85,7 @@ func Update(c *fiber.Ctx) error {
 	if strings.TrimSpace(req.Name) == "" {
 		return response.Error(c, "班级名称不能为空")
 	}
-	if err := ensureClassNameUnique(strings.TrimSpace(req.Name), item.Id.String()); err != nil {
+	if err := ensureClassNameUnique(strings.TrimSpace(req.Name), strings.TrimSpace(req.GradeID), item.Id.String()); err != nil {
 		return response.Error(c, err.Error())
 	}
 
@@ -110,9 +110,12 @@ func defaultClassStatus(status string) string {
 	return strings.TrimSpace(status)
 }
 
-func ensureClassNameUnique(name string, excludeID string) error {
+func ensureClassNameUnique(name string, gradeID string, excludeID string) error {
 	var item model.Class
 	query := db.DB.Where("LOWER(name) = LOWER(?)", strings.TrimSpace(name))
+	if strings.TrimSpace(gradeID) != "" {
+		query = query.Where("grade_id = ?", strings.TrimSpace(gradeID))
+	}
 	if excludeID != "" {
 		query = query.Where("id <> ?", excludeID)
 	}

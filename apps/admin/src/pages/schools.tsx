@@ -309,10 +309,15 @@ function GradeGroup({
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState("");
   const [saving, setSaving] = useState(false);
+  const exactDup = hasExactName(gradeClasses, newName);
 
   const handleQuickAdd = async () => {
     const name = newName.trim();
     if (!name) return;
+    if (exactDup) {
+      toast.error(`「${grade.name}」下已存在同名班级`);
+      return;
+    }
     setSaving(true);
     try {
       await saveClass({
@@ -327,8 +332,8 @@ function GradeGroup({
       setNewName("");
       setAdding(false);
       reloadData();
-    } catch {
-      toast.error("添加失败");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "添加失败");
     } finally {
       setSaving(false);
     }
@@ -402,7 +407,7 @@ function GradeGroup({
               size="sm"
               variant="outline"
               className="h-7"
-              disabled={saving}
+              disabled={saving || exactDup}
               onClick={handleQuickAdd}
             >
               确定
@@ -421,6 +426,9 @@ function GradeGroup({
           </div>
         )}
       </div>
+      {adding && exactDup ? (
+        <p className="mt-2 text-xs text-destructive">当前年级下已存在同名班级</p>
+      ) : null}
     </div>
   );
 }
@@ -622,7 +630,7 @@ function SchoolFormDialog() {
 // ── 编辑班级弹窗 ────────────────────────────────────────
 
 function EditClassDialog() {
-  const { setOpen, currentClass, reloadData } = useSchoolsContext();
+  const { setOpen, currentClass, classes, reloadData } = useSchoolsContext();
   const [form, setForm] = useState({
     name: currentClass?.name ?? "",
     status: currentClass?.status ?? "active",
@@ -630,8 +638,16 @@ function EditClassDialog() {
   const [saving, setSaving] = useState(false);
 
   if (!currentClass) return null;
+  const siblingClasses = classes.filter(
+    (item) => item.gradeId === currentClass.gradeId && item.id !== currentClass.id,
+  );
+  const exactDup = hasExactName(siblingClasses, form.name);
 
   const handleSave = async () => {
+    if (exactDup) {
+      toast.error(`「${currentClass.gradeName}」下已存在同名班级`);
+      return;
+    }
     setSaving(true);
     try {
       await saveClass({
@@ -646,8 +662,8 @@ function EditClassDialog() {
       toast.success("班级已更新");
       setOpen(null);
       reloadData();
-    } catch {
-      toast.error("保存失败");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "保存失败");
     } finally {
       setSaving(false);
     }
@@ -669,6 +685,9 @@ function EditClassDialog() {
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
             />
+            {exactDup ? (
+              <p className="text-sm text-destructive">当前年级下已存在同名班级</p>
+            ) : null}
           </div>
           <div className="space-y-2">
             <Label>状态</Label>
@@ -690,7 +709,7 @@ function EditClassDialog() {
           <Button variant="outline" onClick={() => setOpen(null)}>
             取消
           </Button>
-          <Button disabled={saving || !form.name.trim()} onClick={handleSave}>
+          <Button disabled={saving || !form.name.trim() || exactDup} onClick={handleSave}>
             {saving ? "保存中..." : "保存"}
           </Button>
         </DialogFooter>

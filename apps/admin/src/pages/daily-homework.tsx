@@ -1,5 +1,4 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { DotsHorizontalIcon } from "@radix-ui/react-icons";
 import {
   type ColumnDef,
   type SortingState,
@@ -28,12 +27,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -141,25 +134,19 @@ const columns: ColumnDef<DailyHomeworkItem>[] = [
     cell: function ActionsCell({ row }) {
       const { setOpen, setCurrentItem } = useDailyHomework();
       return (
-        <DropdownMenu modal={false}>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="h-8 w-8 p-0 data-[state=open]:bg-muted">
-              <DotsHorizontalIcon className="h-4 w-4" />
-              <span className="sr-only">操作菜单</span>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem
-              onSelect={() => {
-                setCurrentItem(row.original);
-                setOpen("edit");
-              }}
-            >
-              <Pencil className="mr-2 h-4 w-4" />
-              编辑
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <div className="flex justify-end gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              setCurrentItem(row.original);
+              setOpen("edit");
+            }}
+          >
+            <Pencil className="mr-2 size-4" />
+            编辑
+          </Button>
+        </div>
       );
     },
     enableSorting: false,

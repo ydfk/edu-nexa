@@ -46,6 +46,7 @@ export type GuardianProfileItem = {
   relationship: string;
   remark: string;
   status: string;
+  userId?: string;
 };
 
 export type StudentItem = {
@@ -157,6 +158,20 @@ export async function createUser(input: {
   return request<UserItem>("/api/users", {
     body: input,
     method: "POST",
+  });
+}
+
+export async function updateUser(
+  id: string,
+  input: {
+    displayName: string;
+    phone: string;
+    roles: string[];
+  }
+) {
+  return request<UserItem>(`/api/users/${id}`, {
+    body: input,
+    method: "PUT",
   });
 }
 

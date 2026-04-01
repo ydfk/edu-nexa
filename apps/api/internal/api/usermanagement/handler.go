@@ -1,6 +1,7 @@
 package usermanagement
 
 import (
+	"errors"
 	"strings"
 
 	"github.com/ydfk/edu-nexa/apps/api/internal/api/response"
@@ -22,6 +23,12 @@ type createUserPayload struct {
 
 type resetPasswordPayload struct {
 	Password string `json:"password"`
+}
+
+type updateUserPayload struct {
+	DisplayName string   `json:"displayName"`
+	Phone       string   `json:"phone"`
+	Roles       []string `json:"roles"`
 }
 
 func List(c *fiber.Ctx) error {
@@ -133,6 +140,49 @@ func ResetPassword(c *fiber.Ctx) error {
 	return response.Success(c, buildUserPayload(user))
 }
 
+func Update(c *fiber.Ctx) error {
+	currentUser, err := service.CurrentUser(c)
+	if err != nil {
+		return response.Error(c, "用户未找到")
+	}
+	if !hasRole(currentUser.Roles, "admin") {
+		return response.Error(c, "没有权限")
+	}
+
+	var req updateUserPayload
+	if err := c.BodyParser(&req); err != nil {
+		return response.Error(c, "参数不正确")
+	}
+
+	req.DisplayName = strings.TrimSpace(req.DisplayName)
+	req.Phone = strings.TrimSpace(req.Phone)
+	req.Roles = normalizeRoles(req.Roles)
+	if req.Phone == "" || len(req.Roles) == 0 {
+		return response.Error(c, "手机号和角色不能为空")
+	}
+
+	var user model.User
+	if err := db.DB.First(&user, "id = ?", c.Params("id")).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return response.Error(c, "账号不存在")
+		}
+		return response.Error(c, "查询账号失败")
+	}
+
+	if err := ensureUserPhoneUnique(req.Phone, user.Id.String()); err != nil {
+		return response.Error(c, err.Error())
+	}
+
+	user.DisplayName = req.DisplayName
+	user.Phone = req.Phone
+	user.Roles = joinRoles(req.Roles)
+	if err := db.DB.Save(&user).Error; err != nil {
+		return response.Error(c, "更新账号失败")
+	}
+
+	return response.Success(c, buildUserPayload(user))
+}
+
 func buildUserPayload(user model.User) fiber.Map {
 	return fiber.Map{
 		"displayName": user.DisplayName,
@@ -190,4 +240,21 @@ func normalizeRoles(roles []string) []string {
 	}
 
 	return items
+}
+
+func ensureUserPhoneUnique(phone string, excludeID string) error {
+	var count int64
+	query := db.DB.Model(&model.User{}).Where("phone = ?", phone)
+	if excludeID != "" {
+		query = query.Where("id <> ?", excludeID)
+	}
+
+	if err := query.Count(&count).Error; err != nil {
+		return errors.New("校验手机号失败")
+	}
+	if count > 0 {
+		return fiber.NewError(fiber.StatusBadRequest, "手机号已存在")
+	}
+
+	return nil
 }

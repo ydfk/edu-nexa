@@ -1,5 +1,4 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { DotsHorizontalIcon } from "@radix-ui/react-icons";
 import {
   type ColumnDef,
   type ColumnFiltersState,
@@ -14,7 +13,14 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { AlertTriangle, CircleCheck, CirclePause, UserPen, UserPlus } from "lucide-react";
+import {
+  AlertTriangle,
+  CircleCheck,
+  CirclePause,
+  KeyRound,
+  UserPen,
+  UserPlus,
+} from "lucide-react";
 import { toast } from "sonner";
 import { NameReminderAlert } from "@/components/domain/name-reminder-alert";
 import {
@@ -34,22 +40,20 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { findSimilarNames, hasExactName } from "@/lib/name-check";
+import {
+  getDefaultLoginPassword,
+  getDefaultLoginPasswordHint,
+} from "@/lib/password-rules";
 import {
   emptyRelationshipValue,
   parentRelationshipOptions,
 } from "@/lib/parent-relationships";
 import {
   fetchGuardianProfiles,
+  resetUserPassword,
   saveGuardianProfile,
   type GuardianProfileItem,
 } from "@/lib/server-data";
@@ -72,6 +76,7 @@ import { Textarea } from "@/components/ui/textarea";
 import useDialogState from "@/hooks/use-dialog-state";
 
 type GuardianDialogType = "create" | "edit";
+type DialogType = GuardianDialogType | "reset-password";
 
 const statusOptions = [
   { label: "启用", value: "active", icon: CircleCheck },
@@ -94,9 +99,9 @@ const initialForm = {
 
 type GuardiansContextValue = {
   currentItem: GuardianProfileItem | null;
-  open: GuardianDialogType | null;
+  open: DialogType | null;
   setCurrentItem: (item: GuardianProfileItem | null) => void;
-  setOpen: (value: GuardianDialogType | null) => void;
+  setOpen: (value: DialogType | null) => void;
 };
 
 const GuardiansContext = createContext<GuardiansContextValue | null>(null);
@@ -151,29 +156,32 @@ const columns: ColumnDef<GuardianProfileItem>[] = [
       const { setCurrentItem, setOpen } = useGuardians();
 
       return (
-        <DropdownMenu modal={false}>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="h-8 w-8 p-0 data-[state=open]:bg-muted">
-              <DotsHorizontalIcon className="h-4 w-4" />
-              <span className="sr-only">操作菜单</span>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem
-              onSelect={() => {
+        <div className="flex justify-end gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              setCurrentItem(row.original);
+              setOpen("edit");
+            }}
+          >
+            <UserPen className="mr-2 size-4" />
+            编辑
+          </Button>
+          {row.original.userId ? (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
                 setCurrentItem(row.original);
-                setOpen("edit");
+                setOpen("reset-password");
               }}
             >
-              <UserPen className="mr-2 h-4 w-4" />
-              编辑
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={() => navigator.clipboard.writeText(row.original.id)}>
-              复制 ID
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+              <KeyRound className="mr-2 size-4" />
+              重置密码
+            </Button>
+          ) : null}
+        </div>
       );
     },
     enableSorting: false,
@@ -194,6 +202,7 @@ function GuardianFormDialog({
 
   const [form, setForm] = useState(initialForm);
   const [saving, setSaving] = useState(false);
+  const defaultPassword = useMemo(() => getDefaultLoginPassword(form.phone), [form.phone]);
 
   useEffect(() => {
     if (isEdit && currentItem) {
@@ -274,6 +283,15 @@ function GuardianFormDialog({
               }
             />
           </div>
+          {!isEdit ? (
+            <div className="grid gap-2">
+              <Label>默认密码</Label>
+              <Input readOnly value={defaultPassword} />
+              <p className="text-sm text-muted-foreground">
+                {getDefaultLoginPasswordHint(form.phone)}
+              </p>
+            </div>
+          ) : null}
           {phoneExists ? (
             <Alert variant="destructive">
               <AlertTriangle className="size-4" />
@@ -343,8 +361,74 @@ function GuardianFormDialog({
   );
 }
 
+function ResetPasswordDialog({
+  currentItem,
+  onOpenChange,
+  open,
+}: {
+  currentItem: GuardianProfileItem;
+  onOpenChange: (open: boolean) => void;
+  open: boolean;
+}) {
+  const [saving, setSaving] = useState(false);
+  const defaultPassword = useMemo(
+    () => getDefaultLoginPassword(currentItem.phone),
+    [currentItem.phone],
+  );
+
+  async function handleReset() {
+    if (!currentItem.userId) {
+      toast.error("当前家长还没有登录账号");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await resetUserPassword(currentItem.userId, defaultPassword);
+      toast.success("密码已重置");
+      onOpenChange(false);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "重置失败");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>重置密码</DialogTitle>
+        </DialogHeader>
+        <div className="grid gap-4 py-2">
+          <div className="grid gap-2">
+            <Label>家长</Label>
+            <Input disabled value={currentItem.name || currentItem.phone} />
+          </div>
+          <div className="grid gap-2">
+            <Label>手机号</Label>
+            <Input disabled value={currentItem.phone} />
+          </div>
+          <div className="grid gap-2">
+            <Label>新密码</Label>
+            <Input readOnly value={defaultPassword} />
+            <p className="text-sm text-muted-foreground">
+              {getDefaultLoginPasswordHint(currentItem.phone)}
+            </p>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button disabled={saving} onClick={handleReset}>
+            {saving ? "保存中..." : "确认"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function GuardiansPage() {
-  const [open, setOpen] = useDialogState<GuardianDialogType>();
+  const [open, setOpen] = useDialogState<DialogType>();
   const [currentItem, setCurrentItem] = useState<GuardianProfileItem | null>(null);
 
   const [items, setItems] = useState<GuardianProfileItem[]>([]);
@@ -477,6 +561,18 @@ export default function GuardiansPage() {
         </div>
 
         <GuardianFormDialog items={items} onSaved={loadData} />
+        {currentItem ? (
+          <ResetPasswordDialog
+            currentItem={currentItem}
+            open={open === "reset-password"}
+            onOpenChange={(nextOpen) => {
+              setOpen(nextOpen ? "reset-password" : null);
+              if (!nextOpen) {
+                setTimeout(() => setCurrentItem(null), 300);
+              }
+            }}
+          />
+        ) : null}
       </PageContent>
     </GuardiansContext.Provider>
   );

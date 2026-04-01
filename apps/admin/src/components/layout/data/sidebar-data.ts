@@ -3,6 +3,7 @@ import {
   BookOpenCheck,
   CalendarRange,
   ClipboardList,
+  GraduationCap,
   LayoutDashboard,
   School2,
   Settings,
@@ -49,11 +50,11 @@ export function buildSidebarData(
             ? [
                 { title: "学校管理", url: "/schools", icon: School2 },
                 { title: "家长管理", url: "/guardians", icon: Users },
-                { title: "学生管理", url: "/students", icon: Users },
+                { title: "学生管理", url: "/students", icon: GraduationCap },
               ]
             : []),
           ...(isGuardian
-            ? [{ title: "我的学生", url: "/students", icon: Users }]
+            ? [{ title: "我的学生", url: "/students", icon: GraduationCap }]
             : []),
         ],
       },

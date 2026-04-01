@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { DotsHorizontalIcon } from "@radix-ui/react-icons";
 import {
   type ColumnDef,
   type SortingState,
@@ -11,7 +10,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { KeyRound, UserPlus } from "lucide-react";
+import { KeyRound, Pencil, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { NameReminderAlert } from "@/components/domain/name-reminder-alert";
 import {
@@ -31,13 +30,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuShortcut,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -51,14 +43,19 @@ import {
 import useDialogState from "@/hooks/use-dialog-state";
 import { findSimilarNames, hasExactName } from "@/lib/name-check";
 import {
+  getDefaultLoginPassword,
+  getDefaultLoginPasswordHint,
+} from "@/lib/password-rules";
+import {
   createUser,
   fetchUsers,
   resetUserPassword,
+  updateUser,
   type UserItem,
 } from "@/lib/server-data";
 import { cn } from "@/lib/utils";
 
-type DialogType = "add" | "reset-password";
+type DialogType = "add" | "edit" | "reset-password";
 
 type TeachersContextType = {
   currentRow: UserItem | null;
@@ -77,7 +74,6 @@ const roleLabelMap: Record<string, string> = {
 const initialForm = {
   displayName: "",
   isAdmin: false,
-  password: "123456",
   phone: "",
 };
 
@@ -96,27 +92,30 @@ function RowActions({ row }: { row: { original: UserItem } }) {
   const { setCurrentRow, setOpen } = useTeachers();
 
   return (
-    <DropdownMenu modal={false}>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="flex h-8 w-8 p-0 data-[state=open]:bg-muted">
-          <DotsHorizontalIcon className="h-4 w-4" />
-          <span className="sr-only">操作菜单</span>
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-[160px]">
-        <DropdownMenuItem
-          onClick={() => {
-            setCurrentRow(row.original);
-            setOpen("reset-password");
-          }}
-        >
-          重置密码
-          <DropdownMenuShortcut>
-            <KeyRound size={16} />
-          </DropdownMenuShortcut>
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <div className="flex justify-end gap-2">
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={() => {
+          setCurrentRow(row.original);
+          setOpen("edit");
+        }}
+      >
+        <Pencil className="mr-2 size-4" />
+        编辑
+      </Button>
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={() => {
+          setCurrentRow(row.original);
+          setOpen("reset-password");
+        }}
+      >
+        <KeyRound className="mr-2 size-4" />
+        重置密码
+      </Button>
+    </div>
   );
 }
 
@@ -153,16 +152,35 @@ const columns: ColumnDef<UserItem>[] = [
   },
 ];
 
-function AddTeacherDialog({
+function TeacherFormDialog({
   onOpenChange,
   open,
 }: {
   onOpenChange: (open: boolean) => void;
   open: boolean;
 }) {
-  const { reloadData, users } = useTeachers();
+  const { currentRow, reloadData, users } = useTeachers();
   const [form, setForm] = useState(initialForm);
   const [saving, setSaving] = useState(false);
+  const isEdit = !!currentRow && open;
+  const defaultPassword = useMemo(() => getDefaultLoginPassword(form.phone), [form.phone]);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    if (currentRow) {
+      setForm({
+        displayName: currentRow.displayName || "",
+        isAdmin: currentRow.roles.includes("admin"),
+        phone: currentRow.phone,
+      });
+      return;
+    }
+
+    setForm(initialForm);
+  }, [currentRow, open]);
 
   const nameItems = useMemo(
     () =>
@@ -172,29 +190,37 @@ function AddTeacherDialog({
       })),
     [users],
   );
-  const exactDuplicate = hasExactName(nameItems, form.displayName);
-  const similarItems = findSimilarNames(nameItems, form.displayName);
+  const exactDuplicate = hasExactName(nameItems, form.displayName, currentRow?.id);
+  const similarItems = findSimilarNames(nameItems, form.displayName, currentRow?.id);
 
   async function handleSave() {
-    if (!form.phone.trim() || !form.password) {
-      toast.error("手机号和默认密码不能为空");
+    if (!form.phone.trim()) {
+      toast.error("手机号不能为空");
       return;
     }
 
+    const payload = {
+      displayName: form.displayName.trim(),
+      phone: form.phone.trim(),
+      roles: form.isAdmin ? ["teacher", "admin"] : ["teacher"],
+    };
+
     setSaving(true);
     try {
-      await createUser({
-        displayName: form.displayName.trim(),
-        password: form.password,
-        phone: form.phone.trim(),
-        roles: form.isAdmin ? ["teacher", "admin"] : ["teacher"],
-      });
-      toast.success("教师已创建");
+      if (currentRow) {
+        await updateUser(currentRow.id, payload);
+      } else {
+        await createUser({
+          ...payload,
+          password: defaultPassword,
+        });
+      }
+      toast.success(currentRow ? "教师已更新" : "教师已创建");
       setForm(initialForm);
       onOpenChange(false);
       reloadData();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "创建失败");
+      toast.error(error instanceof Error ? error.message : "保存失败");
     } finally {
       setSaving(false);
     }
@@ -212,8 +238,10 @@ function AddTeacherDialog({
     >
       <DialogContent className="sm:max-w-md">
         <DialogHeader className="text-start">
-          <DialogTitle>新增教师</DialogTitle>
-          <DialogDescription>创建教师信息，并可选同步授予管理员权限。</DialogDescription>
+          <DialogTitle>{isEdit ? "编辑教师" : "新增教师"}</DialogTitle>
+          <DialogDescription>
+            {isEdit ? "修改教师信息与管理员权限。" : "创建教师信息，并可选同步授予管理员权限。"}
+          </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-2">
           <div className="grid grid-cols-4 items-center gap-x-4 gap-y-1">
@@ -229,11 +257,7 @@ function AddTeacherDialog({
               }
             />
           </div>
-          <NameReminderAlert
-            exact={exactDuplicate}
-            label="教师"
-            similarItems={similarItems}
-          />
+          <NameReminderAlert exact={exactDuplicate} label="教师" similarItems={similarItems} />
           <div className="grid grid-cols-4 items-center gap-x-4 gap-y-1">
             <Label className="text-end">手机号</Label>
             <Input
@@ -246,13 +270,14 @@ function AddTeacherDialog({
           </div>
           <div className="grid grid-cols-4 items-center gap-x-4 gap-y-1">
             <Label className="text-end">默认密码</Label>
-            <Input
-              className="col-span-3"
-              value={form.password}
-              onChange={(event) =>
-                setForm((current) => ({ ...current, password: event.target.value }))
-              }
-            />
+            <div className="col-span-3 space-y-1">
+              <Input readOnly value={defaultPassword} />
+              <p className="text-sm text-muted-foreground">
+                {isEdit
+                  ? "编辑教师不会修改现有密码，重置密码时会按这个规则生成。"
+                  : getDefaultLoginPasswordHint(form.phone)}
+              </p>
+            </div>
           </div>
           <div className="grid grid-cols-4 items-center gap-x-4 gap-y-1">
             <Label className="text-end">管理员</Label>
@@ -291,20 +316,17 @@ function ResetPasswordDialog({
   onOpenChange: (open: boolean) => void;
   open: boolean;
 }) {
-  const [password, setPassword] = useState("123456");
   const [saving, setSaving] = useState(false);
+  const defaultPassword = useMemo(
+    () => getDefaultLoginPassword(currentRow.phone),
+    [currentRow.phone],
+  );
 
   async function handleReset() {
-    if (!password) {
-      toast.error("密码不能为空");
-      return;
-    }
-
     setSaving(true);
     try {
-      await resetUserPassword(currentRow.id, password);
+      await resetUserPassword(currentRow.id, defaultPassword);
       toast.success("密码已重置");
-      setPassword("123456");
       onOpenChange(false);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "重置失败");
@@ -314,15 +336,7 @@ function ResetPasswordDialog({
   }
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(nextOpen) => {
-        if (!nextOpen) {
-          setPassword("123456");
-        }
-        onOpenChange(nextOpen);
-      }}
-    >
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader className="text-start">
           <DialogTitle>重置密码</DialogTitle>
@@ -337,11 +351,12 @@ function ResetPasswordDialog({
           </div>
           <div className="grid grid-cols-4 items-center gap-x-4 gap-y-1">
             <Label className="text-end">新密码</Label>
-            <Input
-              className="col-span-3"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-            />
+            <div className="col-span-3 space-y-1">
+              <Input readOnly value={defaultPassword} />
+              <p className="text-sm text-muted-foreground">
+                {getDefaultLoginPasswordHint(currentRow.phone)}
+              </p>
+            </div>
           </div>
         </div>
         <DialogFooter>
@@ -479,9 +494,19 @@ export default function TeachersPage() {
         </div>
       </PageContent>
 
-      <AddTeacherDialog
-        open={open === "add"}
-        onOpenChange={(nextOpen) => setOpen(nextOpen ? "add" : null)}
+      <TeacherFormDialog
+        open={open === "add" || open === "edit"}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) {
+            setOpen(null);
+            if (currentRow) {
+              setTimeout(() => setCurrentRow(null), 300);
+            }
+            return;
+          }
+
+          setOpen(currentRow ? "edit" : "add");
+        }}
       />
       {currentRow ? (
         <ResetPasswordDialog
