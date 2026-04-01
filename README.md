@@ -51,6 +51,9 @@ scripts\dev.bat
 
 使用微信开发者工具打开 `apps/weapp`，`miniprogramRoot` 已配置为 `miniprogram`。
 
+仓库默认使用 `touristappid`。
+需要真机联调时，在本地将 [apps/weapp/project.config.json](/F:/github-my/edu-nexa/apps/weapp/project.config.json) 改成自己的小程序 `appid`，不要提交该改动。
+
 ## 小程序调试建议
 
 ### 一键启动
