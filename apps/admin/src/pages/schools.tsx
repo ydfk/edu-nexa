@@ -33,10 +33,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
+import { cn } from "@/lib/utils";
 import useDialogState from "@/hooks/use-dialog-state";
 import { findSimilarNames, hasExactName } from "@/lib/name-check";
-import { cn } from "@/lib/utils";
 import {
   fetchClasses,
   fetchGrades,
@@ -193,8 +192,6 @@ export default function SchoolsPage() {
           </div>
         )}
 
-        <Separator className="my-6" />
-        <GradeManagement />
         <SchoolsDialogs />
       </PageContent>
     </SchoolsContext.Provider>
@@ -227,6 +224,7 @@ function SchoolTreeItem({ school }: { school: SchoolItem }) {
     return map;
   }, [schoolClasses]);
 
+  const gradeCount = sortedGrades.length;
   const classCount = schoolClasses.length;
   const studentTotal = schoolClasses.reduce(
     (sum, c) => sum + (studentCountByClass[c.id] ?? 0),
@@ -246,7 +244,7 @@ function SchoolTreeItem({ school }: { school: SchoolItem }) {
           <School className="h-4 w-4 shrink-0 text-muted-foreground" />
           <span className="font-semibold">{school.name}</span>
           <Badge variant="outline" className="ml-1">
-            {classCount}个班级
+            {gradeCount}个年级 · {classCount}个班级
           </Badge>
           <span className="text-xs text-muted-foreground">
             {studentTotal}人
@@ -272,20 +270,18 @@ function SchoolTreeItem({ school }: { school: SchoolItem }) {
       </CollapsibleTrigger>
       <CollapsibleContent>
         <div className="ml-4 mt-2 space-y-3 border-l-2 border-muted pl-4">
-          {sortedGrades
-            .filter((g) => gradeClassMap[g.id]?.length)
-            .map((g) => (
-              <GradeGroup
-                key={g.id}
-                grade={g}
-                school={school}
-                classes={gradeClassMap[g.id]}
-              />
-            ))}
-          {classCount === 0 && (
-            <p className="py-2 text-sm text-muted-foreground">暂无班级</p>
+          {sortedGrades.map((g) => (
+            <GradeGroup
+              key={g.id}
+              grade={g}
+              school={school}
+              classes={gradeClassMap[g.id] ?? []}
+            />
+          ))}
+          {gradeCount === 0 && (
+            <p className="py-2 text-sm text-muted-foreground">暂无年级</p>
           )}
-          <AddClassInline school={school} />
+          <AddGradeInline />
         </div>
       </CollapsibleContent>
     </Collapsible>
@@ -303,8 +299,13 @@ function GradeGroup({
   school: SchoolItem;
   classes: ClassItem[];
 }) {
-  const { studentCountByClass, setOpen, setCurrentClass, reloadData } =
-    useSchoolsContext();
+  const {
+    studentCountByClass,
+    setOpen,
+    setCurrentClass,
+    setCurrentGrade,
+    reloadData,
+  } = useSchoolsContext();
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState("");
   const [saving, setSaving] = useState(false);
@@ -335,10 +336,36 @@ function GradeGroup({
 
   return (
     <div>
-      <p className="mb-1 text-sm font-medium text-muted-foreground">
-        📚 {grade.name}
-      </p>
+      <div className="mb-1 flex items-center gap-2">
+        <p className="text-sm font-medium text-muted-foreground">
+          📚 {grade.name}
+        </p>
+        <Button
+          variant="ghost"
+          className="h-6 w-6 p-0"
+          onClick={() => {
+            setCurrentGrade(grade);
+            setOpen("edit-grade");
+          }}
+        >
+          <Pencil size={14} />
+        </Button>
+        {!adding && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-6 gap-1 px-2 text-xs"
+            onClick={() => setAdding(true)}
+          >
+            <Plus className="h-3 w-3" />
+            新增班级
+          </Button>
+        )}
+      </div>
       <div className="flex flex-wrap items-center gap-2">
+        {gradeClasses.length === 0 && !adding && (
+          <span className="text-xs text-muted-foreground">暂无班级</span>
+        )}
         {gradeClasses.map((c) => (
           <div
             key={c.id}
@@ -361,7 +388,7 @@ function GradeGroup({
           </div>
         ))}
 
-        {adding ? (
+        {adding && (
           <div className="inline-flex items-center gap-1">
             <Input
               className="h-7 w-[100px]"
@@ -392,105 +419,20 @@ function GradeGroup({
               取消
             </Button>
           </div>
-        ) : (
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-7 w-7 p-0"
-            onClick={() => setAdding(true)}
-          >
-            <Plus className="h-3.5 w-3.5" />
-          </Button>
         )}
       </div>
     </div>
   );
 }
 
-// ── 学校内快捷添加班级 ──────────────────────────────────
+// ── 学校内新增年级（内联） ──────────────────────────────
 
-function AddClassInline({ school }: { school: SchoolItem }) {
-  const { grades, reloadData } = useSchoolsContext();
-  const [gradeId, setGradeId] = useState("");
-  const [name, setName] = useState("");
-  const [saving, setSaving] = useState(false);
-
-  const sortedGrades = useMemo(
-    () => grades.slice().sort((a, b) => a.sort - b.sort),
-    [grades],
-  );
-
-  const handleAdd = async () => {
-    const trimmed = name.trim();
-    if (!trimmed || !gradeId) return;
-    const grade = grades.find((g) => g.id === gradeId);
-    if (!grade) return;
-    setSaving(true);
-    try {
-      await saveClass({
-        name: trimmed,
-        schoolId: school.id,
-        schoolName: school.name,
-        gradeId: grade.id,
-        gradeName: grade.name,
-        status: "active",
-      });
-      toast.success(`班级「${trimmed}」已添加`);
-      setName("");
-      setGradeId("");
-      reloadData();
-    } catch {
-      toast.error("添加失败");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className="flex items-center gap-2 border-t border-dashed pt-2">
-      <Select value={gradeId} onValueChange={setGradeId}>
-        <SelectTrigger className="h-8 w-[120px]">
-          <SelectValue placeholder="选择年级" />
-        </SelectTrigger>
-        <SelectContent>
-          {sortedGrades.map((g) => (
-            <SelectItem key={g.id} value={g.id}>
-              {g.name}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      <Input
-        className="h-8 w-[140px]"
-        placeholder="班级名称"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-      />
-      <Button
-        size="sm"
-        variant="outline"
-        disabled={saving || !gradeId || !name.trim()}
-        onClick={handleAdd}
-      >
-        添加
-      </Button>
-    </div>
-  );
-}
-
-// ── 年级管理 ──────────────────────────────────────────────
-
-function GradeManagement() {
-  const { grades, setOpen, setCurrentGrade, reloadData } = useSchoolsContext();
+function AddGradeInline() {
+  const { reloadData } = useSchoolsContext();
+  const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
   const [sort, setSort] = useState("");
   const [saving, setSaving] = useState(false);
-
-  const sortedGrades = useMemo(
-    () => grades.slice().sort((a, b) => a.sort - b.sort),
-    [grades],
-  );
 
   const handleAdd = async () => {
     const trimmed = name.trim();
@@ -505,6 +447,7 @@ function GradeManagement() {
       toast.success(`年级「${trimmed}」已添加`);
       setName("");
       setSort("");
+      setAdding(false);
       reloadData();
     } catch {
       toast.error("添加失败");
@@ -513,42 +456,58 @@ function GradeManagement() {
     }
   };
 
+  if (!adding) {
+    return (
+      <Button
+        variant="ghost"
+        size="sm"
+        className="h-7 gap-1 text-muted-foreground"
+        onClick={() => setAdding(true)}
+      >
+        <Plus className="h-3.5 w-3.5" />
+        新增年级
+      </Button>
+    );
+  }
+
   return (
-    <div>
-      <h3 className="mb-3 text-lg font-semibold">年级管理</h3>
-      <div className="flex flex-wrap items-center gap-2">
-        {sortedGrades.map((g) => (
-          <Badge
-            key={g.id}
-            variant={g.status === "active" ? "outline" : "secondary"}
-            className="cursor-pointer px-3 py-1"
-            onClick={() => {
-              setCurrentGrade(g);
-              setOpen("edit-grade");
-            }}
-          >
-            {g.name} ({g.sort})
-          </Badge>
-        ))}
-        <div className="inline-flex items-center gap-1">
-          <Input
-            className="h-8 w-[100px]"
-            placeholder="年级名称"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-          <Input
-            className="h-8 w-[60px]"
-            placeholder="排序"
-            type="number"
-            value={sort}
-            onChange={(e) => setSort(e.target.value)}
-          />
-          <Button size="sm" disabled={saving || !name.trim()} onClick={handleAdd}>
-            添加
-          </Button>
-        </div>
-      </div>
+    <div className="flex items-center gap-1 border-t border-dashed pt-2">
+      <Input
+        className="h-7 w-[100px]"
+        placeholder="年级名称"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+        autoFocus
+      />
+      <Input
+        className="h-7 w-[60px]"
+        placeholder="排序"
+        type="number"
+        value={sort}
+        onChange={(e) => setSort(e.target.value)}
+      />
+      <Button
+        size="sm"
+        variant="outline"
+        className="h-7"
+        disabled={saving || !name.trim()}
+        onClick={handleAdd}
+      >
+        添加
+      </Button>
+      <Button
+        size="sm"
+        variant="ghost"
+        className="h-7"
+        onClick={() => {
+          setAdding(false);
+          setName("");
+          setSort("");
+        }}
+      >
+        取消
+      </Button>
     </div>
   );
 }
