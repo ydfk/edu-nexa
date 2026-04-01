@@ -1,24 +1,19 @@
-/*
- * @Description: Copyright (c) ydfk. All rights reserved
- * @Author: ydfk
- * @Date: 2025-03-11 11:00:18
- * @LastEditors: ydfk
- * @LastEditTime: 2025-03-11 11:12:05
- */
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { immer } from "zustand/middleware/immer";
 
+export type ThemeMode = "light" | "dark" | "system";
+
 interface ThemeState {
-  theme: "light" | "dark";
+  theme: ThemeMode;
   toggleTheme: () => void;
-  setTheme: (theme: "light" | "dark") => void;
+  setTheme: (theme: ThemeMode) => void;
 }
 
 export const useThemeStore = create<ThemeState>()(
   persist(
     immer((set) => ({
-      theme: "light",
+      theme: "system" as ThemeMode,
       toggleTheme: () =>
         set((state) => {
           state.theme = state.theme === "light" ? "dark" : "light";
@@ -28,8 +23,6 @@ export const useThemeStore = create<ThemeState>()(
           state.theme = theme;
         }),
     })),
-    {
-      name: "theme-storage",
-    }
+    { name: "theme-storage" }
   )
 );

@@ -28,6 +28,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { PageContent } from "@/components/page-content";
 import { findSimilarNames, hasExactName } from "@/lib/name-check";
 import {
   fetchClasses,
@@ -345,6 +346,7 @@ export default function SchoolsPage() {
   }
 
   return (
+    <PageContent>
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between gap-4">
         <div className="flex flex-col gap-1">
@@ -658,6 +660,7 @@ export default function SchoolsPage() {
         </DialogContent>
       </Dialog>
     </div>
+    </PageContent>
   );
 }
 

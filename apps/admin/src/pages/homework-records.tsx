@@ -30,6 +30,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { PageContent } from "@/components/page-content";
 import { useAdminSession } from "@/lib/auth/session";
 import { paginateItems } from "@/lib/list-page";
 import {
@@ -188,6 +189,7 @@ export default function HomeworkRecordsPage() {
   }
 
   return (
+    <PageContent>
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-4">
         <CardTitle className="text-lg">作业记录</CardTitle>
@@ -345,6 +347,7 @@ export default function HomeworkRecordsPage() {
         </DialogContent>
       </Dialog>
     </Card>
+    </PageContent>
   );
 }
 

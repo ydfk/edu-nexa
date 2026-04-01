@@ -1,54 +1,61 @@
-/*
- * @Description: Copyright (c) ydfk. All rights reserved
- * @Author: ydfk
- * @Date: 2025-03-11 11:00:35
- * @LastEditors: ydfk
- * @LastEditTime: 2025-03-11 11:00:47
- */
 import { createContext, useContext, useEffect, useState } from "react";
-import { useThemeStore } from "../store/theme-store";
-
-type Theme = "dark" | "light";
+import { useThemeStore, type ThemeMode } from "../store/theme-store";
 
 type ThemeProviderProps = {
   children: React.ReactNode;
-  defaultTheme?: Theme;
-  storageKey?: string;
+  defaultTheme?: ThemeMode;
 };
 
 type ThemeProviderState = {
-  theme: Theme;
-  setTheme: (theme: Theme) => void;
+  theme: ThemeMode;
+  setTheme: (theme: ThemeMode) => void;
   toggleTheme: () => void;
 };
 
 const initialState: ThemeProviderState = {
-  theme: "light",
+  theme: "system",
   setTheme: () => null,
   toggleTheme: () => null,
 };
 
 const ThemeProviderContext = createContext<ThemeProviderState>(initialState);
 
-export function ThemeProvider({ children, defaultTheme = "light", ...props }: ThemeProviderProps) {
+function getSystemTheme(): "light" | "dark" {
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
+function applyTheme(theme: ThemeMode) {
+  const root = window.document.documentElement;
+  root.classList.remove("light", "dark");
+  const resolved = theme === "system" ? getSystemTheme() : theme;
+  root.classList.add(resolved);
+}
+
+export function ThemeProvider({ children, defaultTheme = "system", ...props }: ThemeProviderProps) {
   const themeStore = useThemeStore();
-  const [theme, setTheme] = useState<Theme>(() => (themeStore.theme as Theme) || defaultTheme);
+  const [theme, setThemeState] = useState<ThemeMode>(() => (themeStore.theme as ThemeMode) || defaultTheme);
 
   useEffect(() => {
-    const root = window.document.documentElement;
-    root.classList.remove("light", "dark");
-    root.classList.add(theme);
+    applyTheme(theme);
+
+    if (theme === "system") {
+      const mq = window.matchMedia("(prefers-color-scheme: dark)");
+      const handler = () => applyTheme("system");
+      mq.addEventListener("change", handler);
+      return () => mq.removeEventListener("change", handler);
+    }
   }, [theme]);
 
-  const value = {
+  const value: ThemeProviderState = {
     theme,
-    setTheme: (theme: Theme) => {
-      themeStore.setTheme(theme);
-      setTheme(theme);
+    setTheme: (newTheme: ThemeMode) => {
+      themeStore.setTheme(newTheme);
+      setThemeState(newTheme);
     },
     toggleTheme: () => {
-      themeStore.toggleTheme();
-      setTheme(theme === "light" ? "dark" : "light");
+      const next = theme === "light" ? "dark" : "light";
+      themeStore.setTheme(next);
+      setThemeState(next);
     },
   };
 
@@ -61,8 +68,6 @@ export function ThemeProvider({ children, defaultTheme = "light", ...props }: Th
 
 export const useTheme = () => {
   const context = useContext(ThemeProviderContext);
-
   if (context === undefined) throw new Error("useTheme must be used within a ThemeProvider");
-
   return context;
 };

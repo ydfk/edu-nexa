@@ -3,7 +3,7 @@ import { toast } from "sonner";
 import { ListPagination } from "@/components/domain/list-pagination";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -21,6 +21,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { PageContent } from "@/components/page-content";
 import { paginateItems } from "@/lib/list-page";
 import {
   createUser,
@@ -134,6 +135,7 @@ export default function TeachersPage() {
   }
 
   return (
+    <PageContent>
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between gap-4">
         <div className="flex flex-col gap-1">
@@ -290,5 +292,6 @@ export default function TeachersPage() {
         </DialogContent>
       </Dialog>
     </div>
+    </PageContent>
   );
 }

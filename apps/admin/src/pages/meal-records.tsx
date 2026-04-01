@@ -30,6 +30,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { PageContent } from "@/components/page-content";
 import { useAdminSession } from "@/lib/auth/session";
 import { paginateItems } from "@/lib/list-page";
 import {
@@ -184,6 +185,7 @@ export default function MealRecordsPage() {
   }
 
   return (
+    <PageContent>
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between gap-4">
         <div className="flex flex-col gap-1">
@@ -342,6 +344,7 @@ export default function MealRecordsPage() {
         </DialogContent>
       </Dialog>
     </div>
+    </PageContent>
   );
 }
 

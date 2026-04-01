@@ -8,7 +8,6 @@ import {
 } from "@/components/auth/route-guards";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/theme-provider";
-import Unauthorized from "@/components/error/unauthorized";
 import Layout from "@/components/layout/layout";
 import DashboardPage from "@/pages/dashboard";
 import DailyHomeworkPage from "@/pages/daily-homework";
@@ -21,6 +20,12 @@ import ServiceCalendarPage from "@/pages/service-calendar";
 import StatisticsPage from "@/pages/statistics";
 import TeachersPage from "@/pages/teachers";
 import LoginPage from "@/pages/login";
+import NotFoundPage from "@/pages/errors/not-found";
+import ForbiddenPage from "@/pages/errors/forbidden";
+import ServerErrorPage from "@/pages/errors/server-error";
+import SettingsProfilePage from "@/pages/settings/index";
+import SettingsAppearancePage from "@/pages/settings/appearance";
+import { PageContent } from "@/components/page-content";
 import "./index.css";
 
 const router = createBrowserRouter([
@@ -83,7 +88,7 @@ const router = createBrowserRouter([
           {
             path: "students",
             element: (
-              <RequireRoles allowedRoles={["admin", "teacher"]}>
+              <RequireRoles allowedRoles={["admin", "teacher", "guardian"]}>
                 <StudentsPage />
               </RequireRoles>
             ),
@@ -106,13 +111,22 @@ const router = createBrowserRouter([
               </RequireRoles>
             ),
           },
+          // 设置页面
+          { path: "settings", element: <SettingsProfilePage /> },
+          { path: "settings/appearance", element: <SettingsAppearancePage /> },
+          // 错误示例页面（已登录状态下查看）
+          { path: "errors/not-found", element: <PageContent><NotFoundPage /></PageContent> },
+          { path: "errors/forbidden", element: <PageContent><ForbiddenPage /></PageContent> },
+          { path: "errors/server-error", element: <PageContent><ServerErrorPage /></PageContent> },
+          // 未匹配路由 → 404
+          { path: "*", element: <PageContent><NotFoundPage /></PageContent> },
         ],
       },
     ],
   },
   {
     path: "/401",
-    element: <Unauthorized />,
+    element: <ForbiddenPage />,
   },
   {
     element: <RedirectAuthenticatedUser />,
@@ -123,6 +137,8 @@ const router = createBrowserRouter([
       },
     ],
   },
+  // 未登录情况下的 404
+  { path: "*", element: <NotFoundPage /> },
 ]);
 
 createRoot(document.getElementById("root")!).render(

@@ -23,6 +23,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { PageContent } from "@/components/page-content";
 import { paginateItems } from "@/lib/list-page";
 import { fetchServiceDays, saveServiceDay, type ServiceDayItem } from "@/lib/server-data";
 
@@ -136,6 +137,7 @@ export default function ServiceCalendarPage() {
   }
 
   return (
+    <PageContent>
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-4">
         <CardTitle className="text-lg">服务日历</CardTitle>
@@ -268,6 +270,7 @@ export default function ServiceCalendarPage() {
         </DialogContent>
       </Dialog>
     </Card>
+    </PageContent>
   );
 }
 
