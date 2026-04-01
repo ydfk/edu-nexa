@@ -1,41 +1,29 @@
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { DotsHorizontalIcon } from "@radix-ui/react-icons";
 import {
-  type ColumnDef,
-  type ColumnFiltersState,
-  type SortingState,
-  type VisibilityState,
-  flexRender,
-  getCoreRowModel,
-  getFilteredRowModel,
-  getPaginationRowModel,
-  getSortedRowModel,
-  useReactTable,
-} from "@tanstack/react-table";
-import { AlertTriangle, Pencil, Plus } from "lucide-react";
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+import { ChevronRight, Pencil, Plus, School } from "lucide-react";
 import { toast } from "sonner";
-import {
-  DataTableColumnHeader,
-  DataTablePagination,
-  DataTableToolbar,
-} from "@/components/data-table";
 import { PageContent } from "@/components/page-content";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -45,22 +33,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
+import { Separator } from "@/components/ui/separator";
 import useDialogState from "@/hooks/use-dialog-state";
 import { findSimilarNames, hasExactName } from "@/lib/name-check";
+import { cn } from "@/lib/utils";
 import {
   fetchClasses,
   fetchGrades,
@@ -72,1133 +48,591 @@ import {
   type ClassItem,
   type GradeItem,
   type SchoolItem,
-  type StudentItem,
 } from "@/lib/server-data";
 
-// ---------------------------------------------------------------------------
-// 类型定义
-// ---------------------------------------------------------------------------
+// ── 类型与上下文 ──────────────────────────────────────────
 
-type SchoolsDialogType =
-  | "add-school"
-  | "edit-school"
-  | "add-grade"
-  | "edit-grade"
-  | "add-class"
-  | "edit-class";
+type DialogType = "add-school" | "edit-school" | "edit-class" | "edit-grade";
 
 type SchoolsContextValue = {
-  classes: ClassItem[];
-  grades: GradeItem[];
-  loading: boolean;
-  open: SchoolsDialogType | null;
-  schools: SchoolItem[];
-  setOpen: (value: SchoolsDialogType | null) => void;
-  studentCountByClassID: Record<string, number>;
-  studentCountBySchoolID: Record<string, number>;
+  open: DialogType | null;
+  setOpen: (v: DialogType | null) => void;
   currentSchool: SchoolItem | null;
-  setCurrentSchool: (item: SchoolItem | null) => void;
-  currentGrade: GradeItem | null;
-  setCurrentGrade: (item: GradeItem | null) => void;
+  setCurrentSchool: (v: SchoolItem | null) => void;
   currentClass: ClassItem | null;
-  setCurrentClass: (item: ClassItem | null) => void;
-  classPreset: Partial<{ schoolId: string; gradeId: string }>;
-  setClassPreset: (preset: Partial<{ schoolId: string; gradeId: string }>) => void;
+  setCurrentClass: (v: ClassItem | null) => void;
+  currentGrade: GradeItem | null;
+  setCurrentGrade: (v: GradeItem | null) => void;
+  schools: SchoolItem[];
+  grades: GradeItem[];
+  classes: ClassItem[];
+  studentCountByClass: Record<string, number>;
+  reloadData: () => void;
 };
-
-// ---------------------------------------------------------------------------
-// 表单初始值
-// ---------------------------------------------------------------------------
-
-const initialSchoolForm = {
-  id: "",
-  name: "",
-  status: "active",
-};
-
-const initialGradeForm = {
-  id: "",
-  name: "",
-  sort: "0",
-  status: "active",
-};
-
-const initialClassForm = {
-  gradeId: "",
-  id: "",
-  name: "",
-  schoolId: "",
-  status: "active",
-};
-
-// ---------------------------------------------------------------------------
-// Context
-// ---------------------------------------------------------------------------
 
 const SchoolsContext = createContext<SchoolsContextValue | null>(null);
 
 function useSchoolsContext() {
   const ctx = useContext(SchoolsContext);
-  if (!ctx) throw new Error("useSchoolsContext must be used within SchoolsProvider");
+  if (!ctx) throw new Error("useSchoolsContext 需在 SchoolsPage 内使用");
   return ctx;
 }
 
-// ---------------------------------------------------------------------------
-// 主页面
-// ---------------------------------------------------------------------------
+// ── 主页面 ────────────────────────────────────────────────
 
 export default function SchoolsPage() {
-  const [open, setOpen] = useDialogState<SchoolsDialogType>();
-  const [classes, setClasses] = useState<ClassItem[]>([]);
-  const [grades, setGrades] = useState<GradeItem[]>([]);
-  const [loading, setLoading] = useState(true);
   const [schools, setSchools] = useState<SchoolItem[]>([]);
-  const [students, setStudents] = useState<StudentItem[]>([]);
+  const [grades, setGrades] = useState<GradeItem[]>([]);
+  const [classes, setClasses] = useState<ClassItem[]>([]);
+  const [studentCountByClass, setStudentCountByClass] = useState<
+    Record<string, number>
+  >({});
+  const [loading, setLoading] = useState(true);
 
+  const [open, setOpen] = useDialogState<DialogType>();
   const [currentSchool, setCurrentSchool] = useState<SchoolItem | null>(null);
-  const [currentGrade, setCurrentGrade] = useState<GradeItem | null>(null);
   const [currentClass, setCurrentClass] = useState<ClassItem | null>(null);
-  const [classPreset, setClassPreset] = useState<Partial<{ schoolId: string; gradeId: string }>>({});
+  const [currentGrade, setCurrentGrade] = useState<GradeItem | null>(null);
 
-  useEffect(() => {
-    void loadData();
-  }, []);
-
-  const studentCountByClassID = useMemo(() => {
-    return students.reduce<Record<string, number>>((acc, item) => {
-      if (!item.classId) return acc;
-      acc[item.classId] = (acc[item.classId] || 0) + 1;
-      return acc;
-    }, {});
-  }, [students]);
-
-  const studentCountBySchoolID = useMemo(() => {
-    return students.reduce<Record<string, number>>((acc, item) => {
-      if (!item.schoolId) return acc;
-      acc[item.schoolId] = (acc[item.schoolId] || 0) + 1;
-      return acc;
-    }, {});
-  }, [students]);
-
-  async function loadData() {
-    setLoading(true);
+  const loadData = useCallback(async () => {
     try {
-      const [schoolItems, gradeItems, classItems, studentItems] = await Promise.all([
+      const [s, g, c, st] = await Promise.all([
         fetchSchools(),
         fetchGrades(),
         fetchClasses(),
         fetchStudents(),
       ]);
-      setSchools(schoolItems);
-      setGrades(gradeItems);
-      setClasses(classItems);
-      setStudents(studentItems);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "加载失败");
+      setSchools(s);
+      setGrades(g);
+      setClasses(c);
+      const countMap: Record<string, number> = {};
+      for (const stu of st) {
+        countMap[stu.classId] = (countMap[stu.classId] || 0) + 1;
+      }
+      setStudentCountByClass(countMap);
+    } catch {
+      toast.error("加载数据失败");
       setSchools([]);
       setGrades([]);
       setClasses([]);
-      setStudents([]);
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
-  const contextValue = useMemo<SchoolsContextValue>(
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const ctx = useMemo<SchoolsContextValue>(
     () => ({
-      classes,
-      grades,
-      loading,
       open,
-      schools,
       setOpen,
-      studentCountByClassID,
-      studentCountBySchoolID,
       currentSchool,
       setCurrentSchool,
-      currentGrade,
-      setCurrentGrade,
       currentClass,
       setCurrentClass,
-      classPreset,
-      setClassPreset,
+      currentGrade,
+      setCurrentGrade,
+      schools,
+      grades,
+      classes,
+      studentCountByClass,
+      reloadData: loadData,
     }),
     [
-      classes,
-      grades,
-      loading,
       open,
-      schools,
       setOpen,
-      studentCountByClassID,
-      studentCountBySchoolID,
       currentSchool,
-      currentGrade,
       currentClass,
-      classPreset,
-    ]
+      currentGrade,
+      schools,
+      grades,
+      classes,
+      studentCountByClass,
+      loadData,
+    ],
   );
 
-  return (
-    <SchoolsContext.Provider value={contextValue}>
+  if (loading) {
+    return (
       <PageContent>
-        <div className="flex flex-col gap-6">
+        <div className="flex h-[50vh] items-center justify-center text-muted-foreground">
+          加载中...
+        </div>
+      </PageContent>
+    );
+  }
+
+  return (
+    <SchoolsContext.Provider value={ctx}>
+      <PageContent>
+        <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">学校管理</h1>
-            <p className="text-sm text-muted-foreground">
-              管理学校、年级与班级信息
+            <h2 className="text-2xl font-bold tracking-tight">学校管理</h2>
+            <p className="text-muted-foreground">
+              管理学校、年级与班级的层级结构
             </p>
           </div>
-
-          <Tabs defaultValue="schools">
-            <TabsList>
-              <TabsTrigger value="schools">学校</TabsTrigger>
-              <TabsTrigger value="grades">年级</TabsTrigger>
-              <TabsTrigger value="classes">班级</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="schools">
-              <SchoolsTab />
-            </TabsContent>
-            <TabsContent value="grades">
-              <GradesTab />
-            </TabsContent>
-            <TabsContent value="classes">
-              <ClassesTab />
-            </TabsContent>
-          </Tabs>
+          <Button onClick={() => setOpen("add-school")}>
+            <Plus className="mr-1 h-4 w-4" />
+            新增学校
+          </Button>
         </div>
 
-        <SchoolDialog onSuccess={loadData} />
-        <GradeDialog onSuccess={loadData} />
-        <ClassDialog onSuccess={loadData} />
+        {schools.length === 0 ? (
+          <div className="flex flex-col items-center justify-center gap-4 py-16 text-muted-foreground">
+            <School className="h-12 w-12" />
+            <p>暂无学校，点击上方按钮创建</p>
+          </div>
+        ) : (
+          <div className="mt-4 space-y-3">
+            {schools.map((s) => (
+              <SchoolTreeItem key={s.id} school={s} />
+            ))}
+          </div>
+        )}
+
+        <Separator className="my-6" />
+        <GradeManagement />
+        <SchoolsDialogs />
       </PageContent>
     </SchoolsContext.Provider>
   );
 }
 
-// ---------------------------------------------------------------------------
-// 学校 Tab
-// ---------------------------------------------------------------------------
+// ── 学校树节点 ──────────────────────────────────────────
 
-function SchoolsTab() {
-  const { schools, loading, studentCountBySchoolID, setOpen, setCurrentSchool } =
+function SchoolTreeItem({ school }: { school: SchoolItem }) {
+  const { classes, grades, studentCountByClass, setOpen, setCurrentSchool } =
     useSchoolsContext();
+  const [isOpen, setIsOpen] = useState(true);
 
-  const [sorting, setSorting] = useState<SortingState>([]);
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
-  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
-
-  const columns = useMemo<ColumnDef<SchoolItem>[]>(
-    () => [
-      {
-        accessorKey: "name",
-        header: ({ column }) => (
-          <DataTableColumnHeader column={column} title="学校名称" />
-        ),
-        cell: ({ row }) => (
-          <span className="font-medium">{row.getValue("name")}</span>
-        ),
-      },
-      {
-        id: "studentCount",
-        header: "学生数",
-        cell: ({ row }) => studentCountBySchoolID[row.original.id] || 0,
-        enableSorting: false,
-      },
-      {
-        accessorKey: "status",
-        header: ({ column }) => (
-          <DataTableColumnHeader column={column} title="状态" />
-        ),
-        cell: ({ row }) => (
-          <Badge
-            variant={row.getValue("status") === "active" ? "secondary" : "outline"}
-          >
-            {row.getValue("status") === "active" ? "启用" : "暂停"}
-          </Badge>
-        ),
-        filterFn: (row, id, value: string[]) => value.includes(row.getValue(id)),
-      },
-      {
-        id: "actions",
-        cell: ({ row }) => (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                className="h-8 w-8 p-0 data-[state=open]:bg-muted"
-              >
-                <DotsHorizontalIcon className="h-4 w-4" />
-                <span className="sr-only">操作</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem
-                onClick={() => {
-                  setCurrentSchool(row.original);
-                  setOpen("edit-school");
-                }}
-              >
-                <Pencil className="mr-2 h-4 w-4" />
-                编辑
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        ),
-        enableSorting: false,
-        enableHiding: false,
-      },
-    ],
-    [studentCountBySchoolID, setCurrentSchool, setOpen]
+  const schoolClasses = useMemo(
+    () => classes.filter((c) => c.schoolId === school.id),
+    [classes, school.id],
   );
 
-  const table = useReactTable({
-    data: schools,
-    columns,
-    state: { sorting, columnFilters, columnVisibility },
-    onSortingChange: setSorting,
-    onColumnFiltersChange: setColumnFilters,
-    onColumnVisibilityChange: setColumnVisibility,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-  });
-
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-medium">学校列表</h2>
-        <Button
-          className="space-x-1"
-          onClick={() => {
-            setCurrentSchool(null);
-            setOpen("add-school");
-          }}
-        >
-          <span>新增学校</span> <Plus size={18} />
-        </Button>
-      </div>
-
-      {loading ? (
-        <div className="text-sm text-muted-foreground">加载中…</div>
-      ) : (
-        <>
-          <DataTableToolbar
-            table={table}
-            searchPlaceholder="搜索学校名称…"
-          />
-          <div className="overflow-hidden rounded-md border">
-            <Table>
-              <TableHeader>
-                {table.getHeaderGroups().map((headerGroup) => (
-                  <TableRow key={headerGroup.id}>
-                    {headerGroup.headers.map((header) => (
-                      <TableHead key={header.id} colSpan={header.colSpan}>
-                        {header.isPlaceholder
-                          ? null
-                          : flexRender(
-                              header.column.columnDef.header,
-                              header.getContext()
-                            )}
-                      </TableHead>
-                    ))}
-                  </TableRow>
-                ))}
-              </TableHeader>
-              <TableBody>
-                {table.getRowModel().rows.length ? (
-                  table.getRowModel().rows.map((row) => (
-                    <TableRow key={row.id} className="group/row">
-                      {row.getVisibleCells().map((cell) => (
-                        <TableCell
-                          key={cell.id}
-                          className="bg-background group-hover/row:bg-muted/50"
-                        >
-                          {flexRender(
-                            cell.column.columnDef.cell,
-                            cell.getContext()
-                          )}
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell
-                      colSpan={columns.length}
-                      className="h-24 text-center"
-                    >
-                      暂无学校
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
-          <DataTablePagination table={table} />
-        </>
-      )}
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// 年级 Tab
-// ---------------------------------------------------------------------------
-
-function GradesTab() {
-  const { grades, loading, setOpen, setCurrentGrade } = useSchoolsContext();
-
-  const [sorting, setSorting] = useState<SortingState>([]);
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
-  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
-
-  const columns = useMemo<ColumnDef<GradeItem>[]>(
-    () => [
-      {
-        accessorKey: "name",
-        header: ({ column }) => (
-          <DataTableColumnHeader column={column} title="年级名称" />
-        ),
-        cell: ({ row }) => (
-          <span className="font-medium">{row.getValue("name")}</span>
-        ),
-      },
-      {
-        accessorKey: "sort",
-        header: ({ column }) => (
-          <DataTableColumnHeader column={column} title="排序" />
-        ),
-        cell: ({ row }) => row.getValue("sort"),
-      },
-      {
-        accessorKey: "status",
-        header: ({ column }) => (
-          <DataTableColumnHeader column={column} title="状态" />
-        ),
-        cell: ({ row }) => (
-          <Badge
-            variant={row.getValue("status") === "active" ? "secondary" : "outline"}
-          >
-            {row.getValue("status") === "active" ? "启用" : "暂停"}
-          </Badge>
-        ),
-        filterFn: (row, id, value: string[]) => value.includes(row.getValue(id)),
-      },
-      {
-        id: "actions",
-        cell: ({ row }) => (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                className="h-8 w-8 p-0 data-[state=open]:bg-muted"
-              >
-                <DotsHorizontalIcon className="h-4 w-4" />
-                <span className="sr-only">操作</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem
-                onClick={() => {
-                  setCurrentGrade(row.original);
-                  setOpen("edit-grade");
-                }}
-              >
-                <Pencil className="mr-2 h-4 w-4" />
-                编辑
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        ),
-        enableSorting: false,
-        enableHiding: false,
-      },
-    ],
-    [setCurrentGrade, setOpen]
+  const sortedGrades = useMemo(
+    () => grades.slice().sort((a, b) => a.sort - b.sort),
+    [grades],
   );
 
-  const table = useReactTable({
-    data: grades,
-    columns,
-    state: { sorting, columnFilters, columnVisibility },
-    onSortingChange: setSorting,
-    onColumnFiltersChange: setColumnFilters,
-    onColumnVisibilityChange: setColumnVisibility,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-  });
-
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-medium">年级列表</h2>
-        <Button
-          className="space-x-1"
-          onClick={() => {
-            setCurrentGrade(null);
-            setOpen("add-grade");
-          }}
-        >
-          <span>新增年级</span> <Plus size={18} />
-        </Button>
-      </div>
-
-      {loading ? (
-        <div className="text-sm text-muted-foreground">加载中…</div>
-      ) : (
-        <>
-          <DataTableToolbar
-            table={table}
-            searchPlaceholder="搜索年级名称…"
-          />
-          <div className="overflow-hidden rounded-md border">
-            <Table>
-              <TableHeader>
-                {table.getHeaderGroups().map((headerGroup) => (
-                  <TableRow key={headerGroup.id}>
-                    {headerGroup.headers.map((header) => (
-                      <TableHead key={header.id} colSpan={header.colSpan}>
-                        {header.isPlaceholder
-                          ? null
-                          : flexRender(
-                              header.column.columnDef.header,
-                              header.getContext()
-                            )}
-                      </TableHead>
-                    ))}
-                  </TableRow>
-                ))}
-              </TableHeader>
-              <TableBody>
-                {table.getRowModel().rows.length ? (
-                  table.getRowModel().rows.map((row) => (
-                    <TableRow key={row.id} className="group/row">
-                      {row.getVisibleCells().map((cell) => (
-                        <TableCell
-                          key={cell.id}
-                          className="bg-background group-hover/row:bg-muted/50"
-                        >
-                          {flexRender(
-                            cell.column.columnDef.cell,
-                            cell.getContext()
-                          )}
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell
-                      colSpan={columns.length}
-                      className="h-24 text-center"
-                    >
-                      暂无年级
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
-          <DataTablePagination table={table} />
-        </>
-      )}
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// 班级 Tab
-// ---------------------------------------------------------------------------
-
-type ClassRow = ClassItem & {
-  schoolName: string;
-  gradeName: string;
-  studentCount: number;
-};
-
-function ClassesTab() {
-  const {
-    classes,
-    grades,
-    loading,
-    schools,
-    studentCountByClassID,
-    setOpen,
-    setCurrentClass,
-    setClassPreset,
-  } = useSchoolsContext();
-
-  const [sorting, setSorting] = useState<SortingState>([]);
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
-  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
-
-  // 级联筛选
-  const [filterSchoolId, setFilterSchoolId] = useState<string>("__all__");
-  const [filterGradeId, setFilterGradeId] = useState<string>("__all__");
-
-  const filteredGrades = useMemo(
-    () =>
-      filterSchoolId === "__all__"
-        ? grades
-        : grades,
-    [filterSchoolId, grades]
-  );
-
-  const rows = useMemo<ClassRow[]>(() => {
-    let items = classes;
-    if (filterSchoolId !== "__all__") {
-      items = items.filter((c) => c.schoolId === filterSchoolId);
+  // 按年级分组
+  const gradeClassMap = useMemo(() => {
+    const map: Record<string, ClassItem[]> = {};
+    for (const c of schoolClasses) {
+      (map[c.gradeId] ??= []).push(c);
     }
-    if (filterGradeId !== "__all__") {
-      items = items.filter((c) => c.gradeId === filterGradeId);
-    }
-    return items.map((c) => ({
-      ...c,
-      schoolName: schools.find((s) => s.id === c.schoolId)?.name || c.schoolName,
-      gradeName: grades.find((g) => g.id === c.gradeId)?.name || c.gradeName,
-      studentCount: studentCountByClassID[c.id] || 0,
-    }));
-  }, [classes, schools, grades, studentCountByClassID, filterSchoolId, filterGradeId]);
+    return map;
+  }, [schoolClasses]);
 
-  const columns = useMemo<ColumnDef<ClassRow>[]>(
-    () => [
-      {
-        accessorKey: "name",
-        header: ({ column }) => (
-          <DataTableColumnHeader column={column} title="班级名称" />
-        ),
-        cell: ({ row }) => (
-          <span className="font-medium">{row.getValue("name")}</span>
-        ),
-      },
-      {
-        accessorKey: "schoolName",
-        header: ({ column }) => (
-          <DataTableColumnHeader column={column} title="所属学校" />
-        ),
-      },
-      {
-        accessorKey: "gradeName",
-        header: ({ column }) => (
-          <DataTableColumnHeader column={column} title="所属年级" />
-        ),
-      },
-      {
-        accessorKey: "studentCount",
-        header: ({ column }) => (
-          <DataTableColumnHeader column={column} title="学生数" />
-        ),
-      },
-      {
-        accessorKey: "status",
-        header: ({ column }) => (
-          <DataTableColumnHeader column={column} title="状态" />
-        ),
-        cell: ({ row }) => (
-          <Badge
-            variant={row.getValue("status") === "active" ? "secondary" : "outline"}
-          >
-            {row.getValue("status") === "active" ? "启用" : "暂停"}
-          </Badge>
-        ),
-        filterFn: (row, id, value: string[]) => value.includes(row.getValue(id)),
-      },
-      {
-        id: "actions",
-        cell: ({ row }) => (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                className="h-8 w-8 p-0 data-[state=open]:bg-muted"
-              >
-                <DotsHorizontalIcon className="h-4 w-4" />
-                <span className="sr-only">操作</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem
-                onClick={() => {
-                  setCurrentClass(row.original);
-                  setOpen("edit-class");
-                }}
-              >
-                <Pencil className="mr-2 h-4 w-4" />
-                编辑
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        ),
-        enableSorting: false,
-        enableHiding: false,
-      },
-    ],
-    [setCurrentClass, setOpen]
+  const classCount = schoolClasses.length;
+  const studentTotal = schoolClasses.reduce(
+    (sum, c) => sum + (studentCountByClass[c.id] ?? 0),
+    0,
   );
 
-  const table = useReactTable({
-    data: rows,
-    columns,
-    state: { sorting, columnFilters, columnVisibility },
-    onSortingChange: setSorting,
-    onColumnFiltersChange: setColumnFilters,
-    onColumnVisibilityChange: setColumnVisibility,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-  });
-
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-medium">班级列表</h2>
-        <Button
-          className="space-x-1"
-          onClick={() => {
-            setCurrentClass(null);
-            setClassPreset({});
-            setOpen("add-class");
-          }}
-        >
-          <span>新增班级</span> <Plus size={18} />
-        </Button>
-      </div>
-
-      {loading ? (
-        <div className="text-sm text-muted-foreground">加载中…</div>
-      ) : (
-        <>
-          {/* 级联筛选 + 全局搜索 */}
-          <div className="flex flex-wrap items-end gap-2">
-            <div className="flex flex-col gap-1">
-              <Label className="text-xs text-muted-foreground">学校</Label>
-              <Select
-                value={filterSchoolId}
-                onValueChange={(v) => {
-                  setFilterSchoolId(v);
-                  setFilterGradeId("__all__");
-                }}
-              >
-                <SelectTrigger className="h-8 w-[180px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__all__">全部学校</SelectItem>
-                  {schools.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>
-                      {s.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex flex-col gap-1">
-              <Label className="text-xs text-muted-foreground">年级</Label>
-              <Select value={filterGradeId} onValueChange={setFilterGradeId}>
-                <SelectTrigger className="h-8 w-[180px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__all__">全部年级</SelectItem>
-                  {filteredGrades.map((g) => (
-                    <SelectItem key={g.id} value={g.id}>
-                      {g.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex-1">
-              <DataTableToolbar
-                table={table}
-                searchPlaceholder="搜索班级名称…"
+    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+      <CollapsibleTrigger asChild>
+        <div className="flex cursor-pointer items-center gap-2 rounded-lg border p-3 hover:bg-muted/50">
+          <ChevronRight
+            className={cn(
+              "h-4 w-4 shrink-0 transition-transform duration-200",
+              isOpen && "rotate-90",
+            )}
+          />
+          <School className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <span className="font-semibold">{school.name}</span>
+          <Badge variant="outline" className="ml-1">
+            {classCount}个班级
+          </Badge>
+          <span className="text-xs text-muted-foreground">
+            {studentTotal}人
+          </span>
+          <Badge
+            variant={school.status === "active" ? "default" : "secondary"}
+          >
+            {school.status === "active" ? "启用" : "暂停"}
+          </Badge>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="ml-auto h-7 w-7"
+            onClick={(e) => {
+              e.stopPropagation();
+              setCurrentSchool(school);
+              setOpen("edit-school");
+            }}
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <div className="ml-4 mt-2 space-y-3 border-l-2 border-muted pl-4">
+          {sortedGrades
+            .filter((g) => gradeClassMap[g.id]?.length)
+            .map((g) => (
+              <GradeGroup
+                key={g.id}
+                grade={g}
+                school={school}
+                classes={gradeClassMap[g.id]}
               />
-            </div>
-          </div>
-
-          <div className="overflow-hidden rounded-md border">
-            <Table>
-              <TableHeader>
-                {table.getHeaderGroups().map((headerGroup) => (
-                  <TableRow key={headerGroup.id}>
-                    {headerGroup.headers.map((header) => (
-                      <TableHead key={header.id} colSpan={header.colSpan}>
-                        {header.isPlaceholder
-                          ? null
-                          : flexRender(
-                              header.column.columnDef.header,
-                              header.getContext()
-                            )}
-                      </TableHead>
-                    ))}
-                  </TableRow>
-                ))}
-              </TableHeader>
-              <TableBody>
-                {table.getRowModel().rows.length ? (
-                  table.getRowModel().rows.map((row) => (
-                    <TableRow key={row.id} className="group/row">
-                      {row.getVisibleCells().map((cell) => (
-                        <TableCell
-                          key={cell.id}
-                          className="bg-background group-hover/row:bg-muted/50"
-                        >
-                          {flexRender(
-                            cell.column.columnDef.cell,
-                            cell.getContext()
-                          )}
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell
-                      colSpan={columns.length}
-                      className="h-24 text-center"
-                    >
-                      暂无班级
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
-          <DataTablePagination table={table} />
-        </>
-      )}
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// 学校 Dialog
-// ---------------------------------------------------------------------------
-
-function SchoolDialog({ onSuccess }: { onSuccess: () => Promise<void> }) {
-  const { open, setOpen, schools, currentSchool } = useSchoolsContext();
-  const isOpen = open === "add-school" || open === "edit-school";
-  const isEdit = open === "edit-school";
-
-  const [form, setForm] = useState(initialSchoolForm);
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (isOpen) {
-      setForm(
-        isEdit && currentSchool
-          ? { id: currentSchool.id, name: currentSchool.name, status: currentSchool.status }
-          : initialSchoolForm
-      );
-    }
-  }, [isOpen, isEdit, currentSchool]);
-
-  const exactDuplicate = hasExactName(schools, form.name, form.id);
-  const similarItems = findSimilarNames(schools, form.name, form.id);
-
-  async function handleSave() {
-    if (!form.name.trim()) {
-      toast.error("学校名称不能为空");
-      return;
-    }
-    if (exactDuplicate) {
-      toast.error("学校名称已存在");
-      return;
-    }
-    setSaving(true);
-    try {
-      await saveSchool({
-        id: form.id || undefined,
-        name: form.name.trim(),
-        status: form.status,
-      });
-      toast.success("已保存");
-      setOpen(null);
-      await onSuccess();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "保存失败");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <Dialog open={isOpen} onOpenChange={() => setOpen(null)}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>{isEdit ? "编辑学校" : "新增学校"}</DialogTitle>
-        </DialogHeader>
-        <div className="grid gap-4 py-2">
-          <div className="grid gap-2">
-            <Label>学校名称</Label>
-            <Input
-              value={form.name}
-              onChange={(e) => setForm((c) => ({ ...c, name: e.target.value }))}
-            />
-          </div>
-          <DuplicateAlert exact={exactDuplicate} similarItems={similarItems} />
-          <div className="grid gap-2">
-            <Label>状态</Label>
-            <Select
-              value={form.status}
-              onValueChange={(v) => setForm((c) => ({ ...c, status: v }))}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="active">启用</SelectItem>
-                <SelectItem value="paused">暂停</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+            ))}
+          {classCount === 0 && (
+            <p className="py-2 text-sm text-muted-foreground">暂无班级</p>
+          )}
+          <AddClassInline school={school} />
         </div>
-        <DialogFooter>
-          <Button disabled={saving || exactDuplicate} onClick={handleSave}>
-            {saving ? "保存中..." : "保存"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 
-// ---------------------------------------------------------------------------
-// 年级 Dialog
-// ---------------------------------------------------------------------------
+// ── 年级分组（班级卡片） ────────────────────────────────
 
-function GradeDialog({ onSuccess }: { onSuccess: () => Promise<void> }) {
-  const { open, setOpen, grades, currentGrade } = useSchoolsContext();
-  const isOpen = open === "add-grade" || open === "edit-grade";
-  const isEdit = open === "edit-grade";
-
-  const [form, setForm] = useState(initialGradeForm);
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (isOpen) {
-      setForm(
-        isEdit && currentGrade
-          ? {
-              id: currentGrade.id,
-              name: currentGrade.name,
-              sort: String(currentGrade.sort),
-              status: currentGrade.status,
-            }
-          : initialGradeForm
-      );
-    }
-  }, [isOpen, isEdit, currentGrade]);
-
-  const exactDuplicate = hasExactName(grades, form.name, form.id);
-  const similarItems = findSimilarNames(grades, form.name, form.id);
-
-  async function handleSave() {
-    if (!form.name.trim()) {
-      toast.error("年级名称不能为空");
-      return;
-    }
-    if (exactDuplicate) {
-      toast.error("年级名称已存在");
-      return;
-    }
-    setSaving(true);
-    try {
-      await saveGrade({
-        id: form.id || undefined,
-        name: form.name.trim(),
-        sort: Number(form.sort || 0),
-        status: form.status,
-      });
-      toast.success("已保存");
-      setOpen(null);
-      await onSuccess();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "保存失败");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <Dialog open={isOpen} onOpenChange={() => setOpen(null)}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>{isEdit ? "编辑年级" : "新增年级"}</DialogTitle>
-        </DialogHeader>
-        <div className="grid gap-4 py-2">
-          <div className="grid gap-2">
-            <Label>年级名称</Label>
-            <Input
-              value={form.name}
-              onChange={(e) => setForm((c) => ({ ...c, name: e.target.value }))}
-            />
-          </div>
-          <DuplicateAlert exact={exactDuplicate} similarItems={similarItems} />
-          <div className="grid gap-2">
-            <Label>排序</Label>
-            <Input
-              value={form.sort}
-              onChange={(e) => setForm((c) => ({ ...c, sort: e.target.value }))}
-            />
-          </div>
-          <div className="grid gap-2">
-            <Label>状态</Label>
-            <Select
-              value={form.status}
-              onValueChange={(v) => setForm((c) => ({ ...c, status: v }))}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="active">启用</SelectItem>
-                <SelectItem value="paused">暂停</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-        <DialogFooter>
-          <Button disabled={saving || exactDuplicate} onClick={handleSave}>
-            {saving ? "保存中..." : "保存"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// 班级 Dialog
-// ---------------------------------------------------------------------------
-
-function ClassDialog({ onSuccess }: { onSuccess: () => Promise<void> }) {
-  const { open, setOpen, schools, grades, classes, currentClass, classPreset } =
+function GradeGroup({
+  grade,
+  school,
+  classes: gradeClasses,
+}: {
+  grade: GradeItem;
+  school: SchoolItem;
+  classes: ClassItem[];
+}) {
+  const { studentCountByClass, setOpen, setCurrentClass, reloadData } =
     useSchoolsContext();
-  const isOpen = open === "add-class" || open === "edit-class";
-  const isEdit = open === "edit-class";
-
-  const [form, setForm] = useState(initialClassForm);
+  const [adding, setAdding] = useState(false);
+  const [newName, setNewName] = useState("");
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    if (isOpen) {
-      setForm(
-        isEdit && currentClass
-          ? {
-              gradeId: currentClass.gradeId,
-              id: currentClass.id,
-              name: currentClass.name,
-              schoolId: currentClass.schoolId,
-              status: currentClass.status,
-            }
-          : {
-              ...initialClassForm,
-              gradeId: classPreset.gradeId || grades[0]?.id || "",
-              schoolId: classPreset.schoolId || schools[0]?.id || "",
-              status: "active",
-            }
-      );
-    }
-  }, [isOpen, isEdit, currentClass, classPreset, grades, schools]);
-
-  const exactDuplicate = hasExactName(classes, form.name, form.id);
-  const similarItems = findSimilarNames(classes, form.name, form.id);
-
-  async function handleSave() {
-    const school = schools.find((s) => s.id === form.schoolId);
-    const grade = grades.find((g) => g.id === form.gradeId);
-    if (!school || !grade || !form.name.trim()) {
-      toast.error("学校、年级、班级名称不能为空");
-      return;
-    }
-    if (exactDuplicate) {
-      toast.error("班级名称已存在");
-      return;
-    }
+  const handleQuickAdd = async () => {
+    const name = newName.trim();
+    if (!name) return;
     setSaving(true);
     try {
       await saveClass({
-        gradeId: grade.id,
-        gradeName: grade.name,
-        id: form.id || undefined,
-        name: form.name.trim(),
+        name,
         schoolId: school.id,
         schoolName: school.name,
-        status: form.status,
+        gradeId: grade.id,
+        gradeName: grade.name,
+        status: "active",
       });
-      toast.success("已保存");
-      setOpen(null);
-      await onSuccess();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "保存失败");
+      toast.success(`班级「${name}」已添加`);
+      setNewName("");
+      setAdding(false);
+      reloadData();
+    } catch {
+      toast.error("添加失败");
     } finally {
       setSaving(false);
     }
-  }
+  };
 
   return (
-    <Dialog open={isOpen} onOpenChange={() => setOpen(null)}>
+    <div>
+      <p className="mb-1 text-sm font-medium text-muted-foreground">
+        📚 {grade.name}
+      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        {gradeClasses.map((c) => (
+          <div
+            key={c.id}
+            className="inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm"
+          >
+            <span>{c.name}</span>
+            <span className="text-muted-foreground">
+              ({studentCountByClass[c.id] ?? 0}人)
+            </span>
+            <Button
+              variant="ghost"
+              className="h-6 w-6 p-0"
+              onClick={() => {
+                setCurrentClass(c);
+                setOpen("edit-class");
+              }}
+            >
+              <Pencil size={14} />
+            </Button>
+          </div>
+        ))}
+
+        {adding ? (
+          <div className="inline-flex items-center gap-1">
+            <Input
+              className="h-7 w-[100px]"
+              placeholder="班级名称"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleQuickAdd()}
+              autoFocus
+            />
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7"
+              disabled={saving}
+              onClick={handleQuickAdd}
+            >
+              确定
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7"
+              onClick={() => {
+                setAdding(false);
+                setNewName("");
+              }}
+            >
+              取消
+            </Button>
+          </div>
+        ) : (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 w-7 p-0"
+            onClick={() => setAdding(true)}
+          >
+            <Plus className="h-3.5 w-3.5" />
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── 学校内快捷添加班级 ──────────────────────────────────
+
+function AddClassInline({ school }: { school: SchoolItem }) {
+  const { grades, reloadData } = useSchoolsContext();
+  const [gradeId, setGradeId] = useState("");
+  const [name, setName] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const sortedGrades = useMemo(
+    () => grades.slice().sort((a, b) => a.sort - b.sort),
+    [grades],
+  );
+
+  const handleAdd = async () => {
+    const trimmed = name.trim();
+    if (!trimmed || !gradeId) return;
+    const grade = grades.find((g) => g.id === gradeId);
+    if (!grade) return;
+    setSaving(true);
+    try {
+      await saveClass({
+        name: trimmed,
+        schoolId: school.id,
+        schoolName: school.name,
+        gradeId: grade.id,
+        gradeName: grade.name,
+        status: "active",
+      });
+      toast.success(`班级「${trimmed}」已添加`);
+      setName("");
+      setGradeId("");
+      reloadData();
+    } catch {
+      toast.error("添加失败");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-2 border-t border-dashed pt-2">
+      <Select value={gradeId} onValueChange={setGradeId}>
+        <SelectTrigger className="h-8 w-[120px]">
+          <SelectValue placeholder="选择年级" />
+        </SelectTrigger>
+        <SelectContent>
+          {sortedGrades.map((g) => (
+            <SelectItem key={g.id} value={g.id}>
+              {g.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <Input
+        className="h-8 w-[140px]"
+        placeholder="班级名称"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+      />
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={saving || !gradeId || !name.trim()}
+        onClick={handleAdd}
+      >
+        添加
+      </Button>
+    </div>
+  );
+}
+
+// ── 年级管理 ──────────────────────────────────────────────
+
+function GradeManagement() {
+  const { grades, setOpen, setCurrentGrade, reloadData } = useSchoolsContext();
+  const [name, setName] = useState("");
+  const [sort, setSort] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const sortedGrades = useMemo(
+    () => grades.slice().sort((a, b) => a.sort - b.sort),
+    [grades],
+  );
+
+  const handleAdd = async () => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    setSaving(true);
+    try {
+      await saveGrade({
+        name: trimmed,
+        sort: Number(sort) || 0,
+        status: "active",
+      });
+      toast.success(`年级「${trimmed}」已添加`);
+      setName("");
+      setSort("");
+      reloadData();
+    } catch {
+      toast.error("添加失败");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div>
+      <h3 className="mb-3 text-lg font-semibold">年级管理</h3>
+      <div className="flex flex-wrap items-center gap-2">
+        {sortedGrades.map((g) => (
+          <Badge
+            key={g.id}
+            variant={g.status === "active" ? "outline" : "secondary"}
+            className="cursor-pointer px-3 py-1"
+            onClick={() => {
+              setCurrentGrade(g);
+              setOpen("edit-grade");
+            }}
+          >
+            {g.name} ({g.sort})
+          </Badge>
+        ))}
+        <div className="inline-flex items-center gap-1">
+          <Input
+            className="h-8 w-[100px]"
+            placeholder="年级名称"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+          <Input
+            className="h-8 w-[60px]"
+            placeholder="排序"
+            type="number"
+            value={sort}
+            onChange={(e) => setSort(e.target.value)}
+          />
+          <Button size="sm" disabled={saving || !name.trim()} onClick={handleAdd}>
+            添加
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── 弹窗容器 ──────────────────────────────────────────────
+
+function SchoolsDialogs() {
+  const { open } = useSchoolsContext();
+  return (
+    <>
+      {(open === "add-school" || open === "edit-school") && <SchoolFormDialog />}
+      {open === "edit-class" && <EditClassDialog />}
+      {open === "edit-grade" && <EditGradeDialog />}
+    </>
+  );
+}
+
+// ── 学校表单弹窗 ────────────────────────────────────────
+
+function SchoolFormDialog() {
+  const { open, setOpen, currentSchool, schools, reloadData } =
+    useSchoolsContext();
+  const isEdit = open === "edit-school";
+  const [form, setForm] = useState({
+    name: isEdit && currentSchool ? currentSchool.name : "",
+    status: isEdit && currentSchool ? currentSchool.status : "active",
+  });
+  const [saving, setSaving] = useState(false);
+
+  const exactDup = hasExactName(schools, form.name, currentSchool?.id);
+  const similar = findSimilarNames(schools, form.name, currentSchool?.id);
+
+  const handleSave = async () => {
+    if (exactDup) return;
+    setSaving(true);
+    try {
+      await saveSchool({
+        ...(isEdit && currentSchool ? { id: currentSchool.id } : {}),
+        name: form.name.trim(),
+        status: form.status,
+      });
+      toast.success(isEdit ? "学校已更新" : "学校已创建");
+      setOpen(null);
+      reloadData();
+    } catch {
+      toast.error("保存失败");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open onOpenChange={() => setOpen(null)}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{isEdit ? "编辑班级" : "新增班级"}</DialogTitle>
+          <DialogTitle>{isEdit ? "编辑学校" : "新增学校"}</DialogTitle>
+          <DialogDescription>
+            {isEdit ? "修改学校信息" : "填写学校名称创建新学校"}
+          </DialogDescription>
         </DialogHeader>
-        <div className="grid gap-4 py-2">
-          <div className="grid gap-2">
-            <Label>学校</Label>
-            <Select
-              value={form.schoolId}
-              onValueChange={(v) => setForm((c) => ({ ...c, schoolId: v }))}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="选择学校" />
-              </SelectTrigger>
-              <SelectContent>
-                {schools.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>
-                    {s.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid gap-2">
-            <Label>年级</Label>
-            <Select
-              value={form.gradeId}
-              onValueChange={(v) => setForm((c) => ({ ...c, gradeId: v }))}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="选择年级" />
-              </SelectTrigger>
-              <SelectContent>
-                {grades.map((g) => (
-                  <SelectItem key={g.id} value={g.id}>
-                    {g.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid gap-2">
-            <Label>班级名称</Label>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label>学校名称</Label>
             <Input
               value={form.name}
-              onChange={(e) => setForm((c) => ({ ...c, name: e.target.value }))}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              placeholder="请输入学校名称"
             />
+            {exactDup && (
+              <p className="text-sm text-destructive">
+                已存在同名学校，请更换名称
+              </p>
+            )}
+            {!exactDup && similar.length > 0 && (
+              <p className="text-sm text-orange-500">
+                发现相似名称：{similar.map((s) => s.name).join("、")}
+              </p>
+            )}
           </div>
-          <DuplicateAlert exact={exactDuplicate} similarItems={similarItems} />
-          <div className="grid gap-2">
+          <div className="space-y-2">
             <Label>状态</Label>
             <Select
               value={form.status}
-              onValueChange={(v) => setForm((c) => ({ ...c, status: v }))}
+              onValueChange={(v) => setForm({ ...form, status: v })}
             >
               <SelectTrigger>
                 <SelectValue />
@@ -1211,7 +645,13 @@ function ClassDialog({ onSuccess }: { onSuccess: () => Promise<void> }) {
           </div>
         </div>
         <DialogFooter>
-          <Button disabled={saving || exactDuplicate} onClick={handleSave}>
+          <Button variant="outline" onClick={() => setOpen(null)}>
+            取消
+          </Button>
+          <Button
+            disabled={saving || exactDup || !form.name.trim()}
+            onClick={handleSave}
+          >
             {saving ? "保存中..." : "保存"}
           </Button>
         </DialogFooter>
@@ -1220,28 +660,165 @@ function ClassDialog({ onSuccess }: { onSuccess: () => Promise<void> }) {
   );
 }
 
-// ---------------------------------------------------------------------------
-// 重名提示
-// ---------------------------------------------------------------------------
+// ── 编辑班级弹窗 ────────────────────────────────────────
 
-function DuplicateAlert({
-  exact,
-  similarItems,
-}: {
-  exact: boolean;
-  similarItems: Array<{ id: string; name: string }>;
-}) {
-  if (!exact && similarItems.length === 0) return null;
+function EditClassDialog() {
+  const { setOpen, currentClass, reloadData } = useSchoolsContext();
+  const [form, setForm] = useState({
+    name: currentClass?.name ?? "",
+    status: currentClass?.status ?? "active",
+  });
+  const [saving, setSaving] = useState(false);
+
+  if (!currentClass) return null;
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await saveClass({
+        id: currentClass.id,
+        name: form.name.trim(),
+        status: form.status,
+        schoolId: currentClass.schoolId,
+        schoolName: currentClass.schoolName,
+        gradeId: currentClass.gradeId,
+        gradeName: currentClass.gradeName,
+      });
+      toast.success("班级已更新");
+      setOpen(null);
+      reloadData();
+    } catch {
+      toast.error("保存失败");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
-    <Alert variant={exact ? "destructive" : "default"}>
-      <AlertTriangle className="size-4" />
-      <AlertTitle>{exact ? "名称已存在" : "发现相似名称"}</AlertTitle>
-      <AlertDescription>
-        {exact
-          ? "当前名称不能重复。"
-          : similarItems.map((item) => item.name).join("、")}
-      </AlertDescription>
-    </Alert>
+    <Dialog open onOpenChange={() => setOpen(null)}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>编辑班级</DialogTitle>
+          <DialogDescription>
+            {currentClass.schoolName} / {currentClass.gradeName}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label>班级名称</Label>
+            <Input
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>状态</Label>
+            <Select
+              value={form.status}
+              onValueChange={(v) => setForm({ ...form, status: v })}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="active">启用</SelectItem>
+                <SelectItem value="paused">暂停</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(null)}>
+            取消
+          </Button>
+          <Button disabled={saving || !form.name.trim()} onClick={handleSave}>
+            {saving ? "保存中..." : "保存"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ── 编辑年级弹窗 ────────────────────────────────────────
+
+function EditGradeDialog() {
+  const { setOpen, currentGrade, reloadData } = useSchoolsContext();
+  const [form, setForm] = useState({
+    name: currentGrade?.name ?? "",
+    sort: String(currentGrade?.sort ?? 0),
+    status: currentGrade?.status ?? "active",
+  });
+  const [saving, setSaving] = useState(false);
+
+  if (!currentGrade) return null;
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await saveGrade({
+        id: currentGrade.id,
+        name: form.name.trim(),
+        sort: Number(form.sort) || 0,
+        status: form.status,
+      });
+      toast.success("年级已更新");
+      setOpen(null);
+      reloadData();
+    } catch {
+      toast.error("保存失败");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open onOpenChange={() => setOpen(null)}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>编辑年级</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label>年级名称</Label>
+            <Input
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>排序</Label>
+            <Input
+              type="number"
+              value={form.sort}
+              onChange={(e) => setForm({ ...form, sort: e.target.value })}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>状态</Label>
+            <Select
+              value={form.status}
+              onValueChange={(v) => setForm({ ...form, status: v })}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="active">启用</SelectItem>
+                <SelectItem value="paused">暂停</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(null)}>
+            取消
+          </Button>
+          <Button disabled={saving || !form.name.trim()} onClick={handleSave}>
+            {saving ? "保存中..." : "保存"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
