@@ -1,11 +1,30 @@
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { useEffect, useMemo, useState } from "react";
-import { Plus } from "lucide-react";
+import { DotsHorizontalIcon } from "@radix-ui/react-icons";
+import {
+  type ColumnDef,
+  type ColumnFiltersState,
+  type SortingState,
+  type VisibilityState,
+  flexRender,
+  getCoreRowModel,
+  getFacetedRowModel,
+  getFacetedUniqueValues,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from "@tanstack/react-table";
+import { CircleCheck, CirclePause, Pencil, Plus, UserPlus } from "lucide-react";
 import { toast } from "sonner";
-import { ListPagination } from "@/components/domain/list-pagination";
-import { StatusBadge } from "@/components/domain/status-badge";
+import {
+  DataTableColumnHeader,
+  DataTablePagination,
+  DataTableToolbar,
+} from "@/components/data-table";
+import { PageContent } from "@/components/page-content";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -13,6 +32,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -31,8 +56,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
-import { PageContent } from "@/components/page-content";
-import { paginateItems } from "@/lib/list-page";
+import useDialogState from "@/hooks/use-dialog-state";
 import {
   fetchClasses,
   fetchGrades,
@@ -54,7 +78,39 @@ import {
   type StudentServiceItem,
 } from "@/lib/server-data";
 
-const pageSize = 10;
+// ---------------------------------------------------------------------------
+// Constants & types
+// ---------------------------------------------------------------------------
+
+type DialogType =
+  | "create"
+  | "edit"
+  | "quick-school"
+  | "quick-grade"
+  | "quick-class"
+  | "quick-guardian";
+
+const statusOptions = [
+  { label: "启用", value: "active", icon: CircleCheck },
+  { label: "暂停", value: "paused", icon: CirclePause },
+] as const;
+
+const statusMap: Record<
+  string,
+  { label: string; variant: "default" | "secondary" }
+> = {
+  active: { label: "启用", variant: "default" },
+  paused: { label: "暂停", variant: "secondary" },
+};
+
+const paymentStatusMap: Record<
+  string,
+  { label: string; variant: "default" | "secondary" | "destructive" }
+> = {
+  paid: { label: "已缴费", variant: "default" },
+  unpaid: { label: "待缴费", variant: "destructive" },
+  paused: { label: "已暂停", variant: "secondary" },
+};
 
 const initialStudentForm = {
   classId: "",
@@ -73,24 +129,14 @@ const initialStudentForm = {
   status: "active",
 };
 
-const initialSchoolForm = {
-  name: "",
-  status: "active",
-};
-
-const initialGradeForm = {
-  name: "",
-  sort: "0",
-  status: "active",
-};
-
+const initialSchoolForm = { name: "", status: "active" };
+const initialGradeForm = { name: "", sort: "0", status: "active" };
 const initialClassForm = {
   gradeId: "",
   name: "",
   schoolId: "",
   status: "active",
 };
-
 const initialGuardianForm = {
   name: "",
   phone: "",
@@ -99,153 +145,277 @@ const initialGuardianForm = {
   status: "active",
 };
 
-type QuickDialogType = "class" | "grade" | "guardian" | "school" | null;
+// ---------------------------------------------------------------------------
+// Context
+// ---------------------------------------------------------------------------
 
-export default function StudentsPage() {
-  const [classForm, setClassForm] = useState(initialClassForm);
-  const [classes, setClasses] = useState<ClassItem[]>([]);
-  const [dialogOpen, setDialogOpen] = useState(false);
+type StudentsContextValue = {
+  open: DialogType | null;
+  setOpen: (value: DialogType | null) => void;
+  currentItem: StudentItem | null;
+  setCurrentItem: (item: StudentItem | null) => void;
+  reloadData: () => Promise<void>;
+  schools: SchoolItem[];
+  grades: GradeItem[];
+  classes: ClassItem[];
+  guardians: GuardianProfileItem[];
+  servicePlanMap: Record<string, StudentServiceItem>;
+};
+
+const StudentsContext = createContext<StudentsContextValue | null>(null);
+
+function useStudents() {
+  const ctx = useContext(StudentsContext);
+  if (!ctx)
+    throw new Error("useStudents must be used within StudentsProvider");
+  return ctx;
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function formatRange(startDate?: string, endDate?: string) {
+  if (!startDate && !endDate) return "-";
+  return `${startDate || "--"} 至 ${endDate || "--"}`;
+}
+
+function SelectWithAction({
+  children,
+  onCreate,
+}: {
+  children: ReactNode;
+  onCreate: () => void;
+}) {
+  return (
+    <div className="space-y-2">
+      {children}
+      <Button
+        className="w-full justify-start"
+        size="sm"
+        variant="outline"
+        onClick={onCreate}
+      >
+        <Plus className="mr-2 size-4" />
+        新增
+      </Button>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Column definitions
+// ---------------------------------------------------------------------------
+
+function createColumns(
+  servicePlanMap: Record<string, StudentServiceItem>,
+): ColumnDef<StudentItem>[] {
+  return [
+    {
+      accessorKey: "name",
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="学生" />
+      ),
+      cell: ({ row }) => (
+        <div className="font-medium">{row.getValue("name")}</div>
+      ),
+    },
+    {
+      id: "schoolGradeClass",
+      header: "学校 / 年级 / 班级",
+      cell: ({ row }) =>
+        [row.original.schoolName, row.original.grade, row.original.className]
+          .filter(Boolean)
+          .join(" / ") || "-",
+      enableSorting: false,
+    },
+    {
+      id: "guardian",
+      header: "监护人",
+      cell: ({ row }) => (
+        <div>
+          <p>{row.original.guardianName || "-"}</p>
+          <p className="text-sm text-muted-foreground">
+            {row.original.guardianPhone || "-"}
+          </p>
+        </div>
+      ),
+      enableSorting: false,
+    },
+    {
+      id: "servicePeriod",
+      header: "服务周期",
+      cell: ({ row }) => {
+        const plan = servicePlanMap[row.original.id];
+        return formatRange(
+          plan?.serviceStartDate ||
+            row.original.serviceSummary?.serviceStartDate,
+          plan?.serviceEndDate || row.original.serviceSummary?.serviceEndDate,
+        );
+      },
+      enableSorting: false,
+    },
+    {
+      id: "payment",
+      header: "缴费",
+      cell: ({ row }) => {
+        const plan = servicePlanMap[row.original.id];
+        const ps =
+          plan?.paymentStatus ||
+          row.original.serviceSummary?.paymentStatus ||
+          "unpaid";
+        const info = paymentStatusMap[ps] ?? {
+          label: ps,
+          variant: "secondary" as const,
+        };
+        return (
+          <div className="space-y-1">
+            <p>
+              ¥{" "}
+              {plan?.paymentAmount ||
+                row.original.serviceSummary?.paymentAmount ||
+                0}
+            </p>
+            <Badge variant={info.variant}>{info.label}</Badge>
+          </div>
+        );
+      },
+      enableSorting: false,
+    },
+    {
+      accessorKey: "status",
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="状态" />
+      ),
+      cell: ({ row }) => {
+        const status = row.getValue<string>("status");
+        const info = statusMap[status] ?? {
+          label: status,
+          variant: "secondary" as const,
+        };
+        return <Badge variant={info.variant}>{info.label}</Badge>;
+      },
+      filterFn: (row, id, value: string[]) => value.includes(row.getValue(id)),
+    },
+    {
+      id: "actions",
+      cell: function ActionsCell({ row }) {
+        const { setOpen, setCurrentItem } = useStudents();
+        return (
+          <DropdownMenu modal={false}>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                className="h-8 w-8 p-0 data-[state=open]:bg-muted"
+              >
+                <DotsHorizontalIcon className="h-4 w-4" />
+                <span className="sr-only">操作菜单</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onSelect={() => {
+                  setCurrentItem(row.original);
+                  setOpen("edit");
+                }}
+              >
+                <Pencil className="mr-2 h-4 w-4" />
+                编辑
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      },
+      enableSorting: false,
+      enableHiding: false,
+    },
+  ];
+}
+
+// ---------------------------------------------------------------------------
+// StudentFormDialog
+// ---------------------------------------------------------------------------
+
+function StudentFormDialog() {
+  const {
+    open,
+    setOpen,
+    currentItem,
+    reloadData,
+    schools,
+    grades,
+    classes,
+    guardians,
+    servicePlanMap,
+  } = useStudents();
+
+  const isEdit = open === "edit";
+  const isOpen = open === "create" || open === "edit";
+
   const [form, setForm] = useState(initialStudentForm);
-  const [gradeForm, setGradeForm] = useState(initialGradeForm);
-  const [grades, setGrades] = useState<GradeItem[]>([]);
-  const [guardianForm, setGuardianForm] = useState(initialGuardianForm);
-  const [guardians, setGuardians] = useState<GuardianProfileItem[]>([]);
-  const [keyword, setKeyword] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState(1);
-  const [quickDialogType, setQuickDialogType] = useState<QuickDialogType>(null);
-  const [quickSaving, setQuickSaving] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [schoolFilter, setSchoolFilter] = useState("all");
+
+  // 记住当前是新增还是编辑，快捷新增关闭后恢复
+  const [previousOpen, setPreviousOpen] = useState<"create" | "edit" | null>(
+    null,
+  );
+
+  // Quick-add form states
   const [schoolForm, setSchoolForm] = useState(initialSchoolForm);
-  const [schools, setSchools] = useState<SchoolItem[]>([]);
-  const [servicePlans, setServicePlans] = useState<StudentServiceItem[]>([]);
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [students, setStudents] = useState<StudentItem[]>([]);
-
-  useEffect(() => {
-    void loadData();
-  }, []);
-
-  useEffect(() => {
-    setPage(1);
-  }, [keyword, schoolFilter, statusFilter]);
-
-  const servicePlanMap = useMemo(() => {
-    return servicePlans.reduce<Record<string, StudentServiceItem>>((acc, item) => {
-      if (acc[item.studentId]) {
-        return acc;
-      }
-      acc[item.studentId] = item;
-      return acc;
-    }, {});
-  }, [servicePlans]);
+  const [gradeForm, setGradeForm] = useState(initialGradeForm);
+  const [classForm, setClassForm] = useState(initialClassForm);
+  const [guardianForm, setGuardianForm] = useState(initialGuardianForm);
+  const [quickSaving, setQuickSaving] = useState(false);
 
   const filteredClasses = useMemo(() => {
     return classes.filter((item) => {
-      if (form.schoolId && item.schoolId !== form.schoolId) {
-        return false;
-      }
-      if (form.gradeId && item.gradeId !== form.gradeId) {
-        return false;
-      }
+      if (form.schoolId && item.schoolId !== form.schoolId) return false;
+      if (form.gradeId && item.gradeId !== form.gradeId) return false;
       return true;
     });
   }, [classes, form.gradeId, form.schoolId]);
 
-  const filteredStudents = useMemo(() => {
-    const normalizedKeyword = keyword.trim().toLowerCase();
-
-    return students.filter((item) => {
-      if (schoolFilter !== "all" && item.schoolId !== schoolFilter) {
-        return false;
-      }
-      if (statusFilter !== "all" && item.status !== statusFilter) {
-        return false;
-      }
-      if (!normalizedKeyword) {
-        return true;
-      }
-
-      return [
-        item.name,
-        item.schoolName,
-        item.grade,
-        item.className,
-        item.guardianName,
-        item.guardianPhone,
-      ]
-        .filter(Boolean)
-        .some((value) => value.toLowerCase().includes(normalizedKeyword));
-    });
-  }, [keyword, schoolFilter, statusFilter, students]);
-
-  const pagination = useMemo(
-    () => paginateItems(filteredStudents, page, pageSize),
-    [filteredStudents, page]
-  );
-
-  async function loadData() {
-    setLoading(true);
-    try {
-      const [studentItems, planItems, schoolItems, gradeItems, classItems, guardianItems] =
-        await Promise.all([
-          fetchStudents(),
-          fetchStudentServices(),
-          fetchSchools(),
-          fetchGrades(),
-          fetchClasses(),
-          fetchGuardianProfiles(),
-        ]);
-      setStudents(studentItems);
-      setServicePlans(planItems);
-      setSchools(schoolItems);
-      setGrades(gradeItems);
-      setClasses(classItems);
-      setGuardians(guardianItems);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "加载失败");
-      setStudents([]);
-      setServicePlans([]);
-      setSchools([]);
-      setGrades([]);
-      setClasses([]);
-      setGuardians([]);
-    } finally {
-      setLoading(false);
+  useEffect(() => {
+    if (isEdit && currentItem) {
+      const plan = servicePlanMap[currentItem.id];
+      setForm({
+        classId: currentItem.classId || "",
+        gradeId: currentItem.gradeId || "",
+        guardianId: currentItem.guardianId || "",
+        id: currentItem.id,
+        name: currentItem.name,
+        paidAt: plan?.paidAt || currentItem.serviceSummary?.paidAt || "",
+        paymentAmount: String(
+          plan?.paymentAmount ||
+            currentItem.serviceSummary?.paymentAmount ||
+            0,
+        ),
+        paymentStatus:
+          plan?.paymentStatus ||
+          currentItem.serviceSummary?.paymentStatus ||
+          "unpaid",
+        remark: plan?.remark || "",
+        schoolId: currentItem.schoolId || "",
+        serviceEndDate:
+          plan?.serviceEndDate ||
+          currentItem.serviceSummary?.serviceEndDate ||
+          "",
+        servicePlanId: plan?.id || "",
+        serviceStartDate:
+          plan?.serviceStartDate ||
+          currentItem.serviceSummary?.serviceStartDate ||
+          "",
+        status: currentItem.status,
+      });
+    } else if (open === "create") {
+      setForm({
+        ...initialStudentForm,
+        gradeId: grades[0]?.id || "",
+        guardianId: guardians[0]?.id || "",
+        schoolId: schools[0]?.id || "",
+      });
     }
-  }
-
-  function openCreateDialog() {
-    setForm({
-      ...initialStudentForm,
-      gradeId: grades[0]?.id || "",
-      guardianId: guardians[0]?.id || "",
-      schoolId: schools[0]?.id || "",
-    });
-    setDialogOpen(true);
-  }
-
-  function openEditDialog(student: StudentItem) {
-    const plan = servicePlanMap[student.id];
-    setForm({
-      classId: student.classId || "",
-      gradeId: student.gradeId || "",
-      guardianId: student.guardianId || "",
-      id: student.id,
-      name: student.name,
-      paidAt: plan?.paidAt || student.serviceSummary?.paidAt || "",
-      paymentAmount: String(plan?.paymentAmount || student.serviceSummary?.paymentAmount || 0),
-      paymentStatus: plan?.paymentStatus || student.serviceSummary?.paymentStatus || "unpaid",
-      remark: plan?.remark || "",
-      schoolId: student.schoolId || "",
-      serviceEndDate: plan?.serviceEndDate || student.serviceSummary?.serviceEndDate || "",
-      servicePlanId: plan?.id || "",
-      serviceStartDate: plan?.serviceStartDate || student.serviceSummary?.serviceStartDate || "",
-      status: student.status,
-    });
-    setDialogOpen(true);
-  }
+  }, [open, currentItem, isEdit, servicePlanMap, grades, guardians, schools]);
 
   async function handleSave() {
     const school = schools.find((item) => item.id === form.schoolId);
@@ -292,8 +462,8 @@ export default function StudentsPage() {
       });
 
       toast.success("已保存");
-      setDialogOpen(false);
-      await loadData();
+      setOpen(null);
+      await reloadData();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "保存失败");
     } finally {
@@ -301,62 +471,59 @@ export default function StudentsPage() {
     }
   }
 
-  function openQuickDialog(type: QuickDialogType) {
-    setQuickDialogType(type);
-    if (type === "school") {
-      setSchoolForm(initialSchoolForm);
-    }
-    if (type === "grade") {
-      setGradeForm(initialGradeForm);
-    }
-    if (type === "class") {
+  // 打开快捷新增弹窗
+  function openQuickDialog(
+    type: "quick-school" | "quick-grade" | "quick-class" | "quick-guardian",
+  ) {
+    setPreviousOpen(isEdit ? "edit" : "create");
+    if (type === "quick-school") setSchoolForm(initialSchoolForm);
+    if (type === "quick-grade") setGradeForm(initialGradeForm);
+    if (type === "quick-class") {
       setClassForm({
         ...initialClassForm,
         gradeId: form.gradeId,
         schoolId: form.schoolId,
       });
     }
-    if (type === "guardian") {
-      setGuardianForm(initialGuardianForm);
-    }
+    if (type === "quick-guardian") setGuardianForm(initialGuardianForm);
+    setOpen(type);
   }
 
   async function handleQuickSave() {
-    if (!quickDialogType) {
+    if (
+      open !== "quick-school" &&
+      open !== "quick-grade" &&
+      open !== "quick-class" &&
+      open !== "quick-guardian"
+    )
       return;
-    }
 
     setQuickSaving(true);
     try {
-      if (quickDialogType === "school") {
-        if (!schoolForm.name.trim()) {
-          throw new Error("学校名称不能为空");
-        }
+      if (open === "quick-school") {
+        if (!schoolForm.name.trim()) throw new Error("学校名称不能为空");
         const item = await saveSchool({
           name: schoolForm.name.trim(),
           status: schoolForm.status,
         });
-        setForm((current) => ({ ...current, schoolId: item.id, classId: "" }));
+        setForm((c) => ({ ...c, schoolId: item.id, classId: "" }));
       }
 
-      if (quickDialogType === "grade") {
-        if (!gradeForm.name.trim()) {
-          throw new Error("年级名称不能为空");
-        }
+      if (open === "quick-grade") {
+        if (!gradeForm.name.trim()) throw new Error("年级名称不能为空");
         const item = await saveGrade({
           name: gradeForm.name.trim(),
           sort: Number(gradeForm.sort || 0),
           status: gradeForm.status,
         });
-        setForm((current) => ({ ...current, classId: "", gradeId: item.id }));
+        setForm((c) => ({ ...c, classId: "", gradeId: item.id }));
       }
 
-      if (quickDialogType === "class") {
-        const school = schools.find((item) => item.id === classForm.schoolId);
-        const grade = grades.find((item) => item.id === classForm.gradeId);
-        if (!school || !grade || !classForm.name.trim()) {
+      if (open === "quick-class") {
+        const school = schools.find((i) => i.id === classForm.schoolId);
+        const grade = grades.find((i) => i.id === classForm.gradeId);
+        if (!school || !grade || !classForm.name.trim())
           throw new Error("学校、年级、班级名称不能为空");
-        }
         const item = await saveClass({
           gradeId: grade.id,
           gradeName: grade.name,
@@ -365,18 +532,17 @@ export default function StudentsPage() {
           schoolName: school.name,
           status: classForm.status,
         });
-        setForm((current) => ({
-          ...current,
+        setForm((c) => ({
+          ...c,
           classId: item.id,
           gradeId: item.gradeId,
           schoolId: item.schoolId,
         }));
       }
 
-      if (quickDialogType === "guardian") {
-        if (!guardianForm.name.trim() || !guardianForm.phone.trim()) {
+      if (open === "quick-guardian") {
+        if (!guardianForm.name.trim() || !guardianForm.phone.trim())
           throw new Error("监护人姓名和手机号不能为空");
-        }
         const item = await saveGuardianProfile({
           name: guardianForm.name.trim(),
           phone: guardianForm.phone.trim(),
@@ -384,12 +550,13 @@ export default function StudentsPage() {
           remark: guardianForm.remark.trim(),
           status: guardianForm.status,
         });
-        setForm((current) => ({ ...current, guardianId: item.id }));
+        setForm((c) => ({ ...c, guardianId: item.id }));
       }
 
       toast.success("已新增");
-      setQuickDialogType(null);
-      await loadData();
+      await reloadData();
+      // 返回学生表单
+      setOpen(previousOpen);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "保存失败");
     } finally {
@@ -397,143 +564,44 @@ export default function StudentsPage() {
     }
   }
 
+  const isQuickOpen =
+    open === "quick-school" ||
+    open === "quick-grade" ||
+    open === "quick-class" ||
+    open === "quick-guardian";
+
+  const quickTitle =
+    open === "quick-school"
+      ? "新增学校"
+      : open === "quick-grade"
+        ? "新增年级"
+        : open === "quick-class"
+          ? "新增班级"
+          : open === "quick-guardian"
+            ? "新增监护人"
+            : "";
+
   return (
-    <PageContent>
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between gap-4">
-        <CardTitle className="text-lg">学生</CardTitle>
-        <Button onClick={openCreateDialog}>新增学生</Button>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="grid gap-3 lg:grid-cols-[1.4fr_0.9fr_0.8fr]">
-          <Input
-            placeholder="搜索学生 / 学校 / 班级 / 监护人"
-            value={keyword}
-            onChange={(event) => setKeyword(event.target.value)}
-          />
-          <Select value={schoolFilter} onValueChange={setSchoolFilter}>
-            <SelectTrigger>
-              <SelectValue placeholder="学校" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">全部学校</SelectItem>
-              {schools.map((item) => (
-                <SelectItem key={item.id} value={item.id}>
-                  {item.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">全部状态</SelectItem>
-              <SelectItem value="active">启用</SelectItem>
-              <SelectItem value="paused">暂停</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        {loading ? (
-          <div className="text-sm text-muted-foreground">加载中</div>
-        ) : (
-          <>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>学生</TableHead>
-                  <TableHead>学校 / 年级 / 班级</TableHead>
-                  <TableHead>监护人</TableHead>
-                  <TableHead>服务周期</TableHead>
-                  <TableHead>缴费</TableHead>
-                  <TableHead>状态</TableHead>
-                  <TableHead className="text-right">操作</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {pagination.items.map((student) => {
-                  const plan = servicePlanMap[student.id];
-                  const paymentStatus =
-                    plan?.paymentStatus || student.serviceSummary?.paymentStatus || "unpaid";
-
-                  return (
-                    <TableRow key={student.id}>
-                      <TableCell className="font-medium">{student.name}</TableCell>
-                      <TableCell>
-                        {[student.schoolName, student.grade, student.className]
-                          .filter(Boolean)
-                          .join(" / ") || "-"}
-                      </TableCell>
-                      <TableCell>
-                        <div>
-                          <p>{student.guardianName || "-"}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {student.guardianPhone || "-"}
-                          </p>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {formatRange(
-                          plan?.serviceStartDate || student.serviceSummary?.serviceStartDate,
-                          plan?.serviceEndDate || student.serviceSummary?.serviceEndDate
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="space-y-1">
-                          <p>¥ {plan?.paymentAmount || student.serviceSummary?.paymentAmount || 0}</p>
-                          <StatusBadge status={paymentStatus} />
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <StatusBadge status={student.status} />
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="outline" onClick={() => openEditDialog(student)}>
-                          编辑
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-
-            {pagination.totalRows === 0 ? (
-              <div className="text-sm text-muted-foreground">无</div>
-            ) : null}
-
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-sm text-muted-foreground">共 {pagination.totalRows} 条</p>
-              <ListPagination
-                currentPage={pagination.currentPage}
-                totalPages={pagination.totalPages}
-                onPageChange={setPage}
-              />
-            </div>
-          </>
-        )}
-      </CardContent>
-
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+    <>
+      {/* 学生表单弹窗 */}
+      <Dialog open={isOpen} onOpenChange={() => setOpen(null)}>
         <DialogContent className="max-w-4xl">
           <DialogHeader>
-            <DialogTitle>{form.id ? "编辑学生" : "新增学生"}</DialogTitle>
+            <DialogTitle>{isEdit ? "编辑学生" : "新增学生"}</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-2 md:grid-cols-2">
             <Field label="学生姓名">
               <Input
                 value={form.name}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, name: event.target.value }))
+                onChange={(e) =>
+                  setForm((c) => ({ ...c, name: e.target.value }))
                 }
               />
             </Field>
             <Field label="学生状态">
               <Select
                 value={form.status}
-                onValueChange={(value) => setForm((current) => ({ ...current, status: value }))}
+                onValueChange={(v) => setForm((c) => ({ ...c, status: v }))}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -546,14 +614,12 @@ export default function StudentsPage() {
             </Field>
             <Field label="学校">
               <SelectWithAction
-                value={form.schoolId}
-                placeholder="选择学校"
-                onCreate={() => openQuickDialog("school")}
+                onCreate={() => openQuickDialog("quick-school")}
               >
                 <Select
                   value={form.schoolId}
-                  onValueChange={(value) =>
-                    setForm((current) => ({ ...current, classId: "", schoolId: value }))
+                  onValueChange={(v) =>
+                    setForm((c) => ({ ...c, classId: "", schoolId: v }))
                   }
                 >
                   <SelectTrigger>
@@ -571,14 +637,12 @@ export default function StudentsPage() {
             </Field>
             <Field label="年级">
               <SelectWithAction
-                value={form.gradeId}
-                placeholder="选择年级"
-                onCreate={() => openQuickDialog("grade")}
+                onCreate={() => openQuickDialog("quick-grade")}
               >
                 <Select
                   value={form.gradeId}
-                  onValueChange={(value) =>
-                    setForm((current) => ({ ...current, classId: "", gradeId: value }))
+                  onValueChange={(v) =>
+                    setForm((c) => ({ ...c, classId: "", gradeId: v }))
                   }
                 >
                   <SelectTrigger>
@@ -596,19 +660,17 @@ export default function StudentsPage() {
             </Field>
             <Field label="班级">
               <SelectWithAction
-                value={form.classId}
-                placeholder="选择班级"
-                onCreate={() => openQuickDialog("class")}
+                onCreate={() => openQuickDialog("quick-class")}
               >
                 <Select
                   value={form.classId}
-                  onValueChange={(value) => {
-                    const item = classes.find((entry) => entry.id === value);
-                    setForm((current) => ({
-                      ...current,
-                      classId: value,
-                      gradeId: item?.gradeId || current.gradeId,
-                      schoolId: item?.schoolId || current.schoolId,
+                  onValueChange={(v) => {
+                    const item = classes.find((entry) => entry.id === v);
+                    setForm((c) => ({
+                      ...c,
+                      classId: v,
+                      gradeId: item?.gradeId || c.gradeId,
+                      schoolId: item?.schoolId || c.schoolId,
                     }));
                   }}
                 >
@@ -627,14 +689,12 @@ export default function StudentsPage() {
             </Field>
             <Field label="监护人">
               <SelectWithAction
-                value={form.guardianId}
-                placeholder="选择监护人"
-                onCreate={() => openQuickDialog("guardian")}
+                onCreate={() => openQuickDialog("quick-guardian")}
               >
                 <Select
                   value={form.guardianId}
-                  onValueChange={(value) =>
-                    setForm((current) => ({ ...current, guardianId: value }))
+                  onValueChange={(v) =>
+                    setForm((c) => ({ ...c, guardianId: v }))
                   }
                 >
                   <SelectTrigger>
@@ -654,8 +714,8 @@ export default function StudentsPage() {
               <Input
                 placeholder="2026-03-01"
                 value={form.serviceStartDate}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, serviceStartDate: event.target.value }))
+                onChange={(e) =>
+                  setForm((c) => ({ ...c, serviceStartDate: e.target.value }))
                 }
               />
             </Field>
@@ -663,16 +723,16 @@ export default function StudentsPage() {
               <Input
                 placeholder="2026-03-31"
                 value={form.serviceEndDate}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, serviceEndDate: event.target.value }))
+                onChange={(e) =>
+                  setForm((c) => ({ ...c, serviceEndDate: e.target.value }))
                 }
               />
             </Field>
             <Field label="缴费状态">
               <Select
                 value={form.paymentStatus}
-                onValueChange={(value) =>
-                  setForm((current) => ({ ...current, paymentStatus: value }))
+                onValueChange={(v) =>
+                  setForm((c) => ({ ...c, paymentStatus: v }))
                 }
               >
                 <SelectTrigger>
@@ -688,8 +748,8 @@ export default function StudentsPage() {
             <Field label="缴费金额">
               <Input
                 value={form.paymentAmount}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, paymentAmount: event.target.value }))
+                onChange={(e) =>
+                  setForm((c) => ({ ...c, paymentAmount: e.target.value }))
                 }
               />
             </Field>
@@ -697,16 +757,16 @@ export default function StudentsPage() {
               <Input
                 placeholder="2026-03-01"
                 value={form.paidAt}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, paidAt: event.target.value }))
+                onChange={(e) =>
+                  setForm((c) => ({ ...c, paidAt: e.target.value }))
                 }
               />
             </Field>
             <Field className="md:col-span-2" label="备注">
               <Textarea
                 value={form.remark}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, remark: event.target.value }))
+                onChange={(e) =>
+                  setForm((c) => ({ ...c, remark: e.target.value }))
                 }
               />
             </Field>
@@ -719,32 +779,38 @@ export default function StudentsPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={quickDialogType !== null} onOpenChange={(open) => !open && setQuickDialogType(null)}>
+      {/* 快捷新增弹窗 */}
+      <Dialog
+        open={isQuickOpen}
+        onOpenChange={(v) => {
+          if (!v) setOpen(previousOpen);
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>{getQuickDialogTitle(quickDialogType)}</DialogTitle>
+            <DialogTitle>{quickTitle}</DialogTitle>
           </DialogHeader>
-          {quickDialogType === "school" ? (
+          {open === "quick-school" ? (
             <div className="grid gap-4 py-2">
               <div className="grid gap-2">
                 <Label>学校名称</Label>
                 <Input
                   value={schoolForm.name}
-                  onChange={(event) =>
-                    setSchoolForm((current) => ({ ...current, name: event.target.value }))
+                  onChange={(e) =>
+                    setSchoolForm((c) => ({ ...c, name: e.target.value }))
                   }
                 />
               </div>
             </div>
           ) : null}
-          {quickDialogType === "grade" ? (
+          {open === "quick-grade" ? (
             <div className="grid gap-4 py-2">
               <div className="grid gap-2">
                 <Label>年级名称</Label>
                 <Input
                   value={gradeForm.name}
-                  onChange={(event) =>
-                    setGradeForm((current) => ({ ...current, name: event.target.value }))
+                  onChange={(e) =>
+                    setGradeForm((c) => ({ ...c, name: e.target.value }))
                   }
                 />
               </div>
@@ -752,21 +818,21 @@ export default function StudentsPage() {
                 <Label>排序</Label>
                 <Input
                   value={gradeForm.sort}
-                  onChange={(event) =>
-                    setGradeForm((current) => ({ ...current, sort: event.target.value }))
+                  onChange={(e) =>
+                    setGradeForm((c) => ({ ...c, sort: e.target.value }))
                   }
                 />
               </div>
             </div>
           ) : null}
-          {quickDialogType === "class" ? (
+          {open === "quick-class" ? (
             <div className="grid gap-4 py-2">
               <div className="grid gap-2">
                 <Label>学校</Label>
                 <Select
                   value={classForm.schoolId}
-                  onValueChange={(value) =>
-                    setClassForm((current) => ({ ...current, schoolId: value }))
+                  onValueChange={(v) =>
+                    setClassForm((c) => ({ ...c, schoolId: v }))
                   }
                 >
                   <SelectTrigger>
@@ -785,8 +851,8 @@ export default function StudentsPage() {
                 <Label>年级</Label>
                 <Select
                   value={classForm.gradeId}
-                  onValueChange={(value) =>
-                    setClassForm((current) => ({ ...current, gradeId: value }))
+                  onValueChange={(v) =>
+                    setClassForm((c) => ({ ...c, gradeId: v }))
                   }
                 >
                   <SelectTrigger>
@@ -805,21 +871,21 @@ export default function StudentsPage() {
                 <Label>班级名称</Label>
                 <Input
                   value={classForm.name}
-                  onChange={(event) =>
-                    setClassForm((current) => ({ ...current, name: event.target.value }))
+                  onChange={(e) =>
+                    setClassForm((c) => ({ ...c, name: e.target.value }))
                   }
                 />
               </div>
             </div>
           ) : null}
-          {quickDialogType === "guardian" ? (
+          {open === "quick-guardian" ? (
             <div className="grid gap-4 py-2">
               <div className="grid gap-2">
                 <Label>姓名</Label>
                 <Input
                   value={guardianForm.name}
-                  onChange={(event) =>
-                    setGuardianForm((current) => ({ ...current, name: event.target.value }))
+                  onChange={(e) =>
+                    setGuardianForm((c) => ({ ...c, name: e.target.value }))
                   }
                 />
               </div>
@@ -827,8 +893,8 @@ export default function StudentsPage() {
                 <Label>手机号</Label>
                 <Input
                   value={guardianForm.phone}
-                  onChange={(event) =>
-                    setGuardianForm((current) => ({ ...current, phone: event.target.value }))
+                  onChange={(e) =>
+                    setGuardianForm((c) => ({ ...c, phone: e.target.value }))
                   }
                 />
               </div>
@@ -836,10 +902,10 @@ export default function StudentsPage() {
                 <Label>关系</Label>
                 <Input
                   value={guardianForm.relationship}
-                  onChange={(event) =>
-                    setGuardianForm((current) => ({
-                      ...current,
-                      relationship: event.target.value,
+                  onChange={(e) =>
+                    setGuardianForm((c) => ({
+                      ...c,
+                      relationship: e.target.value,
                     }))
                   }
                 />
@@ -848,8 +914,8 @@ export default function StudentsPage() {
                 <Label>备注</Label>
                 <Textarea
                   value={guardianForm.remark}
-                  onChange={(event) =>
-                    setGuardianForm((current) => ({ ...current, remark: event.target.value }))
+                  onChange={(e) =>
+                    setGuardianForm((c) => ({ ...c, remark: e.target.value }))
                   }
                 />
               </div>
@@ -862,10 +928,13 @@ export default function StudentsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </Card>
-    </PageContent>
+    </>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Field helper
+// ---------------------------------------------------------------------------
 
 function Field({
   children,
@@ -884,47 +953,231 @@ function Field({
   );
 }
 
-function SelectWithAction({
-  children,
-  onCreate,
-}: {
-  children: ReactNode;
-  onCreate: () => void;
-  placeholder: string;
-  value: string;
-}) {
-  return (
-    <div className="space-y-2">
-      {children}
-      <Button className="w-full justify-start" size="sm" variant="outline" onClick={onCreate}>
-        <Plus className="mr-2 size-4" />
-        新增
-      </Button>
-    </div>
+// ---------------------------------------------------------------------------
+// Page component
+// ---------------------------------------------------------------------------
+
+export default function StudentsPage() {
+  const [open, setOpen] = useDialogState<DialogType>();
+  const [currentItem, setCurrentItem] = useState<StudentItem | null>(null);
+
+  const [items, setItems] = useState<StudentItem[]>([]);
+  const [servicePlans, setServicePlans] = useState<StudentServiceItem[]>([]);
+  const [schools, setSchools] = useState<SchoolItem[]>([]);
+  const [grades, setGrades] = useState<GradeItem[]>([]);
+  const [classes, setClasses] = useState<ClassItem[]>([]);
+  const [guardians, setGuardians] = useState<GuardianProfileItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
+
+  useEffect(() => {
+    void loadData();
+  }, []);
+
+  async function loadData() {
+    setLoading(true);
+    try {
+      const [
+        studentItems,
+        planItems,
+        schoolItems,
+        gradeItems,
+        classItems,
+        guardianItems,
+      ] = await Promise.all([
+        fetchStudents(),
+        fetchStudentServices(),
+        fetchSchools(),
+        fetchGrades(),
+        fetchClasses(),
+        fetchGuardianProfiles(),
+      ]);
+      setItems(studentItems);
+      setServicePlans(planItems);
+      setSchools(schoolItems);
+      setGrades(gradeItems);
+      setClasses(classItems);
+      setGuardians(guardianItems);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "加载失败");
+      setItems([]);
+      setServicePlans([]);
+      setSchools([]);
+      setGrades([]);
+      setClasses([]);
+      setGuardians([]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const servicePlanMap = useMemo(() => {
+    return servicePlans.reduce<Record<string, StudentServiceItem>>(
+      (acc, item) => {
+        if (acc[item.studentId]) return acc;
+        acc[item.studentId] = item;
+        return acc;
+      },
+      {},
+    );
+  }, [servicePlans]);
+
+  const columns = useMemo(
+    () => createColumns(servicePlanMap),
+    [servicePlanMap],
   );
-}
 
-function formatRange(startDate?: string, endDate?: string) {
-  if (!startDate && !endDate) {
-    return "-";
-  }
+  const table = useReactTable({
+    data: items,
+    columns,
+    state: { sorting, columnFilters, columnVisibility },
+    onSortingChange: setSorting,
+    onColumnFiltersChange: setColumnFilters,
+    onColumnVisibilityChange: setColumnVisibility,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getFacetedRowModel: getFacetedRowModel(),
+    getFacetedUniqueValues: getFacetedUniqueValues(),
+    globalFilterFn: (row, _columnId, filterValue: string) => {
+      const keyword = filterValue.toLowerCase();
+      return [
+        row.original.name,
+        row.original.schoolName,
+        row.original.grade,
+        row.original.className,
+        row.original.guardianName,
+        row.original.guardianPhone,
+      ]
+        .filter(Boolean)
+        .some((v) => v.toLowerCase().includes(keyword));
+    },
+  });
 
-  return `${startDate || "--"} 至 ${endDate || "--"}`;
-}
+  const contextValue = useMemo<StudentsContextValue>(
+    () => ({
+      open,
+      setOpen,
+      currentItem,
+      setCurrentItem,
+      reloadData: loadData,
+      schools,
+      grades,
+      classes,
+      guardians,
+      servicePlanMap,
+    }),
+    [
+      open,
+      setOpen,
+      currentItem,
+      schools,
+      grades,
+      classes,
+      guardians,
+      servicePlanMap,
+    ],
+  );
 
-function getQuickDialogTitle(type: QuickDialogType) {
-  if (type === "school") {
-    return "新增学校";
-  }
-  if (type === "grade") {
-    return "新增年级";
-  }
-  if (type === "class") {
-    return "新增班级";
-  }
-  if (type === "guardian") {
-    return "新增监护人";
-  }
+  return (
+    <StudentsContext.Provider value={contextValue}>
+      <PageContent>
+        {/* 标题 */}
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-x-4 space-y-2">
+          <div>
+            <h2 className="text-2xl font-bold tracking-tight">学生</h2>
+            <p className="text-muted-foreground">管理学生信息与服务</p>
+          </div>
+          <Button className="space-x-1" onClick={() => setOpen("create")}>
+            <span>新增学生</span> <UserPlus size={18} />
+          </Button>
+        </div>
 
-  return "";
+        {/* 数据表格 */}
+        <div className="-mx-4 flex-1 overflow-auto px-4 py-1 lg:flex-row lg:space-x-12 lg:space-y-0">
+          {loading ? (
+            <div className="py-8 text-center text-sm text-muted-foreground">
+              加载中…
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <DataTableToolbar
+                table={table}
+                searchPlaceholder="搜索学生 / 学校 / 班级 / 监护人…"
+                filters={[
+                  {
+                    columnId: "status",
+                    title: "状态",
+                    options: statusOptions.map((o) => ({
+                      label: o.label,
+                      value: o.value,
+                      icon: o.icon,
+                    })),
+                  },
+                ]}
+              />
+
+              <div className="overflow-hidden rounded-md border">
+                <Table>
+                  <TableHeader>
+                    {table.getHeaderGroups().map((headerGroup) => (
+                      <TableRow key={headerGroup.id}>
+                        {headerGroup.headers.map((header) => (
+                          <TableHead key={header.id} colSpan={header.colSpan}>
+                            {header.isPlaceholder
+                              ? null
+                              : flexRender(
+                                  header.column.columnDef.header,
+                                  header.getContext(),
+                                )}
+                          </TableHead>
+                        ))}
+                      </TableRow>
+                    ))}
+                  </TableHeader>
+                  <TableBody>
+                    {table.getRowModel().rows?.length ? (
+                      table.getRowModel().rows.map((row) => (
+                        <TableRow key={row.id} className="group/row">
+                          {row.getVisibleCells().map((cell) => (
+                            <TableCell
+                              key={cell.id}
+                              className="bg-background group-hover/row:bg-muted"
+                            >
+                              {flexRender(
+                                cell.column.columnDef.cell,
+                                cell.getContext(),
+                              )}
+                            </TableCell>
+                          ))}
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell
+                          colSpan={columns.length}
+                          className="h-24 text-center"
+                        >
+                          暂无数据
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+
+              <DataTablePagination table={table} />
+            </div>
+          )}
+        </div>
+
+        {/* 弹窗 */}
+        <StudentFormDialog />
+      </PageContent>
+    </StudentsContext.Provider>
+  );
 }

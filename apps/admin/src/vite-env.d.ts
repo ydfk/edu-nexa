@@ -6,3 +6,12 @@ interface ImportMetaEnv {
   VITE_PORT: number;
   VITE_PROXY_HOST: string;
 }
+
+// 扩展 @tanstack/react-table ColumnMeta 以支持自定义 className
+import "@tanstack/react-table";
+declare module "@tanstack/react-table" {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  interface ColumnMeta<TData extends RowData, TValue> {
+    className?: string;
+  }
+}

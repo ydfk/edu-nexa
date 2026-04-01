@@ -1,10 +1,30 @@
-import type { ReactNode } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { DotsHorizontalIcon } from "@radix-ui/react-icons";
+import {
+  type ColumnDef,
+  type ColumnFiltersState,
+  type SortingState,
+  type VisibilityState,
+  flexRender,
+  getCoreRowModel,
+  getFacetedRowModel,
+  getFacetedUniqueValues,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from "@tanstack/react-table";
+import { CircleCheck, CircleDashed, Clock, Pencil, Plus } from "lucide-react";
 import { toast } from "sonner";
-import { ListPagination } from "@/components/domain/list-pagination";
-import { StatusBadge } from "@/components/domain/status-badge";
+import {
+  DataTableColumnHeader,
+  DataTablePagination,
+  DataTableToolbar,
+} from "@/components/data-table";
+import { LongText } from "@/components/long-text";
+import { PageContent } from "@/components/page-content";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -12,6 +32,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -30,9 +56,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
-import { PageContent } from "@/components/page-content";
+import useDialogState from "@/hooks/use-dialog-state";
 import { useAdminSession } from "@/lib/auth/session";
-import { paginateItems } from "@/lib/list-page";
 import {
   fetchHomeworkRecords,
   fetchStudents,
@@ -41,7 +66,24 @@ import {
   type StudentItem,
 } from "@/lib/server-data";
 
-const pageSize = 10;
+// ---------------------------------------------------------------------------
+// Constants & types
+// ---------------------------------------------------------------------------
+
+type HomeworkRecordDialogType = "create" | "edit";
+
+const statusOptions = [
+  { label: "待处理", value: "pending", icon: Clock },
+  { label: "已完成", value: "completed", icon: CircleCheck },
+  { label: "完成一部分", value: "partial", icon: CircleDashed },
+] as const;
+
+const statusMap: Record<string, { label: string; variant: "default" | "secondary" | "outline" }> = {
+  pending: { label: "待处理", variant: "secondary" },
+  completed: { label: "已完成", variant: "default" },
+  partial: { label: "完成一部分", variant: "outline" },
+};
+
 const initialForm = {
   id: "",
   remark: "",
@@ -51,109 +93,131 @@ const initialForm = {
   subjectSummary: "",
 };
 
-export default function HomeworkRecordsPage() {
-  const session = useAdminSession();
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [form, setForm] = useState(initialForm);
-  const [keyword, setKeyword] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState(1);
-  const [records, setRecords] = useState<HomeworkRecordItem[]>([]);
-  const [saving, setSaving] = useState(false);
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [students, setStudents] = useState<StudentItem[]>([]);
+// ---------------------------------------------------------------------------
+// Context – dialog state provider (shadcn-admin pattern)
+// ---------------------------------------------------------------------------
 
-  const canEdit = session.user?.roles.some((role) => role === "admin" || role === "teacher");
+type HomeworkRecordsContextValue = {
+  open: HomeworkRecordDialogType | null;
+  setOpen: (value: HomeworkRecordDialogType | null) => void;
+  currentItem: HomeworkRecordItem | null;
+  setCurrentItem: (item: HomeworkRecordItem | null) => void;
+  canEdit: boolean;
+  reloadData: () => void;
+  students: StudentItem[];
+};
 
-  useEffect(() => {
-    void loadData();
-  }, [session.user?.phone]);
+const HomeworkRecordsContext = createContext<HomeworkRecordsContextValue | null>(null);
 
-  useEffect(() => {
-    setPage(1);
-  }, [keyword, statusFilter]);
+function useHomeworkRecords() {
+  const ctx = useContext(HomeworkRecordsContext);
+  if (!ctx) throw new Error("useHomeworkRecords must be used within HomeworkRecordsProvider");
+  return ctx;
+}
 
-  const studentMap = useMemo(() => {
-    return students.reduce<Record<string, StudentItem>>((acc, item) => {
-      acc[item.id] = item;
-      return acc;
-    }, {});
-  }, [students]);
+// ---------------------------------------------------------------------------
+// Column definitions
+// ---------------------------------------------------------------------------
 
-  const filteredRecords = useMemo(() => {
-    const normalizedKeyword = keyword.trim().toLowerCase();
-
-    return records.filter((item) => {
-      if (statusFilter !== "all" && item.status !== statusFilter) {
-        return false;
-      }
-      if (!normalizedKeyword) {
-        return true;
-      }
-
-      return [
-        item.studentName,
-        item.schoolName,
-        item.className,
-        item.subjectSummary,
-        item.remark,
-        item.serviceDate,
-      ]
+const columns: ColumnDef<HomeworkRecordItem>[] = [
+  {
+    accessorKey: "serviceDate",
+    header: ({ column }) => <DataTableColumnHeader column={column} title="日期" />,
+    cell: ({ row }) => <div>{row.getValue("serviceDate")}</div>,
+  },
+  {
+    accessorKey: "studentName",
+    header: ({ column }) => <DataTableColumnHeader column={column} title="学生" />,
+    cell: ({ row }) => <div className="font-medium">{row.getValue("studentName")}</div>,
+  },
+  {
+    id: "schoolClass",
+    header: ({ column }) => <DataTableColumnHeader column={column} title="学校 / 班级" />,
+    cell: ({ row }) => {
+      const text = [row.original.schoolName, row.original.className]
         .filter(Boolean)
-        .some((value) => value.toLowerCase().includes(normalizedKeyword));
-    });
-  }, [keyword, records, statusFilter]);
-
-  const pagination = useMemo(
-    () => paginateItems(filteredRecords, page, pageSize),
-    [filteredRecords, page]
-  );
-
-  async function loadData() {
-    setLoading(true);
-    try {
-      const studentItems = await fetchStudents(
-        session.user?.roles.includes("guardian")
-          ? { guardianPhone: session.user?.phone || "" }
-          : undefined
+        .join(" / ");
+      return <div>{text || "-"}</div>;
+    },
+    enableSorting: false,
+  },
+  {
+    accessorKey: "status",
+    header: ({ column }) => <DataTableColumnHeader column={column} title="完成情况" />,
+    cell: ({ row }) => {
+      const status = row.getValue<string>("status");
+      const info = statusMap[status] ?? { label: status, variant: "outline" as const };
+      return <Badge variant={info.variant}>{info.label}</Badge>;
+    },
+    filterFn: (row, id, value: string[]) => value.includes(row.getValue(id)),
+  },
+  {
+    accessorKey: "subjectSummary",
+    header: ({ column }) => <DataTableColumnHeader column={column} title="作业摘要" />,
+    cell: ({ row }) => (
+      <LongText className="max-w-[200px]">{row.getValue("subjectSummary") || "-"}</LongText>
+    ),
+    enableSorting: false,
+  },
+  {
+    id: "actions",
+    cell: function ActionsCell({ row }) {
+      const { setOpen, setCurrentItem, canEdit } = useHomeworkRecords();
+      if (!canEdit) return null;
+      return (
+        <DropdownMenu modal={false}>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" className="h-8 w-8 p-0 data-[state=open]:bg-muted">
+              <DotsHorizontalIcon className="h-4 w-4" />
+              <span className="sr-only">操作菜单</span>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              onSelect={() => {
+                setCurrentItem(row.original);
+                setOpen("edit");
+              }}
+            >
+              <Pencil className="mr-2 h-4 w-4" />
+              编辑
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       );
-      const recordItems = await fetchHomeworkRecords();
-      const visibleStudentIDs = new Set(studentItems.map((item) => item.id));
+    },
+    enableSorting: false,
+    enableHiding: false,
+  },
+];
 
-      setStudents(studentItems);
-      setRecords(
-        canEdit
-          ? recordItems
-          : recordItems.filter((item) => visibleStudentIDs.has(item.studentId))
-      );
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "加载失败");
-      setStudents([]);
-      setRecords([]);
-    } finally {
-      setLoading(false);
+// ---------------------------------------------------------------------------
+// Homework record form dialog
+// ---------------------------------------------------------------------------
+
+function HomeworkRecordFormDialog() {
+  const { open, setOpen, currentItem, reloadData, students } = useHomeworkRecords();
+  const session = useAdminSession();
+  const isEdit = open === "edit";
+  const isOpen = open === "create" || open === "edit";
+
+  const [form, setForm] = useState(initialForm);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (isEdit && currentItem) {
+      setForm({
+        id: currentItem.id,
+        remark: currentItem.remark,
+        serviceDate: currentItem.serviceDate,
+        status: currentItem.status,
+        studentId: currentItem.studentId,
+        subjectSummary: currentItem.subjectSummary,
+      });
+    } else if (open === "create") {
+      setForm({ ...initialForm, studentId: students[0]?.id || "" });
     }
-  }
-
-  function openCreateDialog() {
-    setForm({
-      ...initialForm,
-      studentId: students[0]?.id || "",
-    });
-    setDialogOpen(true);
-  }
-
-  function openEditDialog(record: HomeworkRecordItem) {
-    setForm({
-      id: record.id,
-      remark: record.remark,
-      serviceDate: record.serviceDate,
-      status: record.status,
-      studentId: record.studentId,
-      subjectSummary: record.subjectSummary,
-    });
-    setDialogOpen(true);
-  }
+  }, [open, currentItem, isEdit, students]);
 
   async function handleSave() {
     const student = students.find((item) => item.id === form.studentId);
@@ -179,8 +243,8 @@ export default function HomeworkRecordsPage() {
         subjectSummary: form.subjectSummary.trim(),
       });
       toast.success("已保存");
-      setDialogOpen(false);
-      await loadData();
+      setOpen(null);
+      reloadData();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "保存失败");
     } finally {
@@ -189,181 +253,267 @@ export default function HomeworkRecordsPage() {
   }
 
   return (
-    <PageContent>
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between gap-4">
-        <CardTitle className="text-lg">作业记录</CardTitle>
-        {canEdit ? <Button onClick={openCreateDialog}>新增记录</Button> : null}
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="grid gap-3 lg:grid-cols-[1.4fr_0.8fr]">
-          <Input
-            placeholder="搜索日期 / 学生 / 学校 / 班级"
-            value={keyword}
-            onChange={(event) => setKeyword(event.target.value)}
-          />
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">全部状态</SelectItem>
-              <SelectItem value="pending">待处理</SelectItem>
-              <SelectItem value="completed">已完成</SelectItem>
-              <SelectItem value="partial">完成一部分</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        {loading ? (
-          <div className="text-sm text-muted-foreground">加载中</div>
-        ) : (
-          <>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>日期</TableHead>
-                  <TableHead>学生</TableHead>
-                  <TableHead>学校 / 班级</TableHead>
-                  <TableHead>完成情况</TableHead>
-                  <TableHead>作业摘要</TableHead>
-                  {canEdit ? <TableHead className="text-right">操作</TableHead> : null}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {pagination.items.map((record) => {
-                  const student = studentMap[record.studentId];
-                  return (
-                    <TableRow key={record.id}>
-                      <TableCell>{record.serviceDate}</TableCell>
-                      <TableCell className="font-medium">{record.studentName}</TableCell>
-                      <TableCell>
-                        {[record.schoolName || student?.schoolName, record.className || student?.className]
-                          .filter(Boolean)
-                          .join(" / ") || "-"}
-                      </TableCell>
-                      <TableCell>
-                        <StatusBadge status={record.status} />
-                      </TableCell>
-                      <TableCell>{record.subjectSummary || record.remark || "-"}</TableCell>
-                      {canEdit ? (
-                        <TableCell className="text-right">
-                          <Button variant="outline" onClick={() => openEditDialog(record)}>
-                            编辑
-                          </Button>
-                        </TableCell>
-                      ) : null}
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-
-            {pagination.totalRows === 0 ? (
-              <div className="text-sm text-muted-foreground">无</div>
-            ) : null}
-
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-sm text-muted-foreground">共 {pagination.totalRows} 条</p>
-              <ListPagination
-                currentPage={pagination.currentPage}
-                totalPages={pagination.totalPages}
-                onPageChange={setPage}
-              />
-            </div>
-          </>
-        )}
-      </CardContent>
-
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>{form.id ? "编辑作业记录" : "新增作业记录"}</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-4 py-2 md:grid-cols-2">
-            <Field label="学生">
-              <Select
-                value={form.studentId}
-                onValueChange={(value) => setForm((current) => ({ ...current, studentId: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="选择学生" />
-                </SelectTrigger>
-                <SelectContent>
-                  {students.map((student) => (
-                    <SelectItem key={student.id} value={student.id}>
-                      {student.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
-            <Field label="日期">
-              <Input
-                placeholder="2026-03-31"
-                value={form.serviceDate}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, serviceDate: event.target.value }))
-                }
-              />
-            </Field>
-            <Field label="完成情况">
-              <Select
-                value={form.status}
-                onValueChange={(value) => setForm((current) => ({ ...current, status: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pending">待处理</SelectItem>
-                  <SelectItem value="completed">已完成</SelectItem>
-                  <SelectItem value="partial">完成一部分</SelectItem>
-                </SelectContent>
-              </Select>
-            </Field>
-            <Field className="md:col-span-2" label="作业摘要">
-              <Textarea
-                value={form.subjectSummary}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, subjectSummary: event.target.value }))
-                }
-              />
-            </Field>
-            <Field className="md:col-span-2" label="反馈">
-              <Textarea
-                value={form.remark}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, remark: event.target.value }))
-                }
-              />
-            </Field>
+    <Dialog open={isOpen} onOpenChange={() => setOpen(null)}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>{isEdit ? "编辑作业记录" : "新增作业记录"}</DialogTitle>
+        </DialogHeader>
+        <div className="grid gap-4 py-2 md:grid-cols-2">
+          <div className="grid gap-2">
+            <Label>学生</Label>
+            <Select
+              value={form.studentId}
+              onValueChange={(value) => setForm((current) => ({ ...current, studentId: value }))}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="选择学生" />
+              </SelectTrigger>
+              <SelectContent>
+                {students.map((student) => (
+                  <SelectItem key={student.id} value={student.id}>
+                    {student.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-          <DialogFooter>
-            <Button disabled={saving} onClick={handleSave}>
-              {saving ? "保存中..." : "保存"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </Card>
-    </PageContent>
+          <div className="grid gap-2">
+            <Label htmlFor="hw-date">日期</Label>
+            <Input
+              id="hw-date"
+              placeholder="2026-03-31"
+              value={form.serviceDate}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, serviceDate: event.target.value }))
+              }
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label>完成情况</Label>
+            <Select
+              value={form.status}
+              onValueChange={(value) => setForm((current) => ({ ...current, status: value }))}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="pending">待处理</SelectItem>
+                <SelectItem value="completed">已完成</SelectItem>
+                <SelectItem value="partial">完成一部分</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid gap-2 md:col-span-2">
+            <Label htmlFor="hw-subject-summary">作业摘要</Label>
+            <Textarea
+              id="hw-subject-summary"
+              value={form.subjectSummary}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, subjectSummary: event.target.value }))
+              }
+            />
+          </div>
+          <div className="grid gap-2 md:col-span-2">
+            <Label htmlFor="hw-remark">反馈</Label>
+            <Textarea
+              id="hw-remark"
+              value={form.remark}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, remark: event.target.value }))
+              }
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button disabled={saving} onClick={handleSave}>
+            {saving ? "保存中..." : "保存"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
-function Field({
-  children,
-  className,
-  label,
-}: {
-  children: ReactNode;
-  className?: string;
-  label: string;
-}) {
+// ---------------------------------------------------------------------------
+// Page component
+// ---------------------------------------------------------------------------
+
+export default function HomeworkRecordsPage() {
+  const session = useAdminSession();
+  const [open, setOpen] = useDialogState<HomeworkRecordDialogType>();
+  const [currentItem, setCurrentItem] = useState<HomeworkRecordItem | null>(null);
+
+  const [items, setItems] = useState<HomeworkRecordItem[]>([]);
+  const [students, setStudents] = useState<StudentItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
+
+  const canEdit = !!session.user?.roles.some((role) => role === "admin" || role === "teacher");
+
+  useEffect(() => {
+    void loadData();
+  }, [session.user?.phone]);
+
+  async function loadData() {
+    setLoading(true);
+    try {
+      const studentItems = await fetchStudents(
+        session.user?.roles.includes("guardian")
+          ? { guardianPhone: session.user?.phone || "" }
+          : undefined,
+      );
+      const recordItems = await fetchHomeworkRecords();
+      const visibleStudentIDs = new Set(studentItems.map((item) => item.id));
+
+      setStudents(studentItems);
+      setItems(
+        canEdit
+          ? recordItems
+          : recordItems.filter((item) => visibleStudentIDs.has(item.studentId)),
+      );
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "加载失败");
+      setStudents([]);
+      setItems([]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const table = useReactTable({
+    data: items,
+    columns,
+    state: { sorting, columnFilters, columnVisibility },
+    onSortingChange: setSorting,
+    onColumnFiltersChange: setColumnFilters,
+    onColumnVisibilityChange: setColumnVisibility,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getFacetedRowModel: getFacetedRowModel(),
+    getFacetedUniqueValues: getFacetedUniqueValues(),
+    globalFilterFn: (row, _columnId, filterValue: string) => {
+      const keyword = filterValue.toLowerCase();
+      return [
+        row.original.studentName,
+        row.original.schoolName,
+        row.original.className,
+        row.original.subjectSummary,
+        row.original.remark,
+        row.original.serviceDate,
+      ]
+        .filter(Boolean)
+        .some((v) => v.toLowerCase().includes(keyword));
+    },
+  });
+
+  const contextValue = useMemo<HomeworkRecordsContextValue>(
+    () => ({ open, setOpen, currentItem, setCurrentItem, canEdit, reloadData: loadData, students }),
+    [open, setOpen, currentItem, canEdit, students],
+  );
+
   return (
-    <div className={className}>
-      <Label className="mb-2 block">{label}</Label>
-      {children}
-    </div>
+    <HomeworkRecordsContext.Provider value={contextValue}>
+      <PageContent>
+        {/* 标题 */}
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-x-4 space-y-2">
+          <div>
+            <h2 className="text-2xl font-bold tracking-tight">作业记录</h2>
+            <p className="text-muted-foreground">管理学生作业完成情况</p>
+          </div>
+          {canEdit && (
+            <Button className="space-x-1" onClick={() => setOpen("create")}>
+              <span>新增记录</span> <Plus size={18} />
+            </Button>
+          )}
+        </div>
+
+        {/* 数据表格 */}
+        <div className="-mx-4 flex-1 overflow-auto px-4 py-1 lg:flex-row lg:space-x-12 lg:space-y-0">
+          {loading ? (
+            <div className="py-8 text-center text-sm text-muted-foreground">
+              加载中…
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <DataTableToolbar
+                table={table}
+                searchPlaceholder="搜索学生 / 学校 / 班级 / 摘要 / 反馈 / 日期…"
+                filters={[
+                  {
+                    columnId: "status",
+                    title: "完成情况",
+                    options: statusOptions.map((o) => ({
+                      label: o.label,
+                      value: o.value,
+                      icon: o.icon,
+                    })),
+                  },
+                ]}
+              />
+
+              <div className="overflow-hidden rounded-md border">
+                <Table>
+                  <TableHeader>
+                    {table.getHeaderGroups().map((headerGroup) => (
+                      <TableRow key={headerGroup.id}>
+                        {headerGroup.headers.map((header) => (
+                          <TableHead key={header.id} colSpan={header.colSpan}>
+                            {header.isPlaceholder
+                              ? null
+                              : flexRender(
+                                  header.column.columnDef.header,
+                                  header.getContext(),
+                                )}
+                          </TableHead>
+                        ))}
+                      </TableRow>
+                    ))}
+                  </TableHeader>
+                  <TableBody>
+                    {table.getRowModel().rows?.length ? (
+                      table.getRowModel().rows.map((row) => (
+                        <TableRow key={row.id} className="group/row">
+                          {row.getVisibleCells().map((cell) => (
+                            <TableCell
+                              key={cell.id}
+                              className="bg-background group-hover/row:bg-muted"
+                            >
+                              {flexRender(
+                                cell.column.columnDef.cell,
+                                cell.getContext(),
+                              )}
+                            </TableCell>
+                          ))}
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell
+                          colSpan={columns.length}
+                          className="h-24 text-center"
+                        >
+                          暂无数据
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+
+              <DataTablePagination table={table} />
+            </div>
+          )}
+        </div>
+
+        {/* 对话框 */}
+        <HomeworkRecordFormDialog />
+      </PageContent>
+    </HomeworkRecordsContext.Provider>
   );
 }
