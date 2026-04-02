@@ -51,7 +51,7 @@ import {
 } from "@/lib/server-data";
 
 // ---------------------------------------------------------------------------
-// Constants
+// 常量
 // ---------------------------------------------------------------------------
 
 /** getDay() 返回 0=周日, 1=周一 … 6=周六，与此顺序一致 */
@@ -76,40 +76,82 @@ const INITIAL_BATCH_SERVICES = {
   hasEveningHomeworkService: true,
 };
 
+function normalizeTimeValue(value: string) {
+  const match = value.trim().match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return "";
+
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+    return "";
+  }
+
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
+function parseWorkHours(value: string) {
+  const [start = "", end = ""] = value.split("-").map((item) => normalizeTimeValue(item));
+  return { end, start };
+}
+
+function buildWorkHours(start: string, end: string) {
+  const normalizedStart = normalizeTimeValue(start);
+  const normalizedEnd = normalizeTimeValue(end);
+
+  if (!normalizedStart && !normalizedEnd) {
+    return "";
+  }
+  if (!normalizedStart || !normalizedEnd) {
+    return null;
+  }
+
+  return `${normalizedStart} - ${normalizedEnd}`;
+}
+
+function getServiceLabels(item: Pick<
+  ServiceDayItem,
+  | "hasLunchService"
+  | "hasDinnerService"
+  | "hasDaytimeHomeworkService"
+  | "hasEveningHomeworkService"
+>) {
+  return SERVICE_COLORS.filter(({ key }) => item[key]).map(({ label }) => label);
+}
+
 // ---------------------------------------------------------------------------
-// Page component
+// 页面组件
 // ---------------------------------------------------------------------------
 
 export default function ServiceCalendarPage() {
-  // Data
+  // 数据
   const [serviceDays, setServiceDays] = useState<ServiceDayItem[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Calendar
+  // 日历
   const [currentMonth, setCurrentMonth] = useState(() =>
     startOfMonth(new Date()),
   );
 
-  // Batch form
+  // 批量设置表单
   const [dateRange, setDateRange] = useState({ start: "", end: "" });
   const [selectedWeekdays, setSelectedWeekdays] = useState<number[]>([
     1, 2, 3, 4, 5,
   ]);
   const [batchServices, setBatchServices] = useState(INITIAL_BATCH_SERVICES);
-  const [batchWorkHours, setBatchWorkHours] = useState("");
+  const [batchWorkHours, setBatchWorkHours] = useState({ end: "", start: "" });
   const [batchProgress, setBatchProgress] = useState<{
     current: number;
     total: number;
   } | null>(null);
 
-  // Single day edit
+  // 单日编辑
   const [editingDay, setEditingDay] = useState<{
     date: string;
     item: ServiceDayItem | null;
   } | null>(null);
 
   // ---------------------------------------------------------------------------
-  // Derived state
+  // 派生状态
   // ---------------------------------------------------------------------------
 
   const serviceDayMap = useMemo(() => {
@@ -146,7 +188,7 @@ export default function ServiceCalendarPage() {
   }, [currentMonth]);
 
   // ---------------------------------------------------------------------------
-  // Data loading
+  // 数据加载
   // ---------------------------------------------------------------------------
 
   const loadData = useCallback(async () => {
@@ -166,7 +208,7 @@ export default function ServiceCalendarPage() {
   }, [loadData]);
 
   // ---------------------------------------------------------------------------
-  // Weekday helpers
+  // 星期选择
   // ---------------------------------------------------------------------------
 
   function toggleWeekday(day: number) {
@@ -182,12 +224,18 @@ export default function ServiceCalendarPage() {
   }
 
   // ---------------------------------------------------------------------------
-  // Batch apply / clear
+  // 批量设置与清除
   // ---------------------------------------------------------------------------
 
   async function batchApply(clear = false) {
     if (matchedDates.length === 0) {
       toast.error("没有匹配的日期，请检查日期范围和星期选择");
+      return;
+    }
+
+    const workHours = buildWorkHours(batchWorkHours.start, batchWorkHours.end);
+    if (!clear && workHours === null) {
+      toast.error("请完整选择开始和结束时间");
       return;
     }
 
@@ -227,7 +275,7 @@ export default function ServiceCalendarPage() {
           id: existing?.id ?? undefined,
           remark: existing?.remark ?? "",
           serviceDate: dateStr,
-          workHours: clear ? (existing?.workHours ?? "") : batchWorkHours,
+          workHours: clear ? "" : (workHours ?? ""),
         });
 
         setBatchProgress({ current: i + 1, total: matchedDates.length });
@@ -245,7 +293,7 @@ export default function ServiceCalendarPage() {
   }
 
   // ---------------------------------------------------------------------------
-  // Single day save
+  // 单日保存
   // ---------------------------------------------------------------------------
 
   async function handleSaveDay(form: {
@@ -277,14 +325,14 @@ export default function ServiceCalendarPage() {
   }
 
   // ---------------------------------------------------------------------------
-  // Render
+  // 渲染
   // ---------------------------------------------------------------------------
 
   const isBusy = batchProgress !== null;
 
   return (
     <PageContent>
-      {/* Title */}
+      {/* 标题 */}
       <div className="mb-2 flex flex-wrap items-center justify-between gap-x-4 space-y-2">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">服务日历</h2>
@@ -299,14 +347,14 @@ export default function ServiceCalendarPage() {
       ) : (
         <div className="space-y-6">
           {/* ----------------------------------------------------------------- */}
-          {/* Batch Setup Card                                                  */}
+          {/* 批量设置                                                          */}
           {/* ----------------------------------------------------------------- */}
           <Card>
             <CardHeader className="pb-4">
               <CardTitle className="text-lg">批量设置</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Date range */}
+              {/* 日期范围 */}
               <div className="flex flex-wrap items-center gap-2">
                 <Input
                   className="w-44"
@@ -327,7 +375,7 @@ export default function ServiceCalendarPage() {
                 />
               </div>
 
-              {/* Weekday selectors */}
+              {/* 星期选择 */}
               <div className="flex flex-wrap items-center gap-2">
                 <Label className="mr-1">星期</Label>
                 <Button
@@ -361,10 +409,10 @@ export default function ServiceCalendarPage() {
                   >
                     {WEEKDAY_LABELS[idx]}
                   </Toggle>
-                ))}
+                  ))}
               </div>
 
-              {/* Service switches */}
+              {/* 服务项目 */}
               <div className="flex flex-wrap items-center gap-4">
                 {SERVICE_COLORS.map(({ key, label }) => (
                   <div key={key} className="flex items-center gap-2">
@@ -379,13 +427,17 @@ export default function ServiceCalendarPage() {
                 ))}
               </div>
 
-              {/* Work hours + preview + action */}
+              {/* 工作时间与操作 */}
               <div className="flex flex-wrap items-center gap-3">
-                <Input
-                  className="w-44"
-                  placeholder="16:00-21:00"
-                  value={batchWorkHours}
-                  onChange={(e) => setBatchWorkHours(e.target.value)}
+                <TimeRangeField
+                  end={batchWorkHours.end}
+                  onEndChange={(value) =>
+                    setBatchWorkHours((current) => ({ ...current, end: value }))
+                  }
+                  onStartChange={(value) =>
+                    setBatchWorkHours((current) => ({ ...current, start: value }))
+                  }
+                  start={batchWorkHours.start}
                 />
                 <span className="text-sm text-muted-foreground">
                   将影响 <strong>{matchedDates.length}</strong> 个日期
@@ -406,7 +458,7 @@ export default function ServiceCalendarPage() {
                 </Button>
               </div>
 
-              {/* Progress */}
+              {/* 进度 */}
               {batchProgress && (
                 <div className="space-y-1">
                   <Progress
@@ -423,10 +475,10 @@ export default function ServiceCalendarPage() {
           </Card>
 
           {/* ----------------------------------------------------------------- */}
-          {/* Calendar Grid                                                     */}
+          {/* 日历网格                                                          */}
           {/* ----------------------------------------------------------------- */}
           <div>
-            {/* Month navigation */}
+            {/* 月份切换 */}
             <div className="mb-3 flex items-center justify-center gap-4">
               <Button
                 size="icon"
@@ -447,7 +499,7 @@ export default function ServiceCalendarPage() {
               </Button>
             </div>
 
-            {/* Weekday header */}
+            {/* 星期标题 */}
             <div className="grid grid-cols-7 text-center text-sm font-medium text-muted-foreground">
               {WEEKDAY_LABELS.map((label) => (
                 <div key={label} className="py-1">
@@ -456,7 +508,7 @@ export default function ServiceCalendarPage() {
               ))}
             </div>
 
-            {/* Day cells */}
+            {/* 日期单元格 */}
             <TooltipProvider delayDuration={200}>
               <div className="grid grid-cols-7 gap-px rounded-lg border bg-border">
                 {calendarDays.map((day) => {
@@ -465,6 +517,7 @@ export default function ServiceCalendarPage() {
                   const today = isToday(day);
                   const highlighted = matchedDateSet.has(dateStr);
                   const item = serviceDayMap.get(dateStr);
+                  const labels = item ? getServiceLabels(item) : [];
 
                   return (
                     <Tooltip key={dateStr}>
@@ -472,7 +525,7 @@ export default function ServiceCalendarPage() {
                         <button
                           type="button"
                           className={cn(
-                            "flex min-h-[80px] flex-col items-start gap-1 bg-background p-2 text-left transition-colors hover:bg-muted/60",
+                            "flex min-h-[108px] flex-col items-start gap-1 bg-background p-2 text-left transition-colors hover:bg-muted/60 md:min-h-[120px]",
                             !inMonth && "text-muted-foreground opacity-40",
                             today && "ring-2 ring-primary ring-inset",
                             highlighted &&
@@ -482,9 +535,16 @@ export default function ServiceCalendarPage() {
                             setEditingDay({ date: dateStr, item: item ?? null })
                           }
                         >
-                          <span className="text-sm font-medium">
-                            {format(day, "d")}
-                          </span>
+                          <div className="flex w-full items-start justify-between gap-2">
+                            <span className="text-sm font-medium">
+                              {format(day, "d")}
+                            </span>
+                            {item?.workHours ? (
+                              <span className="text-[10px] text-muted-foreground">
+                                {item.workHours}
+                              </span>
+                            ) : null}
+                          </div>
                           {item && (
                             <div className="flex flex-wrap gap-1">
                               {SERVICE_COLORS.map(({ key, dot }) =>
@@ -500,18 +560,24 @@ export default function ServiceCalendarPage() {
                               )}
                             </div>
                           )}
+                          {labels.length > 0 ? (
+                            <div className="mt-1 flex w-full flex-col gap-1">
+                              {labels.map((label) => (
+                                <span
+                                  key={label}
+                                  className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] leading-4"
+                                >
+                                  {label}
+                                </span>
+                              ))}
+                            </div>
+                          ) : null}
                         </button>
                       </TooltipTrigger>
                       {item && (
                         <TooltipContent side="top" className="text-xs">
                           <p>{dateStr}</p>
-                          {SERVICE_COLORS.filter(({ key }) => item[key]).map(
-                            ({ label }) => (
-                              <span key={label} className="mr-1">
-                                {label}
-                              </span>
-                            ),
-                          )}
+                          <p>{labels.join("、") || "未设置服务"}</p>
                           {item.workHours && <p>⏰ {item.workHours}</p>}
                         </TooltipContent>
                       )}
@@ -523,7 +589,7 @@ export default function ServiceCalendarPage() {
           </div>
 
           {/* ----------------------------------------------------------------- */}
-          {/* Legend                                                             */}
+          {/* 图例                                                              */}
           {/* ----------------------------------------------------------------- */}
           <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
             {SERVICE_COLORS.map(({ label, dot }) => (
@@ -539,7 +605,7 @@ export default function ServiceCalendarPage() {
       )}
 
       {/* ------------------------------------------------------------------- */}
-      {/* Single Day Edit Dialog                                               */}
+      {/* 单日编辑弹窗                                                        */}
       {/* ------------------------------------------------------------------- */}
       {editingDay && (
         <SingleDayDialog
@@ -554,7 +620,7 @@ export default function ServiceCalendarPage() {
 }
 
 // ---------------------------------------------------------------------------
-// Single Day Dialog
+// 单日编辑弹窗
 // ---------------------------------------------------------------------------
 
 function SingleDayDialog({
@@ -577,12 +643,14 @@ function SingleDayDialog({
     workHours: string;
   }) => Promise<void>;
 }) {
+  const initialWorkHours = parseWorkHours(item?.workHours ?? "");
   const [form, setForm] = useState({
     hasLunchService: item?.hasLunchService ?? false,
     hasDinnerService: item?.hasDinnerService ?? false,
     hasDaytimeHomeworkService: item?.hasDaytimeHomeworkService ?? false,
     hasEveningHomeworkService: item?.hasEveningHomeworkService ?? false,
-    workHours: item?.workHours ?? "",
+    workHoursEnd: initialWorkHours.end,
+    workHoursStart: initialWorkHours.start,
     remark: item?.remark ?? "",
   });
   const [saving, setSaving] = useState(false);
@@ -593,6 +661,12 @@ function SingleDayDialog({
   })();
 
   async function handleSave() {
+    const workHours = buildWorkHours(form.workHoursStart, form.workHoursEnd);
+    if (workHours === null) {
+      toast.error("请完整选择开始和结束时间");
+      return;
+    }
+
     setSaving(true);
     try {
       await onSave({
@@ -603,7 +677,7 @@ function SingleDayDialog({
         id: item?.id,
         remark: form.remark.trim(),
         serviceDate: dateStr,
-        workHours: form.workHours.trim(),
+        workHours,
       });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "保存失败");
@@ -648,12 +722,15 @@ function SingleDayDialog({
             }
           />
           <Field label="工作时间">
-            <Input
-              placeholder="16:00-21:00"
-              value={form.workHours}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, workHours: e.target.value }))
+            <TimeRangeField
+              end={form.workHoursEnd}
+              onEndChange={(value) =>
+                setForm((current) => ({ ...current, workHoursEnd: value }))
               }
+              onStartChange={(value) =>
+                setForm((current) => ({ ...current, workHoursStart: value }))
+              }
+              start={form.workHoursStart}
             />
           </Field>
           <Field label="备注">
@@ -679,7 +756,7 @@ function SingleDayDialog({
 }
 
 // ---------------------------------------------------------------------------
-// Shared helper components
+// 通用组件
 // ---------------------------------------------------------------------------
 
 function Field({
@@ -695,6 +772,38 @@ function Field({
     <div className={className}>
       <Label className="mb-2 block">{label}</Label>
       {children}
+    </div>
+  );
+}
+
+function TimeRangeField({
+  end,
+  onEndChange,
+  onStartChange,
+  start,
+}: {
+  end: string;
+  onEndChange: (value: string) => void;
+  onStartChange: (value: string) => void;
+  start: string;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <Input
+        className="w-32"
+        step={60}
+        type="time"
+        value={start}
+        onChange={(event) => onStartChange(event.target.value)}
+      />
+      <span className="text-muted-foreground">至</span>
+      <Input
+        className="w-32"
+        step={60}
+        type="time"
+        value={end}
+        onChange={(event) => onEndChange(event.target.value)}
+      />
     </div>
   );
 }

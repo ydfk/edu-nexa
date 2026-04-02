@@ -195,6 +195,7 @@ const columns: ColumnDef<MealRecordItem>[] = [
           <Button
             size="sm"
             variant="outline"
+            className="text-destructive"
             onClick={async () => {
               if (!window.confirm("确定删除这条用餐记录？")) return;
               try {

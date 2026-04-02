@@ -171,9 +171,23 @@ const columns: ColumnDef<GuardianProfileItem>[] = [
             <UserPen className="mr-2 size-4" />
             编辑
           </Button>
+          {row.original.userId ? (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setCurrentItem(row.original);
+                setOpen("reset-password");
+              }}
+            >
+              <KeyRound className="mr-2 size-4" />
+              重置密码
+            </Button>
+          ) : null}
           <Button
             size="sm"
             variant="outline"
+            className="text-destructive"
             onClick={async () => {
               if (!window.confirm(`确定删除家长「${row.original.name}」？`)) return;
               try {
@@ -188,19 +202,6 @@ const columns: ColumnDef<GuardianProfileItem>[] = [
             <Trash2 className="mr-2 size-4" />
             删除
           </Button>
-          {row.original.userId ? (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                setCurrentItem(row.original);
-                setOpen("reset-password");
-              }}
-            >
-              <KeyRound className="mr-2 size-4" />
-              重置密码
-            </Button>
-          ) : null}
         </div>
       );
     },

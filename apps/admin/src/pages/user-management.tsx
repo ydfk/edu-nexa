@@ -198,7 +198,7 @@ export default function UserManagement() {
               <Pencil className="mr-2 h-4 w-4" />
               Edit
             </Button>
-            <Button size="sm" variant="outline" onClick={() => handleDelete(user.id)}>
+            <Button size="sm" variant="outline" className="text-destructive" onClick={() => handleDelete(user.id)}>
               <Trash2 className="mr-2 h-4 w-4" />
               Delete
             </Button>

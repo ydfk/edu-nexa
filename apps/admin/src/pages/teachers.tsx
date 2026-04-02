@@ -119,6 +119,7 @@ function RowActions({ row }: { row: { original: UserItem } }) {
       <Button
         size="sm"
         variant="outline"
+        className="text-destructive"
         onClick={async () => {
           if (!window.confirm(`确定删除教师「${row.original.displayName || row.original.phone}」？`)) {
             return;

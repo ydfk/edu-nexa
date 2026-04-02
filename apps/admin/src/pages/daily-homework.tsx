@@ -18,6 +18,7 @@ import {
   DataTableToolbar,
 } from "@/components/data-table";
 import { LongText } from "@/components/long-text";
+import { SchoolClassCascader } from "@/components/domain/school-class-cascader";
 import { PageContent } from "@/components/page-content";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,13 +30,6 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -157,6 +151,7 @@ const columns: ColumnDef<DailyHomeworkItem>[] = [
           <Button
             size="sm"
             variant="outline"
+            className="text-destructive"
             onClick={async () => {
               if (!window.confirm("确定删除这条每日作业？")) return;
               try {
@@ -191,11 +186,6 @@ function DailyHomeworkFormDialog() {
 
   const [form, setForm] = useState(initialForm);
   const [saving, setSaving] = useState(false);
-
-  const filteredClasses = useMemo(() => {
-    if (!form.schoolId) return classes;
-    return classes.filter((item) => item.schoolId === form.schoolId);
-  }, [classes, form.schoolId]);
 
   useEffect(() => {
     if (isEdit && currentItem) {
@@ -256,43 +246,17 @@ function DailyHomeworkFormDialog() {
           <DialogTitle>{isEdit ? "编辑每日作业" : "新增每日作业"}</DialogTitle>
         </DialogHeader>
         <div className="grid gap-4 py-2 md:grid-cols-2">
-          <div className="grid gap-2">
-            <Label>学校</Label>
-            <Select
-              value={form.schoolId}
-              onValueChange={(value) =>
-                setForm((current) => ({ ...current, classId: "", schoolId: value }))
+          <div className="grid gap-2 md:col-span-2">
+            <Label>学校 / 班级</Label>
+            <SchoolClassCascader
+              schools={schools}
+              classes={classes}
+              schoolId={form.schoolId}
+              classId={form.classId}
+              onSelect={(sid, cid) =>
+                setForm((current) => ({ ...current, schoolId: sid, classId: cid }))
               }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="选择学校" />
-              </SelectTrigger>
-              <SelectContent>
-                {schools.map((item) => (
-                  <SelectItem key={item.id} value={item.id}>
-                    {item.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid gap-2">
-            <Label>班级</Label>
-            <Select
-              value={form.classId}
-              onValueChange={(value) => setForm((current) => ({ ...current, classId: value }))}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="选择班级" />
-              </SelectTrigger>
-              <SelectContent>
-                {filteredClasses.map((item) => (
-                  <SelectItem key={item.id} value={item.id}>
-                    {item.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            />
           </div>
           <div className="grid gap-2">
             <Label htmlFor="hw-service-date">日期</Label>
@@ -305,7 +269,6 @@ function DailyHomeworkFormDialog() {
               }
             />
           </div>
-          <div />
           <div className="grid gap-2 md:col-span-2">
             <Label htmlFor="hw-content">作业内容</Label>
             <Textarea

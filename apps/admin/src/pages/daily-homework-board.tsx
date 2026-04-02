@@ -17,6 +17,7 @@ import {
   serializeAttachments,
   type FileItem,
 } from "@/components/domain/file-upload";
+import { SchoolClassCascader } from "@/components/domain/school-class-cascader";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -127,11 +128,6 @@ function HomeworkFormDialog({
   const session = useAdminSession();
   const [form, setForm] = useState<HomeworkFormState>(emptyForm);
   const [saving, setSaving] = useState(false);
-
-  const filteredClasses = useMemo(() => {
-    if (!form.schoolId) return classes;
-    return classes.filter((c) => c.schoolId === form.schoolId);
-  }, [classes, form.schoolId]);
 
   // 初始化表单
   useEffect(() => {
@@ -258,48 +254,18 @@ function HomeworkFormDialog({
             </Select>
           </div>
 
-          {/* 学校 */}
+          {/* 学校 / 年级 / 班级 级联选择 */}
           <div className="grid gap-2">
-            <Label>学校</Label>
-            <Select
-              value={form.schoolId}
-              onValueChange={(value) =>
-                setForm((prev) => ({ ...prev, classId: "", schoolId: value }))
+            <Label>学校 / 班级</Label>
+            <SchoolClassCascader
+              schools={schools}
+              classes={classes}
+              schoolId={form.schoolId}
+              classId={form.classId}
+              onSelect={(sid, cid) =>
+                setForm((prev) => ({ ...prev, schoolId: sid, classId: cid }))
               }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="选择学校" />
-              </SelectTrigger>
-              <SelectContent>
-                {schools.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>
-                    {s.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* 班级 */}
-          <div className="grid gap-2 md:col-span-2">
-            <Label>班级</Label>
-            <Select
-              value={form.classId}
-              onValueChange={(value) =>
-                setForm((prev) => ({ ...prev, classId: value }))
-              }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="选择班级" />
-              </SelectTrigger>
-              <SelectContent>
-                {filteredClasses.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            />
           </div>
 
           {/* 作业内容（多条） */}
@@ -380,25 +346,34 @@ function HomeworkFormDialog({
 
 function HomeworkCard({
   item,
+  classes,
   onEdit,
   onDelete,
 }: {
   item: DailyHomeworkItem;
+  classes: ClassItem[];
   onEdit: () => void;
   onDelete: () => void;
 }) {
   const attachments = useMemo(() => parseAttachments(item.attachments), [item.attachments]);
   const contentLines = item.content.split("\n").filter(Boolean);
+  const gradeName = useMemo(() => {
+    const cls = classes.find(
+      (c) => c.schoolName === item.schoolName && c.name === item.className,
+    );
+    return cls?.gradeName || "";
+  }, [classes, item.schoolName, item.className]);
 
   return (
     <div className="rounded-lg border bg-card p-4 shadow-sm">
       <div className="mb-2 flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-medium">{item.schoolName}</span>
-            <Badge variant="outline" className="text-xs">
-              {item.className}
-            </Badge>
+            <span className="text-sm font-medium">
+              {item.schoolName}
+              {gradeName && ` / ${gradeName}`}
+              {` / ${item.className}`}
+            </span>
           </div>
           {item.teacherName && (
             <p className="mt-0.5 text-xs text-muted-foreground">
@@ -637,6 +612,7 @@ export default function DailyHomeworkBoard() {
                     <HomeworkCard
                       key={item.id}
                       item={item}
+                      classes={classes}
                       onEdit={() => handleEdit(item)}
                       onDelete={() => handleDelete(item)}
                     />
@@ -660,6 +636,7 @@ export default function DailyHomeworkBoard() {
                   <HomeworkCard
                     key={item.id}
                     item={item}
+                    classes={classes}
                     onEdit={() => handleEdit(item)}
                     onDelete={() => handleDelete(item)}
                   />

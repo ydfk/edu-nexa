@@ -174,6 +174,7 @@ const columns: ColumnDef<HomeworkRecordItem>[] = [
           <Button
             size="sm"
             variant="outline"
+            className="text-destructive"
             onClick={async () => {
               if (!window.confirm("确定删除这条作业记录？")) return;
               try {

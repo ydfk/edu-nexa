@@ -322,6 +322,7 @@ function createColumns(
             <Button
               size="sm"
               variant="outline"
+              className="text-destructive"
               onClick={async () => {
                 if (!window.confirm(`确定删除学生「${row.original.name}」？`)) return;
                 try {
