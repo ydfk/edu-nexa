@@ -6,7 +6,7 @@ import {
   useMemo,
   useState,
 } from "react";
-import { ChevronRight, Pencil, Plus, School } from "lucide-react";
+import { ChevronRight, Pencil, Plus, School, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { PageContent } from "@/components/page-content";
 import { Badge } from "@/components/ui/badge";
@@ -37,6 +37,9 @@ import { cn } from "@/lib/utils";
 import useDialogState from "@/hooks/use-dialog-state";
 import { findSimilarNames, hasExactName } from "@/lib/name-check";
 import {
+  deleteClass,
+  deleteGrade,
+  deleteSchool,
   fetchClasses,
   fetchGrades,
   fetchSchools,
@@ -201,7 +204,7 @@ export default function SchoolsPage() {
 // ── 学校树节点 ──────────────────────────────────────────
 
 function SchoolTreeItem({ school }: { school: SchoolItem }) {
-  const { classes, grades, studentCountByClass, setOpen, setCurrentSchool } =
+  const { classes, grades, reloadData, studentCountByClass, setOpen, setCurrentSchool } =
     useSchoolsContext();
   const [isOpen, setIsOpen] = useState(true);
 
@@ -265,6 +268,24 @@ function SchoolTreeItem({ school }: { school: SchoolItem }) {
             }}
           >
             <Pencil className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 text-destructive"
+            onClick={async (e) => {
+              e.stopPropagation();
+              if (!window.confirm(`确定删除学校「${school.name}」？`)) return;
+              try {
+                await deleteSchool(school.id);
+                toast.success("学校已删除");
+                reloadData();
+              } catch (error) {
+                toast.error(error instanceof Error ? error.message : "删除失败");
+              }
+            }}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
           </Button>
         </div>
       </CollapsibleTrigger>
@@ -355,6 +376,22 @@ function GradeGroup({
         >
           <Pencil size={14} />
         </Button>
+        <Button
+          variant="ghost"
+          className="h-6 w-6 p-0 text-destructive"
+          onClick={async () => {
+            if (!window.confirm(`确定删除年级「${grade.name}」？`)) return;
+            try {
+              await deleteGrade(grade.id);
+              toast.success("年级已删除");
+              reloadData();
+            } catch (error) {
+              toast.error(error instanceof Error ? error.message : "删除失败");
+            }
+          }}
+        >
+          <Trash2 size={14} />
+        </Button>
         {!adding && (
           <Button
             variant="outline"
@@ -389,6 +426,22 @@ function GradeGroup({
               }}
             >
               <Pencil size={14} />
+            </Button>
+            <Button
+              variant="ghost"
+              className="h-6 w-6 p-0 text-destructive"
+              onClick={async () => {
+                if (!window.confirm(`确定删除班级「${c.name}」？`)) return;
+                try {
+                  await deleteClass(c.id);
+                  toast.success("班级已删除");
+                  reloadData();
+                } catch (error) {
+                  toast.error(error instanceof Error ? error.message : "删除失败");
+                }
+              }}
+            >
+              <Trash2 size={14} />
             </Button>
           </div>
         ))}

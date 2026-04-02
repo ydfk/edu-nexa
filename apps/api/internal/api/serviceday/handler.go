@@ -11,6 +11,7 @@ import (
 )
 
 type dayPayload struct {
+	CampusID                  string `json:"campusId"`
 	HasHomeworkService        bool   `json:"hasHomeworkService"`
 	HasMealService            bool   `json:"hasMealService"`
 	HasLunchService           bool   `json:"hasLunchService"`
@@ -54,6 +55,7 @@ func Create(c *fiber.Ctx) error {
 	}
 
 	day := model.Day{
+		CampusID:                  strings.TrimSpace(req.CampusID),
 		HasHomeworkService:        mergeHomeworkService(req),
 		HasMealService:            mergeMealService(req),
 		HasLunchService:           req.HasLunchService,
@@ -83,6 +85,7 @@ func Update(c *fiber.Ctx) error {
 		return response.Error(c, "服务日历不存在")
 	}
 
+	day.CampusID = strings.TrimSpace(req.CampusID)
 	day.HasHomeworkService = mergeHomeworkService(req)
 	day.HasMealService = mergeMealService(req)
 	day.HasLunchService = req.HasLunchService

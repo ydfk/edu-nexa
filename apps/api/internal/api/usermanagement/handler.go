@@ -5,6 +5,11 @@ import (
 	"strings"
 
 	"github.com/ydfk/edu-nexa/apps/api/internal/api/response"
+	guardianbindingModel "github.com/ydfk/edu-nexa/apps/api/internal/model/guardianbinding"
+	guardianprofileModel "github.com/ydfk/edu-nexa/apps/api/internal/model/guardianprofile"
+	homeworkassignmentModel "github.com/ydfk/edu-nexa/apps/api/internal/model/homeworkassignment"
+	homeworkrecordModel "github.com/ydfk/edu-nexa/apps/api/internal/model/homeworkrecord"
+	mealrecordModel "github.com/ydfk/edu-nexa/apps/api/internal/model/mealrecord"
 	model "github.com/ydfk/edu-nexa/apps/api/internal/model/user"
 	"github.com/ydfk/edu-nexa/apps/api/internal/service"
 	"github.com/ydfk/edu-nexa/apps/api/pkg/db"
@@ -183,6 +188,36 @@ func Update(c *fiber.Ctx) error {
 	return response.Success(c, buildUserPayload(user))
 }
 
+func Delete(c *fiber.Ctx) error {
+	currentUser, err := service.CurrentUser(c)
+	if err != nil {
+		return response.Error(c, "用户未找到")
+	}
+	if !hasRole(currentUser.Roles, "admin") {
+		return response.Error(c, "没有权限")
+	}
+	if currentUser.Id.String() == c.Params("id") {
+		return response.Error(c, "不能删除当前登录账号")
+	}
+
+	var user model.User
+	if err := db.DB.First(&user, "id = ?", c.Params("id")).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return response.Error(c, "账号不存在")
+		}
+		return response.Error(c, "查询账号失败")
+	}
+	if err := ensureUserDeletable(user); err != nil {
+		return response.Error(c, err.Error())
+	}
+
+	if err := db.DB.Delete(&user).Error; err != nil {
+		return response.Error(c, "删除账号失败")
+	}
+
+	return response.Success(c, fiber.Map{"id": user.Id})
+}
+
 func buildUserPayload(user model.User) fiber.Map {
 	return fiber.Map{
 		"displayName": user.DisplayName,
@@ -254,6 +289,46 @@ func ensureUserPhoneUnique(phone string, excludeID string) error {
 	}
 	if count > 0 {
 		return fiber.NewError(fiber.StatusBadRequest, "手机号已存在")
+	}
+
+	return nil
+}
+
+func ensureUserDeletable(user model.User) error {
+	var count int64
+	if err := db.DB.Model(&guardianprofileModel.Profile{}).Where("user_id = ?", user.Id.String()).Count(&count).Error; err != nil {
+		return errors.New("校验账号关联家长失败")
+	}
+	if count > 0 {
+		return errors.New("账号已关联家长信息，不能删除")
+	}
+
+	if err := db.DB.Model(&guardianbindingModel.Binding{}).Where("guardian_user_id = ?", user.Id.String()).Count(&count).Error; err != nil {
+		return errors.New("校验账号关联学生关系失败")
+	}
+	if count > 0 {
+		return errors.New("账号已关联学生关系，不能删除")
+	}
+
+	if err := db.DB.Model(&homeworkassignmentModel.Assignment{}).Where("teacher_id = ?", user.Id.String()).Count(&count).Error; err != nil {
+		return errors.New("校验账号关联每日作业失败")
+	}
+	if count > 0 {
+		return errors.New("账号已关联每日作业，不能删除")
+	}
+
+	if err := db.DB.Model(&mealrecordModel.Record{}).Where("recorded_by_id = ?", user.Id.String()).Count(&count).Error; err != nil {
+		return errors.New("校验账号关联用餐记录失败")
+	}
+	if count > 0 {
+		return errors.New("账号已关联用餐记录，不能删除")
+	}
+
+	if err := db.DB.Model(&homeworkrecordModel.Record{}).Where("recorded_by_id = ?", user.Id.String()).Count(&count).Error; err != nil {
+		return errors.New("校验账号关联作业记录失败")
+	}
+	if count > 0 {
+		return errors.New("账号已关联作业记录，不能删除")
 	}
 
 	return nil

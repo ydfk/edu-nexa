@@ -10,3 +10,7 @@ type Config struct {
 	Announcement string `gorm:"size:255" json:"announcement"`
 	BannersJSON  string `gorm:"type:text" json:"-"`
 }
+
+func (Config) TableName() string {
+	return "home_configs"
+}

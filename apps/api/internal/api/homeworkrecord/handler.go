@@ -12,6 +12,7 @@ import (
 )
 
 type homeworkRecordPayload struct {
+	CampusID      string   `json:"campusId"`
 	ClassName      string   `json:"className"`
 	ImageURLs      []string `json:"imageUrls"`
 	RecordedBy     string   `json:"recordedBy"`
@@ -74,6 +75,7 @@ func Create(c *fiber.Ctx) error {
 	}
 
 	record := model.Record{
+		CampusID:      strings.TrimSpace(req.CampusID),
 		ClassName:      req.ClassName,
 		ImageURLs:      strings.Join(req.ImageURLs, ","),
 		RecordedBy:     req.RecordedBy,
@@ -108,6 +110,7 @@ func Update(c *fiber.Ctx) error {
 		return response.Error(c, err.Error())
 	}
 
+	record.CampusID = strings.TrimSpace(req.CampusID)
 	record.ClassName = req.ClassName
 	record.ImageURLs = strings.Join(req.ImageURLs, ",")
 	record.RecordedBy = req.RecordedBy
@@ -127,8 +130,22 @@ func Update(c *fiber.Ctx) error {
 	return response.Success(c, buildHomeworkRecordPayload(record))
 }
 
+func Delete(c *fiber.Ctx) error {
+	var record model.Record
+	if err := db.DB.First(&record, "id = ?", c.Params("id")).Error; err != nil {
+		return response.Error(c, "作业记录不存在")
+	}
+
+	if err := db.DB.Delete(&record).Error; err != nil {
+		return response.Error(c, "删除作业记录失败")
+	}
+
+	return response.Success(c, fiber.Map{"id": record.Id})
+}
+
 func buildHomeworkRecordPayload(item model.Record) fiber.Map {
 	return fiber.Map{
+		"campusId":       item.CampusID,
 		"className":      item.ClassName,
 		"id":             item.Id,
 		"imageUrls":      splitHomeworkCommaField(item.ImageURLs),

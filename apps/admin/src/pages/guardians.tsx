@@ -18,6 +18,7 @@ import {
   CircleCheck,
   CirclePause,
   KeyRound,
+  Trash2,
   UserPen,
   UserPlus,
 } from "lucide-react";
@@ -52,6 +53,7 @@ import {
   parentRelationshipOptions,
 } from "@/lib/parent-relationships";
 import {
+  deleteGuardianProfile,
   fetchGuardianProfiles,
   resetUserPassword,
   saveGuardianProfile,
@@ -100,6 +102,7 @@ const initialForm = {
 type GuardiansContextValue = {
   currentItem: GuardianProfileItem | null;
   open: DialogType | null;
+  reloadData: () => Promise<void>;
   setCurrentItem: (item: GuardianProfileItem | null) => void;
   setOpen: (value: DialogType | null) => void;
 };
@@ -153,7 +156,7 @@ const columns: ColumnDef<GuardianProfileItem>[] = [
   {
     id: "actions",
     cell: function ActionsCell({ row }) {
-      const { setCurrentItem, setOpen } = useGuardians();
+      const { reloadData, setCurrentItem, setOpen } = useGuardians();
 
       return (
         <div className="flex justify-end gap-2">
@@ -167,6 +170,23 @@ const columns: ColumnDef<GuardianProfileItem>[] = [
           >
             <UserPen className="mr-2 size-4" />
             编辑
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={async () => {
+              if (!window.confirm(`确定删除家长「${row.original.name}」？`)) return;
+              try {
+                await deleteGuardianProfile(row.original.id);
+                toast.success("家长已删除");
+                await reloadData();
+              } catch (error) {
+                toast.error(error instanceof Error ? error.message : "删除失败");
+              }
+            }}
+          >
+            <Trash2 className="mr-2 size-4" />
+            删除
           </Button>
           {row.original.userId ? (
             <Button
@@ -476,8 +496,8 @@ export default function GuardiansPage() {
   });
 
   const contextValue = useMemo<GuardiansContextValue>(
-    () => ({ currentItem, open, setCurrentItem, setOpen }),
-    [currentItem, open, setOpen],
+    () => ({ currentItem, open, reloadData: loadData, setCurrentItem, setOpen }),
+    [currentItem, loadData, open, setOpen],
   );
 
   return (

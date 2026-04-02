@@ -20,3 +20,17 @@ func UploadImage(c *fiber.Ctx) error {
 
 	return response.Success(c, result)
 }
+
+func UploadFile(c *fiber.Ctx) error {
+	fileHeader, err := c.FormFile("file")
+	if err != nil {
+		return response.Error(c, "请选择要上传的文件")
+	}
+
+	result, err := upload.UploadFile(fileHeader, c.FormValue("provider"), c.FormValue("purpose"))
+	if err != nil {
+		return response.Error(c, err.Error())
+	}
+
+	return response.Success(c, result)
+}

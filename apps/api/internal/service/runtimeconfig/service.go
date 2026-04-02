@@ -14,6 +14,7 @@ const runtimeScene = "app-runtime"
 
 type Snapshot struct {
 	SystemNamePrefix    string `json:"systemNamePrefix"`
+	HomeworkSubjects    string `json:"homeworkSubjects"`
 	ImageSecurityEnable bool   `json:"imageSecurityEnable"`
 	ImageSecurityStrict bool   `json:"imageSecurityStrict"`
 	Scene               string `json:"scene"`
@@ -21,6 +22,8 @@ type Snapshot struct {
 	TextSecurityStrict  bool   `json:"textSecurityStrict"`
 	UploadProvider      string `json:"uploadProvider"`
 }
+
+const defaultHomeworkSubjects = `["语文","数学","英语","其他"]`
 
 func GetSnapshot() (*Snapshot, error) {
 	record, err := getOrCreate()
@@ -30,6 +33,7 @@ func GetSnapshot() (*Snapshot, error) {
 
 	return &Snapshot{
 		SystemNamePrefix:    normalizeSystemNamePrefix(record.SystemNamePrefix),
+		HomeworkSubjects:    normalizeHomeworkSubjects(record.HomeworkSubjects),
 		ImageSecurityEnable: record.ImageSecurityEnable,
 		ImageSecurityStrict: record.ImageSecurityStrict,
 		Scene:               record.Scene,
@@ -46,6 +50,7 @@ func SaveSnapshot(snapshot *Snapshot) (*Snapshot, error) {
 	}
 
 	record.SystemNamePrefix = normalizeSystemNamePrefix(snapshot.SystemNamePrefix)
+	record.HomeworkSubjects = normalizeHomeworkSubjects(snapshot.HomeworkSubjects)
 	record.ImageSecurityEnable = snapshot.ImageSecurityEnable
 	record.ImageSecurityStrict = snapshot.ImageSecurityStrict
 	record.TextSecurityEnable = snapshot.TextSecurityEnable
@@ -95,4 +100,12 @@ func normalizeProvider(provider string) string {
 
 func normalizeSystemNamePrefix(prefix string) string {
 	return strings.TrimSpace(prefix)
+}
+
+func normalizeHomeworkSubjects(subjects string) string {
+	trimmed := strings.TrimSpace(subjects)
+	if trimmed == "" || trimmed == "[]" {
+		return defaultHomeworkSubjects
+	}
+	return trimmed
 }

@@ -12,8 +12,11 @@ import (
 )
 
 type assignmentPayload struct {
+	CampusID    string `json:"campusId"`
 	ClassName   string `json:"className"`
+	Subject     string `json:"subject"`
 	Content     string `json:"content"`
+	Attachments string `json:"attachments"`
 	Remark      string `json:"remark"`
 	SchoolName  string `json:"schoolName"`
 	ServiceDate string `json:"serviceDate"`
@@ -40,6 +43,9 @@ func List(c *fiber.Ctx) error {
 	if dateTo := strings.TrimSpace(c.Query("dateTo")); dateTo != "" {
 		query = query.Where("service_date <= ?", dateTo)
 	}
+	if subject := strings.TrimSpace(c.Query("subject")); subject != "" {
+		query = query.Where("subject = ?", subject)
+	}
 
 	if err := query.Find(&assignments).Error; err != nil {
 		return response.Error(c, "查询每日作业失败")
@@ -64,8 +70,11 @@ func Create(c *fiber.Ctx) error {
 	}
 
 	assignment := model.Assignment{
+		CampusID:    strings.TrimSpace(req.CampusID),
 		ClassName:   strings.TrimSpace(req.ClassName),
+		Subject:     strings.TrimSpace(req.Subject),
 		Content:     strings.TrimSpace(req.Content),
+		Attachments: strings.TrimSpace(req.Attachments),
 		Remark:      strings.TrimSpace(req.Remark),
 		SchoolName:  strings.TrimSpace(req.SchoolName),
 		ServiceDate: strings.TrimSpace(req.ServiceDate),
@@ -94,8 +103,11 @@ func Update(c *fiber.Ctx) error {
 		return response.Error(c, err.Error())
 	}
 
+	assignment.CampusID = strings.TrimSpace(req.CampusID)
 	assignment.ClassName = strings.TrimSpace(req.ClassName)
+	assignment.Subject = strings.TrimSpace(req.Subject)
 	assignment.Content = strings.TrimSpace(req.Content)
+	assignment.Attachments = strings.TrimSpace(req.Attachments)
 	assignment.Remark = strings.TrimSpace(req.Remark)
 	assignment.SchoolName = strings.TrimSpace(req.SchoolName)
 	assignment.ServiceDate = strings.TrimSpace(req.ServiceDate)
@@ -107,4 +119,17 @@ func Update(c *fiber.Ctx) error {
 	}
 
 	return response.Success(c, assignment)
+}
+
+func Delete(c *fiber.Ctx) error {
+	var assignment model.Assignment
+	if err := db.DB.First(&assignment, "id = ?", c.Params("id")).Error; err != nil {
+		return response.Error(c, "每日作业不存在")
+	}
+
+	if err := db.DB.Delete(&assignment).Error; err != nil {
+		return response.Error(c, "删除每日作业失败")
+	}
+
+	return response.Success(c, fiber.Map{"id": assignment.Id})
 }

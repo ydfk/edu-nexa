@@ -10,7 +10,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { KeyRound, Pencil, UserPlus } from "lucide-react";
+import { KeyRound, Pencil, Trash2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { NameReminderAlert } from "@/components/domain/name-reminder-alert";
 import {
@@ -48,6 +48,7 @@ import {
 } from "@/lib/password-rules";
 import {
   createUser,
+  deleteUser,
   fetchUsers,
   resetUserPassword,
   updateUser,
@@ -89,7 +90,7 @@ function useTeachers() {
 }
 
 function RowActions({ row }: { row: { original: UserItem } }) {
-  const { setCurrentRow, setOpen } = useTeachers();
+  const { reloadData, setCurrentRow, setOpen } = useTeachers();
 
   return (
     <div className="flex justify-end gap-2">
@@ -114,6 +115,25 @@ function RowActions({ row }: { row: { original: UserItem } }) {
       >
         <KeyRound className="mr-2 size-4" />
         重置密码
+      </Button>
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={async () => {
+          if (!window.confirm(`确定删除教师「${row.original.displayName || row.original.phone}」？`)) {
+            return;
+          }
+          try {
+            await deleteUser(row.original.id);
+            toast.success("教师已删除");
+            await reloadData();
+          } catch (error) {
+            toast.error(error instanceof Error ? error.message : "删除失败");
+          }
+        }}
+      >
+        <Trash2 className="mr-2 size-4" />
+        删除
       </Button>
     </div>
   );

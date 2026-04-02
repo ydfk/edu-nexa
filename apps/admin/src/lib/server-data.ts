@@ -110,12 +110,14 @@ export type HomeworkRecordItem = {
 };
 
 export type DailyHomeworkItem = {
+  attachments: string;
   className: string;
   content: string;
   id: string;
   remark: string;
   schoolName: string;
   serviceDate: string;
+  subject: string;
   teacherId: string;
   teacherName: string;
 };
@@ -194,6 +196,12 @@ export async function saveSchool(input: { id?: string; name: string; status: str
   });
 }
 
+export async function deleteSchool(id: string) {
+  return request<{ id: string }>(`/api/schools/${id}`, {
+    method: "DELETE",
+  });
+}
+
 export async function fetchGrades(query?: ListQuery) {
   return request<GradeItem[]>("/api/grades", { query });
 }
@@ -208,6 +216,12 @@ export async function saveGrade(input: {
   return request<GradeItem>(path, {
     body: input,
     method: input.id ? "PUT" : "POST",
+  });
+}
+
+export async function deleteGrade(id: string) {
+  return request<{ id: string }>(`/api/grades/${id}`, {
+    method: "DELETE",
   });
 }
 
@@ -231,6 +245,12 @@ export async function saveClass(input: {
   });
 }
 
+export async function deleteClass(id: string) {
+  return request<{ id: string }>(`/api/classes/${id}`, {
+    method: "DELETE",
+  });
+}
+
 export async function fetchGuardianProfiles(query?: ListQuery) {
   return request<GuardianProfileItem[]>("/api/guardian-profiles", { query });
 }
@@ -247,6 +267,12 @@ export async function saveGuardianProfile(input: {
   return request<GuardianProfileItem>(path, {
     body: input,
     method: input.id ? "PUT" : "POST",
+  });
+}
+
+export async function deleteGuardianProfile(id: string) {
+  return request<{ id: string }>(`/api/guardian-profiles/${id}`, {
+    method: "DELETE",
   });
 }
 
@@ -275,6 +301,12 @@ export async function saveStudent(input: {
   });
 }
 
+export async function deleteStudent(id: string) {
+  return request<{ id: string }>(`/api/students/${id}`, {
+    method: "DELETE",
+  });
+}
+
 export async function fetchStudentServices(query?: ListQuery) {
   return request<StudentServiceItem[]>("/api/student-services", { query });
 }
@@ -293,6 +325,12 @@ export async function saveStudentService(input: {
   return request<StudentServiceItem>(path, {
     body: input,
     method: input.id ? "PUT" : "POST",
+  });
+}
+
+export async function deleteStudentService(id: string) {
+  return request<{ id: string }>(`/api/student-services/${id}`, {
+    method: "DELETE",
   });
 }
 
@@ -315,6 +353,12 @@ export async function saveMealRecord(input: {
   return request<MealRecordItem>(path, {
     body: input,
     method: input.id ? "PUT" : "POST",
+  });
+}
+
+export async function deleteMealRecord(id: string) {
+  return request<{ id: string }>(`/api/meal-records/${id}`, {
+    method: "DELETE",
   });
 }
 
@@ -343,17 +387,25 @@ export async function saveHomeworkRecord(input: {
   });
 }
 
+export async function deleteHomeworkRecord(id: string) {
+  return request<{ id: string }>(`/api/homework-records/${id}`, {
+    method: "DELETE",
+  });
+}
+
 export async function fetchDailyHomework(query?: ListQuery) {
   return request<DailyHomeworkItem[]>("/api/daily-homework", { query });
 }
 
 export async function saveDailyHomework(input: {
+  attachments?: string;
   className: string;
   content: string;
   id?: string;
   remark: string;
   schoolName: string;
   serviceDate: string;
+  subject?: string;
   teacherId: string;
   teacherName: string;
 }) {
@@ -361,6 +413,12 @@ export async function saveDailyHomework(input: {
   return request<DailyHomeworkItem>(path, {
     body: input,
     method: input.id ? "PUT" : "POST",
+  });
+}
+
+export async function deleteDailyHomework(id: string) {
+  return request<{ id: string }>(`/api/daily-homework/${id}`, {
+    method: "DELETE",
   });
 }
 
@@ -387,11 +445,51 @@ export async function saveServiceDay(input: {
   });
 }
 
+export async function deleteUser(id: string) {
+  return request<{ id: string }>(`/api/users/${id}`, {
+    method: "DELETE",
+  });
+}
+
+export type UploadResult = {
+  objectKey: string;
+  provider: string;
+  url: string;
+};
+
+export async function uploadFile(file: File, purpose = "homework"): Promise<UploadResult> {
+  const session = getAdminSessionSnapshot();
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("purpose", purpose);
+
+  const response = await fetch(`${apiBaseURL}/api/uploads/files`, {
+    body: formData,
+    headers: {
+      Authorization: session.token ? `Bearer ${session.token}` : "",
+    },
+    method: "POST",
+  });
+
+  let payload: ApiEnvelope<UploadResult> | null = null;
+  try {
+    payload = (await response.json()) as ApiEnvelope<UploadResult>;
+  } catch {
+    throw new Error("上传响应解析失败");
+  }
+
+  if (!response.ok || !payload.flag) {
+    throw new Error(payload?.msg || "上传失败");
+  }
+
+  return payload.data;
+}
+
 async function request<T>(
   path: string,
   options?: {
     body?: unknown;
-    method?: "GET" | "POST" | "PUT";
+    method?: "GET" | "POST" | "PUT" | "DELETE";
     query?: ListQuery;
   }
 ) {

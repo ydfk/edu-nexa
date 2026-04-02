@@ -10,7 +10,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { Pencil, Plus } from "lucide-react";
+import { Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   DataTableColumnHeader,
@@ -44,10 +44,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import useDialogState from "@/hooks/use-dialog-state";
 import { useAdminSession } from "@/lib/auth/session";
 import {
+  deleteDailyHomework,
   fetchClasses,
   fetchDailyHomework,
   fetchSchools,
@@ -56,6 +63,7 @@ import {
   type DailyHomeworkItem,
   type SchoolItem,
 } from "@/lib/server-data";
+import DailyHomeworkBoard from "./daily-homework-board";
 
 // ---------------------------------------------------------------------------
 // Constants & types
@@ -132,7 +140,7 @@ const columns: ColumnDef<DailyHomeworkItem>[] = [
   {
     id: "actions",
     cell: function ActionsCell({ row }) {
-      const { setOpen, setCurrentItem } = useDailyHomework();
+      const { reloadData, setOpen, setCurrentItem } = useDailyHomework();
       return (
         <div className="flex justify-end gap-2">
           <Button
@@ -145,6 +153,23 @@ const columns: ColumnDef<DailyHomeworkItem>[] = [
           >
             <Pencil className="mr-2 size-4" />
             编辑
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={async () => {
+              if (!window.confirm("确定删除这条每日作业？")) return;
+              try {
+                await deleteDailyHomework(row.original.id);
+                toast.success("每日作业已删除");
+                reloadData();
+              } catch (error) {
+                toast.error(error instanceof Error ? error.message : "删除失败");
+              }
+            }}
+          >
+            <Trash2 className="mr-2 size-4" />
+            删除
           </Button>
         </div>
       );
@@ -317,6 +342,34 @@ function DailyHomeworkFormDialog() {
 // ---------------------------------------------------------------------------
 
 export default function DailyHomeworkPage() {
+  return (
+    <PageContent>
+      <div className="mb-2">
+        <h2 className="text-2xl font-bold tracking-tight">每日作业</h2>
+        <p className="text-muted-foreground">管理每日作业记录</p>
+      </div>
+
+      <Tabs defaultValue="board" className="flex-1">
+        <TabsList>
+          <TabsTrigger value="board">面板视图</TabsTrigger>
+          <TabsTrigger value="list">列表视图</TabsTrigger>
+        </TabsList>
+        <TabsContent value="board" className="mt-4">
+          <DailyHomeworkBoard />
+        </TabsContent>
+        <TabsContent value="list" className="mt-4">
+          <DailyHomeworkListView />
+        </TabsContent>
+      </Tabs>
+    </PageContent>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 列表视图（原有逻辑）
+// ---------------------------------------------------------------------------
+
+function DailyHomeworkListView() {
   const [open, setOpen] = useDialogState<DailyHomeworkDialogType>();
   const [currentItem, setCurrentItem] = useState<DailyHomeworkItem | null>(null);
 
@@ -384,20 +437,16 @@ export default function DailyHomeworkPage() {
 
   return (
     <DailyHomeworkContext.Provider value={contextValue}>
-      <PageContent>
-        {/* Title section */}
-        <div className="mb-2 flex flex-wrap items-center justify-between gap-x-4 space-y-2">
-          <div>
-            <h2 className="text-2xl font-bold tracking-tight">每日作业</h2>
-            <p className="text-muted-foreground">管理每日作业记录</p>
-          </div>
+      <div>
+        {/* Header */}
+        <div className="mb-4 flex flex-wrap items-center justify-end gap-x-4">
           <Button className="space-x-1" onClick={() => setOpen("create")}>
             <span>新增作业</span> <Plus size={18} />
           </Button>
         </div>
 
         {/* Data table */}
-        <div className="-mx-4 flex-1 overflow-auto px-4 py-1 lg:flex-row lg:space-x-12 lg:space-y-0">
+        <div className="flex-1 overflow-auto py-1 lg:flex-row lg:space-x-12 lg:space-y-0">
           {loading ? (
             <div className="py-8 text-center text-sm text-muted-foreground">
               加载中…
@@ -465,7 +514,7 @@ export default function DailyHomeworkPage() {
 
         {/* Dialogs */}
         <DailyHomeworkFormDialog />
-      </PageContent>
+      </div>
     </DailyHomeworkContext.Provider>
   );
 }

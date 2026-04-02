@@ -5,7 +5,10 @@ import (
 	"strings"
 
 	"github.com/ydfk/edu-nexa/apps/api/internal/api/response"
+	homeworkassignmentModel "github.com/ydfk/edu-nexa/apps/api/internal/model/homeworkassignment"
+	homeworkrecordModel "github.com/ydfk/edu-nexa/apps/api/internal/model/homeworkrecord"
 	model "github.com/ydfk/edu-nexa/apps/api/internal/model/classgroup"
+	studentModel "github.com/ydfk/edu-nexa/apps/api/internal/model/student"
 	"github.com/ydfk/edu-nexa/apps/api/pkg/db"
 
 	"github.com/gofiber/fiber/v2"
@@ -102,6 +105,22 @@ func Update(c *fiber.Ctx) error {
 	return response.Success(c, item)
 }
 
+func Delete(c *fiber.Ctx) error {
+	var item model.Class
+	if err := db.DB.First(&item, "id = ?", c.Params("id")).Error; err != nil {
+		return response.Error(c, "班级不存在")
+	}
+	if err := ensureClassDeletable(item); err != nil {
+		return response.Error(c, err.Error())
+	}
+
+	if err := db.DB.Delete(&item).Error; err != nil {
+		return response.Error(c, "删除班级失败")
+	}
+
+	return response.Success(c, fiber.Map{"id": item.Id})
+}
+
 func defaultClassStatus(status string) string {
 	if strings.TrimSpace(status) == "" {
 		return "active"
@@ -128,4 +147,34 @@ func ensureClassNameUnique(name string, gradeID string, excludeID string) error 
 	}
 
 	return errors.New("班级名称已存在")
+}
+
+func ensureClassDeletable(item model.Class) error {
+	var count int64
+	if err := db.DB.Model(&studentModel.Student{}).Where("class_id = ?", item.Id.String()).Count(&count).Error; err != nil {
+		return errors.New("校验班级关联学生失败")
+	}
+	if count > 0 {
+		return errors.New("班级下存在学生，不能删除")
+	}
+
+	if err := db.DB.Model(&homeworkassignmentModel.Assignment{}).
+		Where("school_name = ? AND class_name = ?", item.SchoolName, item.Name).
+		Count(&count).Error; err != nil {
+		return errors.New("校验班级关联每日作业失败")
+	}
+	if count > 0 {
+		return errors.New("班级已关联每日作业，不能删除")
+	}
+
+	if err := db.DB.Model(&homeworkrecordModel.Record{}).
+		Where("school_name = ? AND class_name = ?", item.SchoolName, item.Name).
+		Count(&count).Error; err != nil {
+		return errors.New("校验班级关联作业记录失败")
+	}
+	if count > 0 {
+		return errors.New("班级已关联作业记录，不能删除")
+	}
+
+	return nil
 }

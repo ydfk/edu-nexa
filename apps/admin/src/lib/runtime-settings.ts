@@ -1,6 +1,7 @@
 import { getAdminSessionSnapshot } from "@/lib/auth/session";
 
 export type RuntimeSettings = {
+  homeworkSubjects: string;
   imageSecurityEnable: boolean;
   imageSecurityStrict: boolean;
   scene: string;
@@ -10,7 +11,10 @@ export type RuntimeSettings = {
   uploadProvider: "local" | "aliyun_oss" | "upyun";
 };
 
+const defaultHomeworkSubjects = '["语文","数学","英语","其他"]';
+
 const defaultSettings: RuntimeSettings = {
+  homeworkSubjects: defaultHomeworkSubjects,
   imageSecurityEnable: false,
   imageSecurityStrict: false,
   scene: "app-runtime",
@@ -88,6 +92,7 @@ function normalizeRuntimeSettings(
       : "local";
 
   return {
+    homeworkSubjects: value?.homeworkSubjects || defaultHomeworkSubjects,
     imageSecurityEnable: !!value?.imageSecurityEnable,
     imageSecurityStrict: !!value?.imageSecurityStrict,
     scene: value?.scene || defaultSettings.scene,
@@ -150,4 +155,14 @@ export function getSystemBrandParts(prefix?: string) {
 
 function cloneRuntimeSettings(settings: RuntimeSettings) {
   return JSON.parse(JSON.stringify(settings)) as RuntimeSettings;
+}
+
+export function parseHomeworkSubjects(settings: RuntimeSettings): string[] {
+  try {
+    const parsed = JSON.parse(settings.homeworkSubjects);
+    if (Array.isArray(parsed)) return parsed.filter((s: unknown) => typeof s === "string" && s.trim());
+  } catch {
+    // ignore
+  }
+  return ["语文", "数学", "英语", "其他"];
 }

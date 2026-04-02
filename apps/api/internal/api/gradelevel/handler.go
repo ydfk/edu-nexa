@@ -6,7 +6,9 @@ import (
 	"strings"
 
 	"github.com/ydfk/edu-nexa/apps/api/internal/api/response"
+	classgroupModel "github.com/ydfk/edu-nexa/apps/api/internal/model/classgroup"
 	model "github.com/ydfk/edu-nexa/apps/api/internal/model/gradelevel"
+	studentModel "github.com/ydfk/edu-nexa/apps/api/internal/model/student"
 	"github.com/ydfk/edu-nexa/apps/api/pkg/db"
 
 	"github.com/gofiber/fiber/v2"
@@ -88,6 +90,22 @@ func Update(c *fiber.Ctx) error {
 	return response.Success(c, item)
 }
 
+func Delete(c *fiber.Ctx) error {
+	var item model.Grade
+	if err := db.DB.First(&item, "id = ?", c.Params("id")).Error; err != nil {
+		return response.Error(c, "年级不存在")
+	}
+	if err := ensureGradeDeletable(item); err != nil {
+		return response.Error(c, err.Error())
+	}
+
+	if err := db.DB.Delete(&item).Error; err != nil {
+		return response.Error(c, "删除年级失败")
+	}
+
+	return response.Success(c, fiber.Map{"id": item.Id})
+}
+
 func defaultGradeStatus(status string) string {
 	if strings.TrimSpace(status) == "" {
 		return "active"
@@ -120,4 +138,23 @@ func ensureGradeNameUnique(name string, excludeID string) error {
 	}
 
 	return errors.New("年级名称已存在")
+}
+
+func ensureGradeDeletable(item model.Grade) error {
+	var count int64
+	if err := db.DB.Model(&classgroupModel.Class{}).Where("grade_id = ?", item.Id.String()).Count(&count).Error; err != nil {
+		return errors.New("校验年级关联班级失败")
+	}
+	if count > 0 {
+		return errors.New("年级下存在班级，不能删除")
+	}
+
+	if err := db.DB.Model(&studentModel.Student{}).Where("grade_id = ?", item.Id.String()).Count(&count).Error; err != nil {
+		return errors.New("校验年级关联学生失败")
+	}
+	if count > 0 {
+		return errors.New("年级下存在学生，不能删除")
+	}
+
+	return nil
 }

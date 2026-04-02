@@ -13,7 +13,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { CircleCheck, CircleDashed, Clock, Pencil, Plus } from "lucide-react";
+import { CircleCheck, CircleDashed, Clock, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   DataTableColumnHeader,
@@ -52,6 +52,7 @@ import { Textarea } from "@/components/ui/textarea";
 import useDialogState from "@/hooks/use-dialog-state";
 import { useAdminSession } from "@/lib/auth/session";
 import {
+  deleteHomeworkRecord,
   fetchHomeworkRecords,
   fetchStudents,
   saveHomeworkRecord,
@@ -155,7 +156,7 @@ const columns: ColumnDef<HomeworkRecordItem>[] = [
   {
     id: "actions",
     cell: function ActionsCell({ row }) {
-      const { setOpen, setCurrentItem, canEdit } = useHomeworkRecords();
+      const { reloadData, setOpen, setCurrentItem, canEdit } = useHomeworkRecords();
       if (!canEdit) return null;
       return (
         <div className="flex justify-end gap-2">
@@ -169,6 +170,23 @@ const columns: ColumnDef<HomeworkRecordItem>[] = [
           >
             <Pencil className="mr-2 size-4" />
             编辑
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={async () => {
+              if (!window.confirm("确定删除这条作业记录？")) return;
+              try {
+                await deleteHomeworkRecord(row.original.id);
+                toast.success("作业记录已删除");
+                reloadData();
+              } catch (error) {
+                toast.error(error instanceof Error ? error.message : "删除失败");
+              }
+            }}
+          >
+            <Trash2 className="mr-2 size-4" />
+            删除
           </Button>
         </div>
       );

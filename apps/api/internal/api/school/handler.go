@@ -5,7 +5,11 @@ import (
 	"strings"
 
 	"github.com/ydfk/edu-nexa/apps/api/internal/api/response"
+	classgroupModel "github.com/ydfk/edu-nexa/apps/api/internal/model/classgroup"
+	homeworkassignmentModel "github.com/ydfk/edu-nexa/apps/api/internal/model/homeworkassignment"
+	homeworkrecordModel "github.com/ydfk/edu-nexa/apps/api/internal/model/homeworkrecord"
 	model "github.com/ydfk/edu-nexa/apps/api/internal/model/school"
+	studentModel "github.com/ydfk/edu-nexa/apps/api/internal/model/student"
 	"github.com/ydfk/edu-nexa/apps/api/pkg/db"
 
 	"github.com/gofiber/fiber/v2"
@@ -84,6 +88,22 @@ func Update(c *fiber.Ctx) error {
 	return response.Success(c, item)
 }
 
+func Delete(c *fiber.Ctx) error {
+	var item model.School
+	if err := db.DB.First(&item, "id = ?", c.Params("id")).Error; err != nil {
+		return response.Error(c, "学校不存在")
+	}
+	if err := ensureSchoolDeletable(item); err != nil {
+		return response.Error(c, err.Error())
+	}
+
+	if err := db.DB.Delete(&item).Error; err != nil {
+		return response.Error(c, "删除学校失败")
+	}
+
+	return response.Success(c, fiber.Map{"id": item.Id})
+}
+
 func defaultStatus(status string) string {
 	if strings.TrimSpace(status) == "" {
 		return "active"
@@ -107,4 +127,37 @@ func ensureSchoolNameUnique(name string, excludeID string) error {
 	}
 
 	return errors.New("学校名称已存在")
+}
+
+func ensureSchoolDeletable(item model.School) error {
+	var count int64
+	if err := db.DB.Model(&classgroupModel.Class{}).Where("school_id = ?", item.Id.String()).Count(&count).Error; err != nil {
+		return errors.New("校验学校关联班级失败")
+	}
+	if count > 0 {
+		return errors.New("学校下存在班级，不能删除")
+	}
+
+	if err := db.DB.Model(&studentModel.Student{}).Where("school_id = ?", item.Id.String()).Count(&count).Error; err != nil {
+		return errors.New("校验学校关联学生失败")
+	}
+	if count > 0 {
+		return errors.New("学校下存在学生，不能删除")
+	}
+
+	if err := db.DB.Model(&homeworkassignmentModel.Assignment{}).Where("school_name = ?", item.Name).Count(&count).Error; err != nil {
+		return errors.New("校验学校关联每日作业失败")
+	}
+	if count > 0 {
+		return errors.New("学校已关联每日作业，不能删除")
+	}
+
+	if err := db.DB.Model(&homeworkrecordModel.Record{}).Where("school_name = ?", item.Name).Count(&count).Error; err != nil {
+		return errors.New("校验学校关联作业记录失败")
+	}
+	if count > 0 {
+		return errors.New("学校已关联作业记录，不能删除")
+	}
+
+	return nil
 }

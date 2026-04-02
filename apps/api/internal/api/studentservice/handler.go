@@ -11,6 +11,7 @@ import (
 )
 
 type planPayload struct {
+	CampusID         string  `json:"campusId"`
 	PaymentAmount    float64 `json:"paymentAmount"`
 	PaidAt           string  `json:"paidAt"`
 	PaymentStatus    string  `json:"paymentStatus"`
@@ -49,6 +50,7 @@ func Create(c *fiber.Ctx) error {
 	}
 
 	plan := model.Plan{
+		CampusID:         strings.TrimSpace(req.CampusID),
 		PaymentAmount:    req.PaymentAmount,
 		PaidAt:           strings.TrimSpace(req.PaidAt),
 		PaymentStatus:    defaultPaymentStatus(req.PaymentStatus),
@@ -56,6 +58,18 @@ func Create(c *fiber.Ctx) error {
 		ServiceEndDate:   strings.TrimSpace(req.ServiceEndDate),
 		ServiceStartDate: strings.TrimSpace(req.ServiceStartDate),
 		StudentID:        strings.TrimSpace(req.StudentID),
+	}
+	if isEmptyPlan(plan) {
+		return response.Success(c, fiber.Map{
+			"campusId":         plan.CampusID,
+			"paymentAmount":    plan.PaymentAmount,
+			"paidAt":           plan.PaidAt,
+			"paymentStatus":    plan.PaymentStatus,
+			"remark":           plan.Remark,
+			"serviceEndDate":   plan.ServiceEndDate,
+			"serviceStartDate": plan.ServiceStartDate,
+			"studentId":        plan.StudentID,
+		})
 	}
 
 	if err := db.DB.Create(&plan).Error; err != nil {
@@ -76,6 +90,7 @@ func Update(c *fiber.Ctx) error {
 		return response.Error(c, "服务计划不存在")
 	}
 
+	plan.CampusID = strings.TrimSpace(req.CampusID)
 	plan.PaymentAmount = req.PaymentAmount
 	plan.PaidAt = strings.TrimSpace(req.PaidAt)
 	plan.PaymentStatus = defaultPaymentStatus(req.PaymentStatus)
@@ -83,6 +98,21 @@ func Update(c *fiber.Ctx) error {
 	plan.ServiceEndDate = strings.TrimSpace(req.ServiceEndDate)
 	plan.ServiceStartDate = strings.TrimSpace(req.ServiceStartDate)
 	plan.StudentID = strings.TrimSpace(req.StudentID)
+	if isEmptyPlan(plan) {
+		if err := db.DB.Delete(&plan).Error; err != nil {
+			return response.Error(c, "删除服务计划失败")
+		}
+		return response.Success(c, fiber.Map{
+			"campusId":         plan.CampusID,
+			"paymentAmount":    0,
+			"paidAt":           "",
+			"paymentStatus":    "unpaid",
+			"remark":           "",
+			"serviceEndDate":   "",
+			"serviceStartDate": "",
+			"studentId":        plan.StudentID,
+		})
+	}
 
 	if err := db.DB.Save(&plan).Error; err != nil {
 		return response.Error(c, "更新服务计划失败")
@@ -91,10 +121,32 @@ func Update(c *fiber.Ctx) error {
 	return response.Success(c, plan)
 }
 
+func Delete(c *fiber.Ctx) error {
+	var plan model.Plan
+	if err := db.DB.First(&plan, "id = ?", c.Params("id")).Error; err != nil {
+		return response.Error(c, "服务计划不存在")
+	}
+
+	if err := db.DB.Delete(&plan).Error; err != nil {
+		return response.Error(c, "删除服务计划失败")
+	}
+
+	return response.Success(c, fiber.Map{"id": plan.Id})
+}
+
 func defaultPaymentStatus(status string) string {
 	if strings.TrimSpace(status) == "" {
 		return "unpaid"
 	}
 
 	return strings.TrimSpace(status)
+}
+
+func isEmptyPlan(plan model.Plan) bool {
+	return plan.PaymentAmount == 0 &&
+		plan.PaidAt == "" &&
+		plan.PaymentStatus == "unpaid" &&
+		plan.Remark == "" &&
+		plan.ServiceEndDate == "" &&
+		plan.ServiceStartDate == ""
 }

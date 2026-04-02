@@ -11,3 +11,7 @@ type Profile struct {
 	Remark       string `gorm:"size:255" json:"remark"`
 	Status       string `gorm:"size:16;default:active" json:"status"`
 }
+
+func (Profile) TableName() string {
+	return "guardian_profiles"
+}

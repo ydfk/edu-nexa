@@ -1,10 +1,13 @@
 package guardianprofile
 
 import (
+	"errors"
 	"strings"
 
 	"github.com/ydfk/edu-nexa/apps/api/internal/api/response"
+	guardianbindingModel "github.com/ydfk/edu-nexa/apps/api/internal/model/guardianbinding"
 	model "github.com/ydfk/edu-nexa/apps/api/internal/model/guardianprofile"
+	studentModel "github.com/ydfk/edu-nexa/apps/api/internal/model/student"
 	userModel "github.com/ydfk/edu-nexa/apps/api/internal/model/user"
 	"github.com/ydfk/edu-nexa/apps/api/pkg/db"
 
@@ -114,6 +117,39 @@ func Update(c *fiber.Ctx) error {
 	return response.Success(c, item)
 }
 
+func Delete(c *fiber.Ctx) error {
+	var item model.Profile
+	if err := db.DB.First(&item, "id = ?", c.Params("id")).Error; err != nil {
+		return response.Error(c, "家长不存在")
+	}
+	if err := ensureGuardianDeletable(item); err != nil {
+		return response.Error(c, err.Error())
+	}
+
+	if err := db.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Delete(&item).Error; err != nil {
+			return err
+		}
+		if strings.TrimSpace(item.UserID) != "" {
+			var user userModel.User
+			if err := tx.First(&user, "id = ?", item.UserID).Error; err != nil {
+				if !errors.Is(err, gorm.ErrRecordNotFound) {
+					return err
+				}
+			} else if shouldDeleteGuardianUser(user) {
+				if err := tx.Delete(&user).Error; err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	}); err != nil {
+		return response.Error(c, "删除家长失败")
+	}
+
+	return response.Success(c, fiber.Map{"id": item.Id})
+}
+
 func defaultGuardianStatus(status string) string {
 	if strings.TrimSpace(status) == "" {
 		return "active"
@@ -209,4 +245,41 @@ func normalizeGuardianRoles(raw string) string {
 	}
 
 	return strings.Join(items, ",")
+}
+
+func shouldDeleteGuardianUser(user userModel.User) bool {
+	parts := strings.Split(user.Roles, ",")
+	roles := make([]string, 0, len(parts))
+	for _, part := range parts {
+		role := strings.TrimSpace(part)
+		if role == "" {
+			continue
+		}
+		roles = append(roles, role)
+	}
+
+	return len(roles) == 0 || (len(roles) == 1 && roles[0] == "guardian")
+}
+
+func ensureGuardianDeletable(item model.Profile) error {
+	var count int64
+	if err := db.DB.Model(&studentModel.Student{}).Where("guardian_id = ?", item.Id.String()).Count(&count).Error; err != nil {
+		return errors.New("校验家长关联学生失败")
+	}
+	if count > 0 {
+		return errors.New("家长已关联学生，不能删除")
+	}
+
+	query := db.DB.Model(&guardianbindingModel.Binding{}).Where("guardian_phone = ?", item.Phone)
+	if strings.TrimSpace(item.UserID) != "" {
+		query = query.Or("guardian_user_id = ?", item.UserID)
+	}
+	if err := query.Count(&count).Error; err != nil {
+		return errors.New("校验家长关联关系失败")
+	}
+	if count > 0 {
+		return errors.New("家长已关联学生关系，不能删除")
+	}
+
+	return nil
 }

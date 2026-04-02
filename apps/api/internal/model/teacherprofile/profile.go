@@ -11,3 +11,7 @@ type Profile struct {
 	Status      string `gorm:"size:16;default:active" json:"status"`
 	Description string `gorm:"size:255" json:"description"`
 }
+
+func (Profile) TableName() string {
+	return "teacher_profiles"
+}

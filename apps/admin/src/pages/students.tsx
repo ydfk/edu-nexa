@@ -14,7 +14,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { CircleCheck, CirclePause, Pencil, Plus, UserPlus } from "lucide-react";
+import { CircleCheck, CirclePause, Pencil, Plus, Trash2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { NameReminderAlert } from "@/components/domain/name-reminder-alert";
 import {
@@ -62,6 +62,7 @@ import {
   parentRelationshipOptions,
 } from "@/lib/parent-relationships";
 import {
+  deleteStudent,
   fetchClasses,
   fetchGrades,
   fetchGuardianProfiles,
@@ -83,7 +84,7 @@ import {
 } from "@/lib/server-data";
 
 // ---------------------------------------------------------------------------
-// Constants & types
+// 常量与类型
 // ---------------------------------------------------------------------------
 
 type DialogType =
@@ -150,7 +151,7 @@ const initialGuardianForm = {
 };
 
 // ---------------------------------------------------------------------------
-// Context
+// 上下文
 // ---------------------------------------------------------------------------
 
 type StudentsContextValue = {
@@ -176,7 +177,7 @@ function useStudents() {
 }
 
 // ---------------------------------------------------------------------------
-// Helpers
+// 工具函数
 // ---------------------------------------------------------------------------
 
 function formatRange(startDate?: string, endDate?: string) {
@@ -208,7 +209,7 @@ function SelectWithAction({
 }
 
 // ---------------------------------------------------------------------------
-// Column definitions
+// 列定义
 // ---------------------------------------------------------------------------
 
 function createColumns(
@@ -304,31 +305,48 @@ function createColumns(
     {
       id: "actions",
       cell: function ActionsCell({ row }) {
-        const { setOpen, setCurrentItem } = useStudents();
-      return (
-        <div className="flex justify-end gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => {
-              setCurrentItem(row.original);
-              setOpen("edit");
-            }}
-          >
-            <Pencil className="mr-2 size-4" />
-            编辑
-          </Button>
-        </div>
-      );
-    },
-    enableSorting: false,
-    enableHiding: false,
+        const { reloadData, setOpen, setCurrentItem } = useStudents();
+        return (
+          <div className="flex justify-end gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setCurrentItem(row.original);
+                setOpen("edit");
+              }}
+            >
+              <Pencil className="mr-2 size-4" />
+              编辑
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={async () => {
+                if (!window.confirm(`确定删除学生「${row.original.name}」？`)) return;
+                try {
+                  await deleteStudent(row.original.id);
+                  toast.success("学生已删除");
+                  await reloadData();
+                } catch (error) {
+                  toast.error(error instanceof Error ? error.message : "删除失败");
+                }
+              }}
+            >
+              <Trash2 className="mr-2 size-4" />
+              删除
+            </Button>
+          </div>
+        );
+      },
+      enableSorting: false,
+      enableHiding: false,
     },
   ];
 }
 
 // ---------------------------------------------------------------------------
-// StudentFormDialog
+// 学生表单弹窗
 // ---------------------------------------------------------------------------
 
 function StudentFormDialog() {
@@ -355,7 +373,7 @@ function StudentFormDialog() {
     null,
   );
 
-  // Quick-add form states
+  // 快捷新增表单状态
   const [schoolForm, setSchoolForm] = useState(initialSchoolForm);
   const [gradeForm, setGradeForm] = useState(initialGradeForm);
   const [classForm, setClassForm] = useState(initialClassForm);
@@ -987,7 +1005,7 @@ function StudentFormDialog() {
 }
 
 // ---------------------------------------------------------------------------
-// Field helper
+// 字段组件
 // ---------------------------------------------------------------------------
 
 function Field({
@@ -1008,7 +1026,7 @@ function Field({
 }
 
 // ---------------------------------------------------------------------------
-// Page component
+// 页面组件
 // ---------------------------------------------------------------------------
 
 export default function StudentsPage() {
@@ -1129,6 +1147,7 @@ export default function StudentsPage() {
       open,
       setOpen,
       currentItem,
+      loadData,
       schools,
       grades,
       classes,

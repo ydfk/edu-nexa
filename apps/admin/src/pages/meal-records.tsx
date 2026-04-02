@@ -13,7 +13,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { CircleCheck, CircleX, Clock, Pencil, Plus } from "lucide-react";
+import { CircleCheck, CircleX, Clock, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   DataTableColumnHeader,
@@ -51,6 +51,7 @@ import { Textarea } from "@/components/ui/textarea";
 import useDialogState from "@/hooks/use-dialog-state";
 import { useAdminSession } from "@/lib/auth/session";
 import {
+  deleteMealRecord,
   fetchMealRecords,
   fetchStudents,
   saveMealRecord,
@@ -176,7 +177,7 @@ const columns: ColumnDef<MealRecordItem>[] = [
   {
     id: "actions",
     cell: function ActionsCell({ row }) {
-      const { setOpen, setCurrentItem, canEdit } = useMealRecords();
+      const { reloadData, setOpen, setCurrentItem, canEdit } = useMealRecords();
       if (!canEdit) return null;
       return (
         <div className="flex justify-end gap-2">
@@ -190,6 +191,23 @@ const columns: ColumnDef<MealRecordItem>[] = [
           >
             <Pencil className="mr-2 size-4" />
             编辑
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={async () => {
+              if (!window.confirm("确定删除这条用餐记录？")) return;
+              try {
+                await deleteMealRecord(row.original.id);
+                toast.success("用餐记录已删除");
+                reloadData();
+              } catch (error) {
+                toast.error(error instanceof Error ? error.message : "删除失败");
+              }
+            }}
+          >
+            <Trash2 className="mr-2 size-4" />
+            删除
           </Button>
         </div>
       );

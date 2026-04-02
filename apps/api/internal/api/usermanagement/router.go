@@ -7,5 +7,6 @@ func RegisterRoutes(router fiber.Router) {
 	grp.Get("/", List)
 	grp.Post("/", Create)
 	grp.Put("/:id", Update)
+	grp.Delete("/:id", Delete)
 	grp.Post("/:id/reset-password", ResetPassword)
 }

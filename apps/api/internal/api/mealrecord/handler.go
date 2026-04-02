@@ -12,6 +12,7 @@ import (
 )
 
 type mealRecordPayload struct {
+	CampusID     string   `json:"campusId"`
 	ImageURLs    []string `json:"imageUrls"`
 	RecordedBy   string   `json:"recordedBy"`
 	RecordedByID string   `json:"recordedById"`
@@ -65,6 +66,7 @@ func Create(c *fiber.Ctx) error {
 	}
 
 	record := model.Record{
+		CampusID:     strings.TrimSpace(req.CampusID),
 		ImageURLs:    strings.Join(req.ImageURLs, ","),
 		RecordedBy:   req.RecordedBy,
 		RecordedByID: req.RecordedByID,
@@ -96,6 +98,7 @@ func Update(c *fiber.Ctx) error {
 		return response.Error(c, err.Error())
 	}
 
+	record.CampusID = strings.TrimSpace(req.CampusID)
 	record.ImageURLs = strings.Join(req.ImageURLs, ",")
 	record.RecordedBy = req.RecordedBy
 	record.RecordedByID = req.RecordedByID
@@ -112,8 +115,22 @@ func Update(c *fiber.Ctx) error {
 	return response.Success(c, buildMealRecordPayload(record))
 }
 
+func Delete(c *fiber.Ctx) error {
+	var record model.Record
+	if err := db.DB.First(&record, "id = ?", c.Params("id")).Error; err != nil {
+		return response.Error(c, "用餐记录不存在")
+	}
+
+	if err := db.DB.Delete(&record).Error; err != nil {
+		return response.Error(c, "删除用餐记录失败")
+	}
+
+	return response.Success(c, fiber.Map{"id": record.Id})
+}
+
 func buildMealRecordPayload(item model.Record) fiber.Map {
 	return fiber.Map{
+		"campusId":     item.CampusID,
 		"id":           item.Id,
 		"imageUrls":    splitCommaField(item.ImageURLs),
 		"recordedBy":   item.RecordedBy,
