@@ -198,6 +198,12 @@ type StudentCardProps = {
   canEdit: boolean;
 };
 
+type StudentSection = {
+  key: string;
+  students: StudentItem[];
+  title: string | null;
+};
+
 function StudentMealCard({ student, record, onRecord, onDelete, canEdit }: StudentCardProps) {
   const isPaid = student.serviceSummary?.paymentStatus === "paid";
 
@@ -349,15 +355,33 @@ export default function MealRecordBoard() {
     return map;
   }, [records]);
 
-  // 按学校分组学生
-  const groupedStudents = useMemo(() => {
-    const groups: Record<string, StudentItem[]> = {};
-    for (const s of students) {
-      const key = [s.schoolName, s.grade, s.className].filter(Boolean).join(" / ") || "未分配";
-      if (!groups[key]) groups[key] = [];
-      groups[key].push(s);
+  const studentSections = useMemo<StudentSection[]>(() => {
+    const schoolNames = Array.from(
+      new Set(students.map((student) => student.schoolName?.trim()).filter(Boolean)),
+    );
+    if (schoolNames.length <= 1) {
+      return [
+        {
+          key: "all",
+          students,
+          title: null,
+        },
+      ];
     }
-    return groups;
+
+    const sectionMap = new Map<string, StudentItem[]>();
+    for (const student of students) {
+      const key = student.schoolName?.trim() || "未分配";
+      const currentStudents = sectionMap.get(key) || [];
+      currentStudents.push(student);
+      sectionMap.set(key, currentStudents);
+    }
+
+    return Array.from(sectionMap.entries()).map(([key, sectionStudents]) => ({
+      key,
+      students: sectionStudents,
+      title: key,
+    }));
   }, [students]);
 
   // 统计
@@ -461,7 +485,7 @@ export default function MealRecordBoard() {
         </div>
       )}
 
-      {/* 学生列表（按班级分组） */}
+      {/* 学生列表 */}
       {loading ? (
         <div className="py-12 text-center text-sm text-muted-foreground">
           加载中…
@@ -475,14 +499,16 @@ export default function MealRecordBoard() {
         </Card>
       ) : (
         <div className="space-y-6">
-          {Object.entries(groupedStudents).map(([groupName, groupStudents]) => (
-            <div key={groupName}>
-              <h3 className="mb-3 text-sm font-semibold text-muted-foreground">
-                {groupName}
-                <span className="ml-2 font-normal">({groupStudents.length} 人)</span>
-              </h3>
+          {studentSections.map((section) => (
+            <div key={section.key}>
+              {section.title ? (
+                <h3 className="mb-3 text-sm font-semibold text-muted-foreground">
+                  {section.title}
+                  <span className="ml-2 font-normal">({section.students.length} 人)</span>
+                </h3>
+              ) : null}
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {groupStudents.map((student) => (
+                {section.students.map((student) => (
                   <StudentMealCard
                     key={student.id}
                     student={student}

@@ -113,6 +113,7 @@ function printViaIframe(
 <html><head><meta charset="utf-8"><title>每日作业 - ${displayDate}</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
+@page{size:landscape;margin:10mm}
 body{font-family:"Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif}
 .grid{display:grid;grid-template-columns:repeat(${columns},1fr)}
 </style></head>
@@ -206,7 +207,7 @@ export function PrintPreviewDialog({
   classes: ClassItem[];
   serviceDate: string;
 }) {
-  const [columns, setColumns] = useState(2);
+  const [columns, setColumns] = useState(3);
   const [classGroups, setClassGroups] = useState<ClassGroup[]>([]);
   const [loading, setLoading] = useState(false);
 

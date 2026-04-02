@@ -3,7 +3,6 @@ import { type Table } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DataTableFacetedFilter } from "./faceted-filter";
-import { DataTableViewOptions } from "./view-options";
 
 type DataTableToolbarProps<TData> = {
   table: Table<TData>;
@@ -79,7 +78,6 @@ export function DataTableToolbar<TData>({
           </Button>
         )}
       </div>
-      <DataTableViewOptions table={table} />
     </div>
   );
 }

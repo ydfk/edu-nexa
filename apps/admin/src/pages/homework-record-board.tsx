@@ -314,6 +314,12 @@ type StudentCardProps = {
   onDelete: (record: HomeworkRecordItem) => void;
 };
 
+type StudentSection = {
+  key: string;
+  students: StudentItem[];
+  title: string | null;
+};
+
 function StudentHomeworkCard({
   student,
   assignments,
@@ -428,18 +434,33 @@ export default function HomeworkRecordBoard() {
     void loadDateData(selectedDate);
   }, [loadDateData, selectedDate]);
 
-  const groupedStudents = useMemo(() => {
-    const groups: Record<string, StudentItem[]> = {};
-    for (const student of students) {
-      const key = [student.schoolName, student.grade, student.className]
-        .filter(Boolean)
-        .join(" / ") || "未分配";
-      if (!groups[key]) {
-        groups[key] = [];
-      }
-      groups[key].push(student);
+  const studentSections = useMemo<StudentSection[]>(() => {
+    const schoolNames = Array.from(
+      new Set(students.map((student) => student.schoolName?.trim()).filter(Boolean)),
+    );
+    if (schoolNames.length <= 1) {
+      return [
+        {
+          key: "all",
+          students,
+          title: null,
+        },
+      ];
     }
-    return groups;
+
+    const sectionMap = new Map<string, StudentItem[]>();
+    for (const student of students) {
+      const key = student.schoolName?.trim() || "未分配";
+      const currentStudents = sectionMap.get(key) || [];
+      currentStudents.push(student);
+      sectionMap.set(key, currentStudents);
+    }
+
+    return Array.from(sectionMap.entries()).map(([key, sectionStudents]) => ({
+      key,
+      students: sectionStudents,
+      title: key,
+    }));
   }, [students]);
 
   const recordMap = useMemo(() => {
@@ -569,14 +590,16 @@ export default function HomeworkRecordBoard() {
         </Card>
       ) : (
         <div className="space-y-6">
-          {Object.entries(groupedStudents).map(([groupName, groupStudents]) => (
-            <div key={groupName}>
-              <h3 className="mb-3 text-sm font-semibold text-muted-foreground">
-                {groupName}
-                <span className="ml-2 font-normal">({groupStudents.length} 人)</span>
-              </h3>
+          {studentSections.map((section) => (
+            <div key={section.key}>
+              {section.title ? (
+                <h3 className="mb-3 text-sm font-semibold text-muted-foreground">
+                  {section.title}
+                  <span className="ml-2 font-normal">({section.students.length} 人)</span>
+                </h3>
+              ) : null}
               <div className="grid gap-3 lg:grid-cols-2">
-                {groupStudents.map((student) => (
+                {section.students.map((student) => (
                   <StudentHomeworkCard
                     key={student.id}
                     student={student}
