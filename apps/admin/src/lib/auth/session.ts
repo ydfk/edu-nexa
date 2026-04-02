@@ -2,6 +2,7 @@ import { useSyncExternalStore } from "react";
 
 const sessionStorageKey = "edunexa.admin.session.v1";
 const sessionEventName = "edunexa-admin-session-change";
+const unauthorizedStorageKey = "edunexa.admin.session.unauthorized";
 const backofficeRoles = new Set(["admin", "teacher", "guardian"]);
 
 export type AdminSessionUser = {
@@ -9,6 +10,7 @@ export type AdminSessionUser = {
   displayName: string;
   phone: string;
   roles: string[];
+  status: string;
 };
 
 export type AdminSession = {
@@ -68,6 +70,7 @@ export function saveAdminSession(session: AdminSession) {
   }
 
   window.localStorage.setItem(sessionStorageKey, JSON.stringify(session));
+  window.sessionStorage.removeItem(unauthorizedStorageKey);
   notifySessionChanged();
 }
 
@@ -85,7 +88,26 @@ export function clearAdminSession() {
   }
 
   window.localStorage.removeItem(sessionStorageKey);
+  window.sessionStorage.removeItem(unauthorizedStorageKey);
   notifySessionChanged();
+}
+
+export function expireAdminSession() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.removeItem(sessionStorageKey);
+  window.sessionStorage.setItem(unauthorizedStorageKey, "1");
+  notifySessionChanged();
+}
+
+export function hasUnauthorizedSessionMarker() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  return window.sessionStorage.getItem(unauthorizedStorageKey) === "1";
 }
 
 export function hasBackofficeAccess(session: AdminSession) {
@@ -136,6 +158,7 @@ function isSessionUser(value: unknown): value is AdminSessionUser {
     typeof user.id === "string" &&
     typeof user.displayName === "string" &&
     typeof user.phone === "string" &&
-    Array.isArray(user.roles)
+    Array.isArray(user.roles) &&
+    typeof user.status === "string"
   );
 }

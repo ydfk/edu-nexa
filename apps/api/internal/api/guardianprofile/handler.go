@@ -64,7 +64,7 @@ func Create(c *fiber.Ctx) error {
 		Status:       defaultGuardianStatus(req.Status),
 	}
 	if err := db.DB.Transaction(func(tx *gorm.DB) error {
-		user, err := upsertGuardianUser(tx, item.UserID, item.Name, item.Phone, defaultPasswordForPhone(item.Phone))
+		user, err := upsertGuardianUser(tx, item.UserID, item.Name, item.Phone, defaultPasswordForPhone(item.Phone), item.Status)
 		if err != nil {
 			return err
 		}
@@ -103,7 +103,7 @@ func Update(c *fiber.Ctx) error {
 	item.Remark = strings.TrimSpace(req.Remark)
 	item.Status = defaultGuardianStatus(req.Status)
 	if err := db.DB.Transaction(func(tx *gorm.DB) error {
-		user, err := upsertGuardianUser(tx, item.UserID, item.Name, item.Phone, defaultPasswordForPhone(item.Phone))
+		user, err := upsertGuardianUser(tx, item.UserID, item.Name, item.Phone, defaultPasswordForPhone(item.Phone), item.Status)
 		if err != nil {
 			return err
 		}
@@ -172,7 +172,7 @@ func existsPhone(phone string, currentID string) (bool, error) {
 	return count > 0, nil
 }
 
-func upsertGuardianUser(tx *gorm.DB, userID string, name string, phone string, password string) (*userModel.User, error) {
+func upsertGuardianUser(tx *gorm.DB, userID string, name string, phone string, password string, status string) (*userModel.User, error) {
 	if exists, err := existsUserPhone(tx, phone, userID); err != nil {
 		return nil, fiber.NewError(fiber.StatusInternalServerError, "校验家长账号失败")
 	} else if exists {
@@ -193,6 +193,7 @@ func upsertGuardianUser(tx *gorm.DB, userID string, name string, phone string, p
 		user.Phone = phone
 		user.Password = string(hash)
 		user.Roles = "guardian"
+		user.Status = status
 		if err := tx.Create(user).Error; err != nil {
 			return nil, fiber.NewError(fiber.StatusBadRequest, "家长手机号已存在")
 		}
@@ -202,6 +203,7 @@ func upsertGuardianUser(tx *gorm.DB, userID string, name string, phone string, p
 	user.DisplayName = name
 	user.Phone = phone
 	user.Roles = normalizeGuardianRoles(user.Roles)
+	user.Status = status
 	if err := tx.Save(user).Error; err != nil {
 		return nil, fiber.NewError(fiber.StatusBadRequest, "家长手机号已存在")
 	}

@@ -7,6 +7,7 @@ import {
   ChevronRight,
   Pencil,
   Plus,
+  Printer,
   Trash2,
   X,
 } from "lucide-react";
@@ -18,6 +19,7 @@ import {
   type FileItem,
 } from "@/components/domain/file-upload";
 import { SchoolClassCascader } from "@/components/domain/school-class-cascader";
+import { PrintPreviewDialog } from "@/pages/daily-homework-print";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -88,18 +90,82 @@ const emptyForm: HomeworkFormState = {
   subject: "",
 };
 
-// ---------------------------------------------------------------------------
-// 按科目分组
-// ---------------------------------------------------------------------------
-
-function groupBySubject(items: DailyHomeworkItem[]): Record<string, DailyHomeworkItem[]> {
-  const groups: Record<string, DailyHomeworkItem[]> = {};
-  for (const item of items) {
-    const key = item.subject || "未分类";
-    if (!groups[key]) groups[key] = [];
-    groups[key].push(item);
+function findHomeworkClass(
+  item: DailyHomeworkItem,
+  schools: SchoolItem[],
+  classes: ClassItem[],
+) {
+  const school =
+    schools.find((entry) => entry.id === item.schoolId) ||
+    schools.find((entry) => entry.name === item.schoolName);
+  const matchedByID = classes.find((entry) => entry.id === item.classId);
+  if (matchedByID) {
+    return matchedByID;
   }
-  return groups;
+
+  const candidates = classes.filter(
+    (entry) =>
+      entry.name === item.className &&
+      (!item.gradeName || entry.gradeName === item.gradeName) &&
+      ((school?.id && entry.schoolId === school.id) || entry.schoolName === item.schoolName),
+  );
+  return candidates.length === 1 ? candidates[0] : undefined;
+}
+
+type HomeworkGroup = {
+  key: string;
+  schoolName: string;
+  gradeName: string;
+  className: string;
+  items: DailyHomeworkItem[];
+};
+
+function resolveHomeworkGradeName(item: DailyHomeworkItem, classes: ClassItem[]) {
+  if (item.gradeName) {
+    return item.gradeName;
+  }
+
+  const cls = classes.find((entry) => entry.id === item.classId);
+  if (cls) {
+    return cls.gradeName;
+  }
+
+  const candidates = classes.filter(
+    (entry) =>
+      entry.schoolName === item.schoolName && entry.name === item.className,
+  );
+  if (candidates.length !== 1) {
+    return "";
+  }
+
+  return candidates[0]?.gradeName || "";
+}
+
+function groupBySchoolGradeClass(items: DailyHomeworkItem[], classes: ClassItem[]) {
+  const groups = new Map<string, HomeworkGroup>();
+
+  for (const item of items) {
+    const gradeName = resolveHomeworkGradeName(item, classes);
+    const key = [
+      item.schoolId || item.schoolName,
+      item.classId || item.className,
+      gradeName,
+    ].join("|");
+
+    if (!groups.has(key)) {
+      groups.set(key, {
+        key,
+        schoolName: item.schoolName,
+        gradeName,
+        className: item.className,
+        items: [],
+      });
+    }
+
+    groups.get(key)?.items.push(item);
+  }
+
+  return Array.from(groups.values());
 }
 
 // ---------------------------------------------------------------------------
@@ -133,10 +199,10 @@ function HomeworkFormDialog({
   useEffect(() => {
     if (!open) return;
     if (editItem) {
-      const school = schools.find((s) => s.name === editItem.schoolName);
-      const cls = classes.find(
-        (c) => c.schoolName === editItem.schoolName && c.name === editItem.className,
-      );
+      const school =
+        schools.find((entry) => entry.id === editItem.schoolId) ||
+        schools.find((entry) => entry.name === editItem.schoolName);
+      const cls = findHomeworkClass(editItem, schools, classes);
       // 将 content 解析为多条（按换行符分割）
       const lines = editItem.content
         .split("\n")
@@ -154,8 +220,7 @@ function HomeworkFormDialog({
     } else {
       setForm({
         ...emptyForm,
-        schoolId: schools[0]?.id || "",
-        subject: subjects[0] || "",
+        subject: "",
       });
     }
   }, [open, editItem, schools, classes, subjects]);
@@ -164,7 +229,11 @@ function HomeworkFormDialog({
     const school = schools.find((s) => s.id === form.schoolId);
     const cls = classes.find((c) => c.id === form.classId);
     if (!school || !cls) {
-      toast.error("请选择学校和班级");
+      toast.error("请选择学校、年级和班级");
+      return;
+    }
+    if (!form.subject.trim()) {
+      toast.error("请选择科目");
       return;
     }
     const contentLines = form.contentItems
@@ -179,10 +248,13 @@ function HomeworkFormDialog({
     try {
       await saveDailyHomework({
         attachments: serializeAttachments(form.attachments),
+        classId: cls.id,
         className: cls.name,
         content: contentLines.join("\n"),
+        gradeName: cls.gradeName,
         id: form.id || undefined,
         remark: form.remark.trim(),
+        schoolId: school.id,
         schoolName: school.name,
         serviceDate,
         subject: form.subject,
@@ -234,7 +306,7 @@ function HomeworkFormDialog({
         <div className="grid gap-4 py-2 md:grid-cols-2">
           {/* 科目选择 */}
           <div className="grid gap-2">
-            <Label>科目</Label>
+            <Label required>科目</Label>
             <Select
               value={form.subject}
               onValueChange={(value) =>
@@ -256,7 +328,7 @@ function HomeworkFormDialog({
 
           {/* 学校 / 年级 / 班级 级联选择 */}
           <div className="grid gap-2">
-            <Label>学校 / 班级</Label>
+            <Label required>学校 / 年级 / 班级</Label>
             <SchoolClassCascader
               schools={schools}
               classes={classes}
@@ -271,7 +343,7 @@ function HomeworkFormDialog({
           {/* 作业内容（多条） */}
           <div className="grid gap-2 md:col-span-2">
             <div className="flex items-center justify-between">
-              <Label>作业内容</Label>
+              <Label required>作业内容</Label>
               <Button
                 type="button"
                 variant="ghost"
@@ -346,34 +418,33 @@ function HomeworkFormDialog({
 
 function HomeworkCard({
   item,
-  classes,
   onEdit,
   onDelete,
+  showLocation = true,
 }: {
   item: DailyHomeworkItem;
-  classes: ClassItem[];
   onEdit: () => void;
   onDelete: () => void;
+  showLocation?: boolean;
 }) {
   const attachments = useMemo(() => parseAttachments(item.attachments), [item.attachments]);
   const contentLines = item.content.split("\n").filter(Boolean);
-  const gradeName = useMemo(() => {
-    const cls = classes.find(
-      (c) => c.schoolName === item.schoolName && c.name === item.className,
-    );
-    return cls?.gradeName || "";
-  }, [classes, item.schoolName, item.className]);
 
   return (
     <div className="rounded-lg border bg-card p-4 shadow-sm">
       <div className="mb-2 flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
+          {showLocation ? (
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium">
+                {item.schoolName}
+                {item.gradeName && ` / ${item.gradeName}`}
+                {` / ${item.className}`}
+              </span>
+            </div>
+          ) : null}
           <div className="flex items-center gap-2">
-            <span className="text-sm font-medium">
-              {item.schoolName}
-              {gradeName && ` / ${gradeName}`}
-              {` / ${item.className}`}
-            </span>
+            <Badge variant="outline">{item.subject || "未分类"}</Badge>
           </div>
           {item.teacherName && (
             <p className="mt-0.5 text-xs text-muted-foreground">
@@ -450,6 +521,7 @@ export default function DailyHomeworkBoard() {
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editItem, setEditItem] = useState<DailyHomeworkItem | null>(null);
+  const [printOpen, setPrintOpen] = useState(false);
 
   // 加载基础数据（学校、班级、科目配置）
   useEffect(() => {
@@ -493,7 +565,10 @@ export default function DailyHomeworkBoard() {
     void loadDateData(selectedDate);
   }, [selectedDate, loadDateData]);
 
-  const grouped = useMemo(() => groupBySubject(items), [items]);
+  const grouped = useMemo(
+    () => groupBySchoolGradeClass(items, classes),
+    [items, classes],
+  );
 
   // 判断是否有作业服务
   const hasHomeworkService = serviceDay?.hasHomeworkService ||
@@ -530,28 +605,29 @@ export default function DailyHomeworkBoard() {
   }
 
   const isToday = selectedDate === format(new Date(), "yyyy-MM-dd");
+  const weekDayNames = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
+  const weekDay = weekDayNames[new Date(selectedDate + "T00:00:00").getDay()];
 
   return (
     <div className="space-y-4">
       {/* 日期导航 */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-1">
+          <CalendarDays className="size-4 text-muted-foreground" />
           <Button variant="outline" size="icon" onClick={goPrevDay}>
             <ChevronLeft className="size-4" />
           </Button>
-          <div className="flex items-center gap-2">
-            <CalendarDays className="size-4 text-muted-foreground" />
-            <Input
-              type="date"
-              value={selectedDate}
-              className="w-auto"
-              onChange={(e) => e.target.value && setSelectedDate(e.target.value)}
-            />
-          </div>
+          <Input
+            type="date"
+            value={selectedDate}
+            className="w-auto"
+            onChange={(e) => e.target.value && setSelectedDate(e.target.value)}
+          />
           <Button variant="outline" size="icon" onClick={goNextDay}>
             <ChevronRight className="size-4" />
           </Button>
         </div>
+        <span className="text-sm font-medium text-muted-foreground">{weekDay}</span>
         {!isToday && (
           <Button variant="ghost" size="sm" onClick={goToday}>
             回到今天
@@ -576,15 +652,23 @@ export default function DailyHomeworkBoard() {
           </div>
         )}
 
-        <div className="ml-auto">
+        <div className="ml-auto flex gap-2">
+          <Button
+            variant="outline"
+            disabled={items.length === 0}
+            onClick={() => setPrintOpen(true)}
+          >
+            打印作业
+            <Printer className="ml-1 size-4" />
+          </Button>
           <Button onClick={handleCreate}>
-            <Plus className="mr-2 size-4" />
             新增作业
+            <Plus className="ml-1 size-4" />
           </Button>
         </div>
       </div>
 
-      {/* 作业列表（按科目分组） */}
+      {/* 作业列表（按学校 / 年级 / 班级分组） */}
       {loading ? (
         <div className="py-12 text-center text-sm text-muted-foreground">
           加载中…
@@ -598,52 +682,31 @@ export default function DailyHomeworkBoard() {
         </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
-          {subjects.map((subject) => {
-            const subjectItems = grouped[subject];
-            if (!subjectItems || subjectItems.length === 0) return null;
-            return (
-              <Card key={subject}>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">{subject}</CardTitle>
-                  <CardDescription>{subjectItems.length} 条作业</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {subjectItems.map((item) => (
-                    <HomeworkCard
-                      key={item.id}
-                      item={item}
-                      classes={classes}
-                      onEdit={() => handleEdit(item)}
-                      onDelete={() => handleDelete(item)}
-                    />
-                  ))}
-                </CardContent>
-              </Card>
-            );
-          })}
-
-          {/* 未分类的作业 */}
-          {grouped["未分类"] && grouped["未分类"].length > 0 && (
-            <Card>
+          {grouped.map((group) => (
+            <Card key={group.key}>
               <CardHeader className="pb-3">
-                <CardTitle className="text-base">未分类</CardTitle>
+                <CardTitle className="text-base">
+                  {group.schoolName}
+                  {group.gradeName && ` / ${group.gradeName}`}
+                  {` / ${group.className}`}
+                </CardTitle>
                 <CardDescription>
-                  {grouped["未分类"].length} 条作业
+                  {group.items.length} 条作业
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                {grouped["未分类"].map((item) => (
+                {group.items.map((item) => (
                   <HomeworkCard
                     key={item.id}
                     item={item}
-                    classes={classes}
                     onEdit={() => handleEdit(item)}
                     onDelete={() => handleDelete(item)}
+                    showLocation={false}
                   />
                 ))}
               </CardContent>
             </Card>
-          )}
+          ))}
         </div>
       )}
 
@@ -655,6 +718,16 @@ export default function DailyHomeworkBoard() {
         editItem={editItem}
         subjects={subjects}
         schools={schools}
+        classes={classes}
+        serviceDate={selectedDate}
+      />
+
+      {/* 打印预览 Dialog */}
+      <PrintPreviewDialog
+        open={printOpen}
+        onClose={() => setPrintOpen(false)}
+        items={items}
+        subjects={subjects}
         classes={classes}
         serviceDate={selectedDate}
       />

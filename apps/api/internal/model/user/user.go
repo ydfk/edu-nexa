@@ -7,5 +7,6 @@ type User struct {
 	DisplayName string `gorm:"size:64" json:"displayName"`
 	Phone       string `gorm:"uniqueIndex;size:20;not null" json:"phone" example:"13800000000"`
 	Roles       string `gorm:"size:128" json:"roles"`
+	Status      string `gorm:"size:16;default:active" json:"status"`
 	Password    string `json:"-"`
 }

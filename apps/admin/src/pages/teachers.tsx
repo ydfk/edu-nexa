@@ -1,16 +1,19 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   type ColumnDef,
+  type ColumnFiltersState,
   type SortingState,
   type VisibilityState,
   flexRender,
   getCoreRowModel,
+  getFacetedRowModel,
+  getFacetedUniqueValues,
   getFilteredRowModel,
   getPaginationRowModel,
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { KeyRound, Pencil, Trash2, UserPlus } from "lucide-react";
+import { CircleCheck, CirclePause, KeyRound, Pencil, Trash2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { NameReminderAlert } from "@/components/domain/name-reminder-alert";
 import {
@@ -32,6 +35,13 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -72,10 +82,21 @@ const roleLabelMap: Record<string, string> = {
   guardian: "家长",
 };
 
+const statusOptions = [
+  { label: "启用", value: "active", icon: CircleCheck },
+  { label: "暂停", value: "paused", icon: CirclePause },
+] as const;
+
+const statusMap: Record<string, { label: string; variant: "default" | "secondary" }> = {
+  active: { label: "启用", variant: "default" },
+  paused: { label: "暂停", variant: "secondary" },
+};
+
 const initialForm = {
   displayName: "",
   isAdmin: false,
   phone: "",
+  status: "active",
 };
 
 const TeachersContext = React.createContext<TeachersContextType | null>(null);
@@ -168,6 +189,16 @@ const columns: ColumnDef<UserItem>[] = [
     enableSorting: false,
   },
   {
+    accessorKey: "status",
+    header: ({ column }) => <DataTableColumnHeader column={column} title="状态" />,
+    cell: ({ row }) => {
+      const status = row.getValue<string>("status");
+      const info = statusMap[status] ?? { label: status, variant: "secondary" as const };
+      return <Badge variant={info.variant}>{info.label}</Badge>;
+    },
+    filterFn: (row, id, value: string[]) => value.includes(row.getValue(id)),
+  },
+  {
     id: "actions",
     cell: ({ row }) => <RowActions row={row} />,
   },
@@ -196,6 +227,7 @@ function TeacherFormDialog({
         displayName: currentRow.displayName || "",
         isAdmin: currentRow.roles.includes("admin"),
         phone: currentRow.phone,
+        status: currentRow.status || "active",
       });
       return;
     }
@@ -215,8 +247,8 @@ function TeacherFormDialog({
   const similarItems = findSimilarNames(nameItems, form.displayName, currentRow?.id);
 
   async function handleSave() {
-    if (!form.phone.trim()) {
-      toast.error("手机号不能为空");
+    if (!form.displayName.trim() || !form.phone.trim()) {
+      toast.error("姓名和手机号不能为空");
       return;
     }
 
@@ -224,6 +256,7 @@ function TeacherFormDialog({
       displayName: form.displayName.trim(),
       phone: form.phone.trim(),
       roles: form.isAdmin ? ["teacher", "admin"] : ["teacher"],
+      status: form.status,
     };
 
     setSaving(true);
@@ -266,7 +299,7 @@ function TeacherFormDialog({
         </DialogHeader>
         <div className="grid gap-4 py-2">
           <div className="grid grid-cols-4 items-center gap-x-4 gap-y-1">
-            <Label className="text-end">姓名</Label>
+            <Label className="text-end" required>姓名</Label>
             <Input
               className="col-span-3"
               value={form.displayName}
@@ -280,7 +313,7 @@ function TeacherFormDialog({
           </div>
           <NameReminderAlert exact={exactDuplicate} label="教师" similarItems={similarItems} />
           <div className="grid grid-cols-4 items-center gap-x-4 gap-y-1">
-            <Label className="text-end">手机号</Label>
+            <Label className="text-end" required>手机号</Label>
             <Input
               className="col-span-3"
               value={form.phone}
@@ -315,6 +348,28 @@ function TeacherFormDialog({
               <span className="text-sm text-muted-foreground">
                 勾选后拥有与默认管理员一致的权限
               </span>
+            </div>
+          </div>
+          <div className="grid grid-cols-4 items-center gap-x-4 gap-y-1">
+            <Label className="text-end">状态</Label>
+            <div className="col-span-3">
+              <Select
+                value={form.status}
+                onValueChange={(value) =>
+                  setForm((current) => ({
+                    ...current,
+                    status: value,
+                  }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">启用</SelectItem>
+                  <SelectItem value="paused">暂停</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </div>
@@ -397,6 +452,7 @@ export default function TeachersPage() {
   const [loading, setLoading] = useState(true);
 
   const [sorting, setSorting] = useState<SortingState>([]);
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
   const [globalFilter, setGlobalFilter] = useState("");
 
@@ -420,11 +476,14 @@ export default function TeachersPage() {
   const table = useReactTable({
     data,
     columns,
-    state: { globalFilter, sorting, columnVisibility },
+    state: { globalFilter, sorting, columnFilters, columnVisibility },
     onSortingChange: setSorting,
+    onColumnFiltersChange: setColumnFilters,
     onColumnVisibilityChange: setColumnVisibility,
     onGlobalFilterChange: setGlobalFilter,
     getCoreRowModel: getCoreRowModel(),
+    getFacetedRowModel: getFacetedRowModel(),
+    getFacetedUniqueValues: getFacetedUniqueValues(),
     getFilteredRowModel: getFilteredRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
@@ -454,7 +513,21 @@ export default function TeachersPage() {
           </div>
 
           <div className="flex flex-1 flex-col gap-4">
-            <DataTableToolbar table={table} searchPlaceholder="搜索姓名 / 手机号..." />
+            <DataTableToolbar
+              table={table}
+              searchPlaceholder="搜索姓名 / 手机号..."
+              filters={[
+                {
+                  columnId: "status",
+                  title: "状态",
+                  options: statusOptions.map((item) => ({
+                    label: item.label,
+                    value: item.value,
+                    icon: item.icon,
+                  })),
+                },
+              ]}
+            />
             <div className="overflow-hidden rounded-md border">
               <Table>
                 <TableHeader>

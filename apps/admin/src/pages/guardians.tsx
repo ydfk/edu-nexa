@@ -284,7 +284,7 @@ function GuardianFormDialog({
         </DialogHeader>
         <div className="grid gap-4 py-2">
           <div className="grid gap-2">
-            <Label htmlFor="guardian-name">姓名</Label>
+            <Label htmlFor="guardian-name" required>姓名</Label>
             <Input
               id="guardian-name"
               value={form.name}
@@ -295,7 +295,7 @@ function GuardianFormDialog({
           </div>
           <NameReminderAlert exact={exactDuplicate} label="家长" similarItems={similarItems} />
           <div className="grid gap-2">
-            <Label htmlFor="guardian-phone">手机号</Label>
+            <Label htmlFor="guardian-phone" required>手机号</Label>
             <Input
               id="guardian-phone"
               value={form.phone}

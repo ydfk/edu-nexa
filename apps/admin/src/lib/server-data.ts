@@ -1,4 +1,4 @@
-import { getAdminSessionSnapshot } from "@/lib/auth/session";
+import { expireAdminSession, getAdminSessionSnapshot } from "@/lib/auth/session";
 
 type ApiEnvelope<T> = {
   code: number;
@@ -14,6 +14,7 @@ export type UserItem = {
   id: string;
   phone: string;
   roles: string[];
+  status: string;
 };
 
 export type SchoolItem = {
@@ -82,6 +83,31 @@ export type StudentServiceItem = {
   studentId: string;
 };
 
+export type PaymentRecordItem = {
+  classId: string;
+  className: string;
+  gradeId: string;
+  gradeName: string;
+  guardianId: string;
+  guardianName: string;
+  guardianPhone: string;
+  id: string;
+  paidAt: string;
+  paymentAmount: number;
+  paymentType: string;
+  periodEndDate: string;
+  periodStartDate: string;
+  refundAmount: number;
+  refundedAt: string;
+  refundRemark: string;
+  remark: string;
+  schoolId: string;
+  schoolName: string;
+  status: string;
+  studentId: string;
+  studentName: string;
+};
+
 export type MealRecordItem = {
   id: string;
   imageUrls: string[];
@@ -111,10 +137,13 @@ export type HomeworkRecordItem = {
 
 export type DailyHomeworkItem = {
   attachments: string;
+  classId: string;
   className: string;
   content: string;
+  gradeName: string;
   id: string;
   remark: string;
+  schoolId: string;
   schoolName: string;
   serviceDate: string;
   subject: string;
@@ -156,6 +185,7 @@ export async function createUser(input: {
   password: string;
   phone: string;
   roles: string[];
+  status: string;
 }) {
   return request<UserItem>("/api/users", {
     body: input,
@@ -169,6 +199,7 @@ export async function updateUser(
     displayName: string;
     phone: string;
     roles: string[];
+    status: string;
   }
 ) {
   return request<UserItem>(`/api/users/${id}`, {
@@ -334,6 +365,36 @@ export async function deleteStudentService(id: string) {
   });
 }
 
+export async function fetchPaymentRecords(query?: ListQuery) {
+  return request<PaymentRecordItem[]>("/api/payment-records", { query });
+}
+
+export async function savePaymentRecord(input: {
+  id?: string;
+  paidAt: string;
+  paymentAmount: number;
+  paymentType: string;
+  periodEndDate: string;
+  periodStartDate: string;
+  refundAmount: number;
+  refundedAt: string;
+  refundRemark: string;
+  remark: string;
+  studentId: string;
+}) {
+  const path = input.id ? `/api/payment-records/${input.id}` : "/api/payment-records";
+  return request<PaymentRecordItem>(path, {
+    body: input,
+    method: input.id ? "PUT" : "POST",
+  });
+}
+
+export async function deletePaymentRecord(id: string) {
+  return request<{ id: string }>(`/api/payment-records/${id}`, {
+    method: "DELETE",
+  });
+}
+
 export async function fetchMealRecords(query?: ListQuery) {
   return request<MealRecordItem[]>("/api/meal-records", { query });
 }
@@ -399,10 +460,13 @@ export async function fetchDailyHomework(query?: ListQuery) {
 
 export async function saveDailyHomework(input: {
   attachments?: string;
+  classId: string;
   className: string;
   content: string;
+  gradeName: string;
   id?: string;
   remark: string;
+  schoolId: string;
   schoolName: string;
   serviceDate: string;
   subject?: string;
@@ -509,6 +573,10 @@ async function request<T>(
     payload = (await response.json()) as ApiEnvelope<T>;
   } catch {
     throw new Error("接口响应解析失败");
+  }
+
+  if (response.status === 401) {
+    expireAdminSession();
   }
 
   if (!response.ok || !payload.flag) {

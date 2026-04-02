@@ -24,6 +24,7 @@ type createUserPayload struct {
 	Password    string   `json:"password"`
 	Phone       string   `json:"phone"`
 	Roles       []string `json:"roles"`
+	Status      string   `json:"status"`
 }
 
 type resetPasswordPayload struct {
@@ -34,12 +35,13 @@ type updateUserPayload struct {
 	DisplayName string   `json:"displayName"`
 	Phone       string   `json:"phone"`
 	Roles       []string `json:"roles"`
+	Status      string   `json:"status"`
 }
 
 func List(c *fiber.Ctx) error {
 	currentUser, err := service.CurrentUser(c)
 	if err != nil {
-		return response.Error(c, "用户未找到")
+		return response.Error(c, err.Error())
 	}
 	if !hasRole(currentUser.Roles, "admin") {
 		return response.Error(c, "没有权限")
@@ -53,6 +55,9 @@ func List(c *fiber.Ctx) error {
 	}
 	if phone := strings.TrimSpace(c.Query("phone")); phone != "" {
 		query = query.Where("phone = ?", phone)
+	}
+	if status := strings.TrimSpace(c.Query("status")); status != "" {
+		query = query.Where("status = ?", status)
 	}
 
 	if err := query.Find(&users).Error; err != nil {
@@ -70,7 +75,7 @@ func List(c *fiber.Ctx) error {
 func Create(c *fiber.Ctx) error {
 	currentUser, err := service.CurrentUser(c)
 	if err != nil {
-		return response.Error(c, "用户未找到")
+		return response.Error(c, err.Error())
 	}
 	if !hasRole(currentUser.Roles, "admin") {
 		return response.Error(c, "没有权限")
@@ -98,6 +103,7 @@ func Create(c *fiber.Ctx) error {
 		Phone:       req.Phone,
 		Password:    string(hash),
 		Roles:       joinRoles(req.Roles),
+		Status:      defaultUserStatus(req.Status),
 	}
 
 	if err := db.DB.Create(&user).Error; err != nil {
@@ -110,7 +116,7 @@ func Create(c *fiber.Ctx) error {
 func ResetPassword(c *fiber.Ctx) error {
 	currentUser, err := service.CurrentUser(c)
 	if err != nil {
-		return response.Error(c, "用户未找到")
+		return response.Error(c, err.Error())
 	}
 	if !hasRole(currentUser.Roles, "admin") {
 		return response.Error(c, "没有权限")
@@ -148,7 +154,7 @@ func ResetPassword(c *fiber.Ctx) error {
 func Update(c *fiber.Ctx) error {
 	currentUser, err := service.CurrentUser(c)
 	if err != nil {
-		return response.Error(c, "用户未找到")
+		return response.Error(c, err.Error())
 	}
 	if !hasRole(currentUser.Roles, "admin") {
 		return response.Error(c, "没有权限")
@@ -173,6 +179,14 @@ func Update(c *fiber.Ctx) error {
 		}
 		return response.Error(c, "查询账号失败")
 	}
+	if currentUser.Id == user.Id {
+		if defaultUserStatus(req.Status) != "active" {
+			return response.Error(c, "不能禁用当前登录账号")
+		}
+		if !hasRole(joinRoles(req.Roles), "admin") {
+			return response.Error(c, "不能移除当前登录账号的管理员权限")
+		}
+	}
 
 	if err := ensureUserPhoneUnique(req.Phone, user.Id.String()); err != nil {
 		return response.Error(c, err.Error())
@@ -181,6 +195,7 @@ func Update(c *fiber.Ctx) error {
 	user.DisplayName = req.DisplayName
 	user.Phone = req.Phone
 	user.Roles = joinRoles(req.Roles)
+	user.Status = defaultUserStatus(req.Status)
 	if err := db.DB.Save(&user).Error; err != nil {
 		return response.Error(c, "更新账号失败")
 	}
@@ -191,7 +206,7 @@ func Update(c *fiber.Ctx) error {
 func Delete(c *fiber.Ctx) error {
 	currentUser, err := service.CurrentUser(c)
 	if err != nil {
-		return response.Error(c, "用户未找到")
+		return response.Error(c, err.Error())
 	}
 	if !hasRole(currentUser.Roles, "admin") {
 		return response.Error(c, "没有权限")
@@ -224,6 +239,7 @@ func buildUserPayload(user model.User) fiber.Map {
 		"id":          user.Id,
 		"phone":       user.Phone,
 		"roles":       splitRoles(user.Roles),
+		"status":      defaultUserStatus(user.Status),
 	}
 }
 
@@ -275,6 +291,14 @@ func normalizeRoles(roles []string) []string {
 	}
 
 	return items
+}
+
+func defaultUserStatus(status string) string {
+	if strings.TrimSpace(status) == "" {
+		return "active"
+	}
+
+	return strings.TrimSpace(status)
 }
 
 func ensureUserPhoneUnique(phone string, excludeID string) error {

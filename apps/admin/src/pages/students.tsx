@@ -68,19 +68,16 @@ import {
   fetchGuardianProfiles,
   fetchSchools,
   fetchStudents,
-  fetchStudentServices,
   saveClass,
   saveGrade,
   saveGuardianProfile,
   saveSchool,
   saveStudent,
-  saveStudentService,
   type ClassItem,
   type GradeItem,
   type GuardianProfileItem,
   type SchoolItem,
   type StudentItem,
-  type StudentServiceItem,
 } from "@/lib/server-data";
 
 // ---------------------------------------------------------------------------
@@ -108,29 +105,13 @@ const statusMap: Record<
   paused: { label: "暂停", variant: "secondary" },
 };
 
-const paymentStatusMap: Record<
-  string,
-  { label: string; variant: "default" | "secondary" | "destructive" }
-> = {
-  paid: { label: "已缴费", variant: "default" },
-  unpaid: { label: "待缴费", variant: "destructive" },
-  paused: { label: "已暂停", variant: "secondary" },
-};
-
 const initialStudentForm = {
   classId: "",
   gradeId: "",
   guardianId: "",
   id: "",
   name: "",
-  paidAt: "",
-  paymentAmount: "0",
-  paymentStatus: "unpaid",
-  remark: "",
   schoolId: "",
-  serviceEndDate: "",
-  servicePlanId: "",
-  serviceStartDate: "",
   status: "active",
 };
 
@@ -150,6 +131,23 @@ const initialGuardianForm = {
   status: "active",
 };
 
+function isActiveItem(item: { status: string }) {
+  return !item.status || item.status === "active";
+}
+
+function buildSelectableItems<T extends { id: string; status: string }>(
+  items: T[],
+  selectedID: string,
+) {
+  const activeItems = items.filter(isActiveItem);
+  if (!selectedID || activeItems.some((item) => item.id === selectedID)) {
+    return activeItems;
+  }
+
+  const currentItem = items.find((item) => item.id === selectedID);
+  return currentItem ? [...activeItems, currentItem] : activeItems;
+}
+
 // ---------------------------------------------------------------------------
 // 上下文
 // ---------------------------------------------------------------------------
@@ -164,7 +162,6 @@ type StudentsContextValue = {
   grades: GradeItem[];
   classes: ClassItem[];
   guardians: GuardianProfileItem[];
-  servicePlanMap: Record<string, StudentServiceItem>;
 };
 
 const StudentsContext = createContext<StudentsContextValue | null>(null);
@@ -174,15 +171,6 @@ function useStudents() {
   if (!ctx)
     throw new Error("useStudents must be used within StudentsProvider");
   return ctx;
-}
-
-// ---------------------------------------------------------------------------
-// 工具函数
-// ---------------------------------------------------------------------------
-
-function formatRange(startDate?: string, endDate?: string) {
-  if (!startDate && !endDate) return "-";
-  return `${startDate || "--"} 至 ${endDate || "--"}`;
 }
 
 function SelectWithAction({
@@ -212,9 +200,7 @@ function SelectWithAction({
 // 列定义
 // ---------------------------------------------------------------------------
 
-function createColumns(
-  servicePlanMap: Record<string, StudentServiceItem>,
-): ColumnDef<StudentItem>[] {
+function createColumns(): ColumnDef<StudentItem>[] {
   return [
     {
       accessorKey: "name",
@@ -245,46 +231,6 @@ function createColumns(
           </p>
         </div>
       ),
-      enableSorting: false,
-    },
-    {
-      id: "servicePeriod",
-      header: "服务周期",
-      cell: ({ row }) => {
-        const plan = servicePlanMap[row.original.id];
-        return formatRange(
-          plan?.serviceStartDate ||
-            row.original.serviceSummary?.serviceStartDate,
-          plan?.serviceEndDate || row.original.serviceSummary?.serviceEndDate,
-        );
-      },
-      enableSorting: false,
-    },
-    {
-      id: "payment",
-      header: "缴费",
-      cell: ({ row }) => {
-        const plan = servicePlanMap[row.original.id];
-        const ps =
-          plan?.paymentStatus ||
-          row.original.serviceSummary?.paymentStatus ||
-          "unpaid";
-        const info = paymentStatusMap[ps] ?? {
-          label: ps,
-          variant: "secondary" as const,
-        };
-        return (
-          <div className="space-y-1">
-            <p>
-              ¥{" "}
-              {plan?.paymentAmount ||
-                row.original.serviceSummary?.paymentAmount ||
-                0}
-            </p>
-            <Badge variant={info.variant}>{info.label}</Badge>
-          </div>
-        );
-      },
       enableSorting: false,
     },
     {
@@ -360,7 +306,6 @@ function StudentFormDialog() {
     grades,
     classes,
     guardians,
-    servicePlanMap,
   } = useStudents();
 
   const isEdit = open === "edit";
@@ -381,13 +326,26 @@ function StudentFormDialog() {
   const [guardianForm, setGuardianForm] = useState(initialGuardianForm);
   const [quickSaving, setQuickSaving] = useState(false);
 
+  const selectableSchools = useMemo(
+    () => buildSelectableItems(schools, form.schoolId),
+    [schools, form.schoolId],
+  );
+  const selectableGrades = useMemo(
+    () => buildSelectableItems(grades, form.gradeId),
+    [grades, form.gradeId],
+  );
+  const selectableGuardians = useMemo(
+    () => buildSelectableItems(guardians, form.guardianId),
+    [guardians, form.guardianId],
+  );
+
   const filteredClasses = useMemo(() => {
-    return classes.filter((item) => {
+    return buildSelectableItems(classes, form.classId).filter((item) => {
       if (form.schoolId && item.schoolId !== form.schoolId) return false;
       if (form.gradeId && item.gradeId !== form.gradeId) return false;
       return true;
     });
-  }, [classes, form.gradeId, form.schoolId]);
+  }, [classes, form.classId, form.gradeId, form.schoolId]);
   const quickGuardianExactDuplicate = hasExactName(guardians, guardianForm.name);
   const quickGuardianSimilarItems = findSimilarNames(guardians, guardianForm.name);
   const quickGuardianPhoneExists = guardians.some(
@@ -404,45 +362,19 @@ function StudentFormDialog() {
 
   useEffect(() => {
     if (isEdit && currentItem) {
-      const plan = servicePlanMap[currentItem.id];
       setForm({
         classId: currentItem.classId || "",
         gradeId: currentItem.gradeId || "",
         guardianId: currentItem.guardianId || "",
         id: currentItem.id,
         name: currentItem.name,
-        paidAt: plan?.paidAt || currentItem.serviceSummary?.paidAt || "",
-        paymentAmount: String(
-          plan?.paymentAmount ||
-            currentItem.serviceSummary?.paymentAmount ||
-            0,
-        ),
-        paymentStatus:
-          plan?.paymentStatus ||
-          currentItem.serviceSummary?.paymentStatus ||
-          "unpaid",
-        remark: plan?.remark || "",
         schoolId: currentItem.schoolId || "",
-        serviceEndDate:
-          plan?.serviceEndDate ||
-          currentItem.serviceSummary?.serviceEndDate ||
-          "",
-        servicePlanId: plan?.id || "",
-        serviceStartDate:
-          plan?.serviceStartDate ||
-          currentItem.serviceSummary?.serviceStartDate ||
-          "",
         status: currentItem.status,
       });
     } else if (open === "create") {
-      setForm({
-        ...initialStudentForm,
-        gradeId: grades[0]?.id || "",
-        guardianId: guardians[0]?.id || "",
-        schoolId: schools[0]?.id || "",
-      });
+      setForm(initialStudentForm);
     }
-  }, [open, currentItem, isEdit, servicePlanMap, grades, guardians, schools]);
+  }, [open, currentItem, isEdit]);
 
   async function handleSave() {
     const school = schools.find((item) => item.id === form.schoolId);
@@ -450,21 +382,16 @@ function StudentFormDialog() {
     const guardian = guardians.find((item) => item.id === form.guardianId);
     const classItem = classes.find((item) => item.id === form.classId);
 
-    if (!form.name.trim() || !school || !grade || !guardian) {
-      toast.error("学生、学校、年级、家长不能为空");
-      return;
-    }
-
-    if (form.classId && !classItem) {
-      toast.error("班级不存在");
+    if (!form.name.trim() || !school || !grade || !classItem || !guardian) {
+      toast.error("学生、学校、年级、班级、家长不能为空");
       return;
     }
 
     setSaving(true);
     try {
-      const student = await saveStudent({
-        classId: classItem?.id || "",
-        className: classItem?.name || "",
+      await saveStudent({
+        classId: classItem.id,
+        className: classItem.name,
         grade: grade.name,
         gradeId: grade.id,
         guardianId: guardian.id,
@@ -475,17 +402,6 @@ function StudentFormDialog() {
         schoolId: school.id,
         schoolName: school.name,
         status: form.status,
-      });
-
-      await saveStudentService({
-        id: form.servicePlanId || undefined,
-        paidAt: form.paidAt,
-        paymentAmount: Number(form.paymentAmount || 0),
-        paymentStatus: form.paymentStatus,
-        remark: form.remark.trim(),
-        serviceEndDate: form.serviceEndDate,
-        serviceStartDate: form.serviceStartDate,
-        studentId: student.id,
       });
 
       toast.success("已保存");
@@ -623,7 +539,7 @@ function StudentFormDialog() {
             <DialogTitle>{isEdit ? "编辑学生" : "新增学生"}</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-2 md:grid-cols-2">
-            <Field label="学生姓名">
+            <Field label="学生姓名" required>
               <Input
                 value={form.name}
                 onChange={(e) =>
@@ -645,8 +561,7 @@ function StudentFormDialog() {
                 </SelectContent>
               </Select>
             </Field>
-            <Field label="学校">
-              <SelectWithAction
+            <Field label="学校" required>              <SelectWithAction
                 onCreate={() => openQuickDialog("quick-school")}
               >
                 <Select
@@ -659,7 +574,7 @@ function StudentFormDialog() {
                     <SelectValue placeholder="选择学校" />
                   </SelectTrigger>
                   <SelectContent>
-                    {schools.map((item) => (
+                    {selectableSchools.map((item) => (
                       <SelectItem key={item.id} value={item.id}>
                         {item.name}
                       </SelectItem>
@@ -668,8 +583,7 @@ function StudentFormDialog() {
                 </Select>
               </SelectWithAction>
             </Field>
-            <Field label="年级">
-              <SelectWithAction
+            <Field label="年级" required>              <SelectWithAction
                 onCreate={() => openQuickDialog("quick-grade")}
               >
                 <Select
@@ -682,7 +596,7 @@ function StudentFormDialog() {
                     <SelectValue placeholder="选择年级" />
                   </SelectTrigger>
                   <SelectContent>
-                    {grades.map((item) => (
+                    {selectableGrades.map((item) => (
                       <SelectItem key={item.id} value={item.id}>
                         {item.name}
                       </SelectItem>
@@ -691,8 +605,7 @@ function StudentFormDialog() {
                 </Select>
               </SelectWithAction>
             </Field>
-            <Field label="班级">
-              <SelectWithAction
+            <Field label="班级" required>              <SelectWithAction
                 onCreate={() => openQuickDialog("quick-class")}
               >
                 <Select
@@ -720,8 +633,7 @@ function StudentFormDialog() {
                 </Select>
               </SelectWithAction>
             </Field>
-            <Field label="家长">
-              <SelectWithAction
+            <Field label="家长" required>              <SelectWithAction
                 onCreate={() => openQuickDialog("quick-guardian")}
               >
                 <Select
@@ -734,7 +646,7 @@ function StudentFormDialog() {
                     <SelectValue placeholder="选择家长" />
                   </SelectTrigger>
                   <SelectContent>
-                    {guardians.map((item) => (
+                    {selectableGuardians.map((item) => (
                       <SelectItem key={item.id} value={item.id}>
                         {item.name} / {item.phone}
                       </SelectItem>
@@ -742,66 +654,6 @@ function StudentFormDialog() {
                   </SelectContent>
                 </Select>
               </SelectWithAction>
-            </Field>
-            <Field label="服务开始">
-              <Input
-                placeholder="2026-03-01"
-                value={form.serviceStartDate}
-                onChange={(e) =>
-                  setForm((c) => ({ ...c, serviceStartDate: e.target.value }))
-                }
-              />
-            </Field>
-            <Field label="服务结束">
-              <Input
-                placeholder="2026-03-31"
-                value={form.serviceEndDate}
-                onChange={(e) =>
-                  setForm((c) => ({ ...c, serviceEndDate: e.target.value }))
-                }
-              />
-            </Field>
-            <Field label="缴费状态">
-              <Select
-                value={form.paymentStatus}
-                onValueChange={(v) =>
-                  setForm((c) => ({ ...c, paymentStatus: v }))
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="paid">已缴费</SelectItem>
-                  <SelectItem value="unpaid">待缴费</SelectItem>
-                  <SelectItem value="paused">已暂停</SelectItem>
-                </SelectContent>
-              </Select>
-            </Field>
-            <Field label="缴费金额">
-              <Input
-                value={form.paymentAmount}
-                onChange={(e) =>
-                  setForm((c) => ({ ...c, paymentAmount: e.target.value }))
-                }
-              />
-            </Field>
-            <Field label="缴费时间">
-              <Input
-                placeholder="2026-03-01"
-                value={form.paidAt}
-                onChange={(e) =>
-                  setForm((c) => ({ ...c, paidAt: e.target.value }))
-                }
-              />
-            </Field>
-            <Field className="md:col-span-2" label="备注">
-              <Textarea
-                value={form.remark}
-                onChange={(e) =>
-                  setForm((c) => ({ ...c, remark: e.target.value }))
-                }
-              />
             </Field>
           </div>
           <DialogFooter>
@@ -826,7 +678,7 @@ function StudentFormDialog() {
           {open === "quick-school" ? (
             <div className="grid gap-4 py-2">
               <div className="grid gap-2">
-                <Label>学校名称</Label>
+                <Label required>学校名称</Label>
                 <Input
                   value={schoolForm.name}
                   onChange={(e) =>
@@ -839,7 +691,7 @@ function StudentFormDialog() {
           {open === "quick-grade" ? (
             <div className="grid gap-4 py-2">
               <div className="grid gap-2">
-                <Label>年级名称</Label>
+                <Label required>年级名称</Label>
                 <Input
                   value={gradeForm.name}
                   onChange={(e) =>
@@ -861,7 +713,7 @@ function StudentFormDialog() {
           {open === "quick-class" ? (
             <div className="grid gap-4 py-2">
               <div className="grid gap-2">
-                <Label>学校</Label>
+                <Label required>学校</Label>
                 <Select
                   value={classForm.schoolId}
                   onValueChange={(v) =>
@@ -872,7 +724,7 @@ function StudentFormDialog() {
                     <SelectValue placeholder="选择学校" />
                   </SelectTrigger>
                   <SelectContent>
-                    {schools.map((item) => (
+                    {schools.filter(isActiveItem).map((item) => (
                       <SelectItem key={item.id} value={item.id}>
                         {item.name}
                       </SelectItem>
@@ -881,7 +733,7 @@ function StudentFormDialog() {
                 </Select>
               </div>
               <div className="grid gap-2">
-                <Label>年级</Label>
+                <Label required>年级</Label>
                 <Select
                   value={classForm.gradeId}
                   onValueChange={(v) =>
@@ -892,7 +744,7 @@ function StudentFormDialog() {
                     <SelectValue placeholder="选择年级" />
                   </SelectTrigger>
                   <SelectContent>
-                    {grades.map((item) => (
+                    {grades.filter(isActiveItem).map((item) => (
                       <SelectItem key={item.id} value={item.id}>
                         {item.name}
                       </SelectItem>
@@ -901,7 +753,7 @@ function StudentFormDialog() {
                 </Select>
               </div>
               <div className="grid gap-2">
-                <Label>班级名称</Label>
+                <Label required>班级名称</Label>
                 <Input
                   value={classForm.name}
                   onChange={(e) =>
@@ -917,7 +769,7 @@ function StudentFormDialog() {
           {open === "quick-guardian" ? (
             <div className="grid gap-4 py-2">
               <div className="grid gap-2">
-                <Label>姓名</Label>
+                <Label required>姓名</Label>
                 <Input
                   value={guardianForm.name}
                   onChange={(e) =>
@@ -931,7 +783,7 @@ function StudentFormDialog() {
                 similarItems={quickGuardianSimilarItems}
               />
               <div className="grid gap-2">
-                <Label>手机号</Label>
+                <Label required>手机号</Label>
                 <Input
                   value={guardianForm.phone}
                   onChange={(e) =>
@@ -1013,14 +865,16 @@ function Field({
   children,
   className,
   label,
+  required,
 }: {
   children: ReactNode;
   className?: string;
   label: string;
+  required?: boolean;
 }) {
   return (
     <div className={className}>
-      <Label className="mb-2 block">{label}</Label>
+      <Label className="mb-2 block" required={required}>{label}</Label>
       {children}
     </div>
   );
@@ -1035,7 +889,6 @@ export default function StudentsPage() {
   const [currentItem, setCurrentItem] = useState<StudentItem | null>(null);
 
   const [items, setItems] = useState<StudentItem[]>([]);
-  const [servicePlans, setServicePlans] = useState<StudentServiceItem[]>([]);
   const [schools, setSchools] = useState<SchoolItem[]>([]);
   const [grades, setGrades] = useState<GradeItem[]>([]);
   const [classes, setClasses] = useState<ClassItem[]>([]);
@@ -1055,21 +908,18 @@ export default function StudentsPage() {
     try {
       const [
         studentItems,
-        planItems,
         schoolItems,
         gradeItems,
         classItems,
         guardianItems,
       ] = await Promise.all([
         fetchStudents(),
-        fetchStudentServices(),
         fetchSchools(),
         fetchGrades(),
         fetchClasses(),
         fetchGuardianProfiles(),
       ]);
       setItems(studentItems);
-      setServicePlans(planItems);
       setSchools(schoolItems);
       setGrades(gradeItems);
       setClasses(classItems);
@@ -1077,7 +927,6 @@ export default function StudentsPage() {
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "加载失败");
       setItems([]);
-      setServicePlans([]);
       setSchools([]);
       setGrades([]);
       setClasses([]);
@@ -1087,21 +936,7 @@ export default function StudentsPage() {
     }
   }
 
-  const servicePlanMap = useMemo(() => {
-    return servicePlans.reduce<Record<string, StudentServiceItem>>(
-      (acc, item) => {
-        if (acc[item.studentId]) return acc;
-        acc[item.studentId] = item;
-        return acc;
-      },
-      {},
-    );
-  }, [servicePlans]);
-
-  const columns = useMemo(
-    () => createColumns(servicePlanMap),
-    [servicePlanMap],
-  );
+  const columns = useMemo(() => createColumns(), []);
 
   const table = useReactTable({
     data: items,
@@ -1142,7 +977,6 @@ export default function StudentsPage() {
       grades,
       classes,
       guardians,
-      servicePlanMap,
     }),
     [
       open,
@@ -1153,7 +987,6 @@ export default function StudentsPage() {
       grades,
       classes,
       guardians,
-      servicePlanMap,
     ],
   );
 

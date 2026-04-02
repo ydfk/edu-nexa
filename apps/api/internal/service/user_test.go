@@ -79,6 +79,36 @@ func TestCurrentUserUserIDString(t *testing.T) {
 	}
 }
 
+func TestCurrentUserRejectsDisabledUser(t *testing.T) {
+	setTestJWTConfig(t)
+	user := setupTestUser(t)
+	user.Status = "paused"
+	if err := db.DB.Save(user).Error; err != nil {
+		t.Fatalf("save user: %v", err)
+	}
+	ctx := newCtxWithToken(t, jwt.MapClaims{"user_id": user.Id.String()})
+
+	currentUser, err := CurrentUser(ctx)
+	if err == nil {
+		t.Fatalf("CurrentUser expected error, got user %v", currentUser)
+	}
+	if err.Error() != "账号已禁用" {
+		t.Fatalf("CurrentUser error %q", err.Error())
+	}
+}
+
+func TestIsActiveStatusTreatsEmptyAsActive(t *testing.T) {
+	if !IsActiveStatus("") {
+		t.Fatalf("expected empty status to be active")
+	}
+	if !IsActiveStatus("active") {
+		t.Fatalf("expected active status to be active")
+	}
+	if IsActiveStatus("paused") {
+		t.Fatalf("expected paused status to be inactive")
+	}
+}
+
 func TestParseUserIDClaimUUID(t *testing.T) {
 	userID := uuid.New()
 	claims := jwt.MapClaims{"user_id": userID}
@@ -196,6 +226,7 @@ func setupTestUser(t *testing.T) *model.User {
 		DisplayName: "测试用户",
 		Phone:       "13800000001",
 		Roles:       "teacher",
+		Status:      "active",
 	}
 	if err := gormDB.Create(user).Error; err != nil {
 		t.Fatalf("create user: %v", err)

@@ -177,8 +177,8 @@ export default function SchoolsPage() {
             </p>
           </div>
           <Button onClick={() => setOpen("add-school")}>
-            <Plus className="mr-1 h-4 w-4" />
             新增学校
+            <Plus className="ml-1 h-4 w-4" />
           </Button>
         </div>
 
@@ -631,7 +631,7 @@ function SchoolFormDialog() {
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label>学校名称</Label>
+            <Label required>学校名称</Label>
             <Input
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -733,7 +733,7 @@ function EditClassDialog() {
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label>班级名称</Label>
+            <Label required>班级名称</Label>
             <Input
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -811,7 +811,7 @@ function EditGradeDialog() {
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label>年级名称</Label>
+            <Label required>年级名称</Label>
             <Input
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}

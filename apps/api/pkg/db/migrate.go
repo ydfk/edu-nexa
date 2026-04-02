@@ -2,6 +2,7 @@ package db
 
 import (
 	"fmt"
+	"strings"
 
 	classgroupModel "github.com/ydfk/edu-nexa/apps/api/internal/model/classgroup"
 	gradelevelModel "github.com/ydfk/edu-nexa/apps/api/internal/model/gradelevel"
@@ -11,6 +12,7 @@ import (
 	homeworkassignmentModel "github.com/ydfk/edu-nexa/apps/api/internal/model/homeworkassignment"
 	homeworkrecordModel "github.com/ydfk/edu-nexa/apps/api/internal/model/homeworkrecord"
 	mealrecordModel "github.com/ydfk/edu-nexa/apps/api/internal/model/mealrecord"
+	paymentrecordModel "github.com/ydfk/edu-nexa/apps/api/internal/model/paymentrecord"
 	runtimeconfigModel "github.com/ydfk/edu-nexa/apps/api/internal/model/runtimeconfig"
 	schoolModel "github.com/ydfk/edu-nexa/apps/api/internal/model/school"
 	servicedayModel "github.com/ydfk/edu-nexa/apps/api/internal/model/serviceday"
@@ -33,6 +35,7 @@ func autoMigrate() error {
 		&guardianbindingModel.Binding{},
 		&teacherprofileModel.Profile{},
 		&studentserviceModel.Plan{},
+		&paymentrecordModel.Record{},
 		&servicedayModel.Day{},
 		&homeworkassignmentModel.Assignment{},
 		&mealrecordModel.Record{},
@@ -45,6 +48,9 @@ func autoMigrate() error {
 		return err
 	}
 	if err := migrateLegacyConfigs(); err != nil {
+		return err
+	}
+	if err := migrateLegacyPaymentRecords(); err != nil {
 		return err
 	}
 
@@ -162,12 +168,71 @@ func migrateLegacyConfigs() error {
 	if runtimeCount == 0 {
 		if err := DB.Exec(
 			fmt.Sprintf(
-				"INSERT INTO %s (id, created_at, updated_at, scene, system_name_prefix, image_security_enable, image_security_strict, text_security_enable, text_security_strict, upload_provider, homework_subjects, deleted_at) "+
-					"SELECT id, created_at, updated_at, scene, COALESCE(system_name_prefix, ''), image_security_enable, image_security_strict, text_security_enable, text_security_strict, upload_provider, COALESCE(homework_subjects, ''), deleted_at "+
+				"INSERT INTO %s (id, created_at, updated_at, scene, system_name_prefix, image_security_enable, image_security_strict, text_security_enable, text_security_strict, upload_provider, homework_subjects, payment_types, deleted_at) "+
+					"SELECT id, created_at, updated_at, scene, COALESCE(system_name_prefix, ''), image_security_enable, image_security_strict, text_security_enable, text_security_strict, upload_provider, COALESCE(homework_subjects, ''), '', deleted_at "+
 					"FROM configs WHERE scene = 'app-runtime'",
 				runtimeTable,
 			),
 		).Error; err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func migrateLegacyPaymentRecords() error {
+	paymentTable := paymentrecordModel.Record{}.TableName()
+
+	var paymentCount int64
+	if err := DB.Table(paymentTable).Count(&paymentCount).Error; err != nil {
+		return err
+	}
+	if paymentCount > 0 {
+		return nil
+	}
+
+	var plans []studentserviceModel.Plan
+	if err := DB.Find(&plans).Error; err != nil {
+		return err
+	}
+	if len(plans) == 0 {
+		return nil
+	}
+
+	for _, plan := range plans {
+		if plan.PaymentAmount <= 0 && strings.TrimSpace(plan.PaidAt) == "" {
+			continue
+		}
+
+		var student studentModel.Student
+		if err := DB.First(&student, "id = ?", plan.StudentID).Error; err != nil {
+			continue
+		}
+
+		item := paymentrecordModel.Record{
+			BaseModel:       plan.BaseModel,
+			StudentID:       student.Id.String(),
+			StudentName:     student.Name,
+			SchoolID:        student.SchoolID,
+			SchoolName:      student.SchoolName,
+			GradeID:         student.GradeID,
+			GradeName:       student.Grade,
+			ClassID:         student.ClassID,
+			ClassName:       student.ClassName,
+			GuardianID:      student.GuardianID,
+			GuardianName:    student.GuardianName,
+			GuardianPhone:   student.GuardianPhone,
+			PaymentType:     "未分类",
+			PaymentAmount:   plan.PaymentAmount,
+			PeriodStartDate: plan.ServiceStartDate,
+			PeriodEndDate:   plan.ServiceEndDate,
+			PaidAt:          plan.PaidAt,
+			Remark:          plan.Remark,
+			Status:          "paid",
+		}
+
+		if err := DB.Create(&item).Error; err != nil {
 			return err
 		}
 	}

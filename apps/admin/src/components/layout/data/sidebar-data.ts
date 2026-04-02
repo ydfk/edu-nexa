@@ -3,6 +3,7 @@ import {
   BookOpenCheck,
   CalendarRange,
   ClipboardList,
+  CreditCard,
   GraduationCap,
   LayoutDashboard,
   School2,
@@ -51,6 +52,7 @@ export function buildSidebarData(
                 { title: "学校管理", url: "/schools", icon: School2 },
                 { title: "家长管理", url: "/guardians", icon: Users },
                 { title: "学生管理", url: "/students", icon: GraduationCap },
+                { title: "缴费管理", url: "/payments", icon: CreditCard },
               ]
             : []),
           ...(isGuardian
@@ -64,10 +66,7 @@ export function buildSidebarData(
           { title: "用餐记录", url: "/meal-records", icon: Soup },
           { title: "作业记录", url: "/homework-records", icon: BookOpenCheck },
           ...(isAdminOrTeacher
-            ? [
-                { title: "每日作业", url: "/daily-homework", icon: ClipboardList },
-                { title: "服务日历", url: "/service-calendar", icon: CalendarRange },
-              ]
+            ? [{ title: "每日作业", url: "/daily-homework", icon: ClipboardList }]
             : []),
         ],
       },
@@ -75,6 +74,9 @@ export function buildSidebarData(
         title: "设置",
         items: [
           { title: "个人设置", url: "/settings", icon: UserCog },
+          ...(isAdminOrTeacher
+            ? [{ title: "服务日历", url: "/service-calendar", icon: CalendarRange }]
+            : []),
           ...(isAdmin
             ? [{ title: "系统设置", url: "/settings/system", icon: Settings }]
             : []),

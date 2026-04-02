@@ -1,10 +1,13 @@
 package mealrecord
 
 import (
+	"errors"
 	"strings"
 
 	"github.com/ydfk/edu-nexa/apps/api/internal/api/response"
 	model "github.com/ydfk/edu-nexa/apps/api/internal/model/mealrecord"
+	studentModel "github.com/ydfk/edu-nexa/apps/api/internal/model/student"
+	"github.com/ydfk/edu-nexa/apps/api/internal/service"
 	"github.com/ydfk/edu-nexa/apps/api/internal/service/contentsafety"
 	"github.com/ydfk/edu-nexa/apps/api/pkg/db"
 
@@ -58,8 +61,12 @@ func Create(c *fiber.Ctx) error {
 		return response.Error(c, "参数不正确")
 	}
 
-	if req.StudentID == "" || req.ServiceDate == "" {
-		return response.Error(c, "学生和日期不能为空")
+	if err := validateMealRecordPayload(req); err != nil {
+		return response.Error(c, err.Error())
+	}
+	student, err := findMealStudent(req.StudentID, "")
+	if err != nil {
+		return response.Error(c, err.Error())
 	}
 	if err := contentsafety.CheckText(req.Remark); err != nil {
 		return response.Error(c, err.Error())
@@ -73,8 +80,8 @@ func Create(c *fiber.Ctx) error {
 		Remark:       req.Remark,
 		ServiceDate:  req.ServiceDate,
 		Status:       defaultMealStatus(req.Status),
-		StudentID:    req.StudentID,
-		StudentName:  req.StudentName,
+		StudentID:    student.Id.String(),
+		StudentName:  student.Name,
 	}
 
 	if err := db.DB.Create(&record).Error; err != nil {
@@ -94,6 +101,13 @@ func Update(c *fiber.Ctx) error {
 	if err := db.DB.First(&record, "id = ?", c.Params("id")).Error; err != nil {
 		return response.Error(c, "用餐记录不存在")
 	}
+	if err := validateMealRecordPayload(req); err != nil {
+		return response.Error(c, err.Error())
+	}
+	student, err := findMealStudent(req.StudentID, record.StudentID)
+	if err != nil {
+		return response.Error(c, err.Error())
+	}
 	if err := contentsafety.CheckText(req.Remark); err != nil {
 		return response.Error(c, err.Error())
 	}
@@ -105,8 +119,8 @@ func Update(c *fiber.Ctx) error {
 	record.Remark = req.Remark
 	record.ServiceDate = req.ServiceDate
 	record.Status = defaultMealStatus(req.Status)
-	record.StudentID = req.StudentID
-	record.StudentName = req.StudentName
+	record.StudentID = student.Id.String()
+	record.StudentName = student.Name
 
 	if err := db.DB.Save(&record).Error; err != nil {
 		return response.Error(c, "更新用餐记录失败")
@@ -167,4 +181,27 @@ func defaultMealStatus(status string) string {
 	}
 
 	return status
+}
+
+func validateMealRecordPayload(req mealRecordPayload) error {
+	if strings.TrimSpace(req.StudentID) == "" {
+		return errors.New("学生不能为空")
+	}
+	if strings.TrimSpace(req.ServiceDate) == "" {
+		return errors.New("日期不能为空")
+	}
+
+	return nil
+}
+
+func findMealStudent(studentID string, currentStudentID string) (*studentModel.Student, error) {
+	var item studentModel.Student
+	if err := db.DB.First(&item, "id = ?", strings.TrimSpace(studentID)).Error; err != nil {
+		return nil, errors.New("学生不存在")
+	}
+	if strings.TrimSpace(currentStudentID) != item.Id.String() && !service.IsActiveStatus(item.Status) {
+		return nil, errors.New("学生已禁用")
+	}
+
+	return &item, nil
 }

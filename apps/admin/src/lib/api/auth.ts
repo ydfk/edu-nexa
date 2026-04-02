@@ -1,4 +1,5 @@
 import {
+  expireAdminSession,
   getAdminSessionSnapshot,
   type AdminSessionUser,
 } from "@/lib/auth/session";
@@ -75,6 +76,10 @@ async function parseEnvelope<T>(response: Response) {
     payload = (await response.json()) as ApiEnvelope<T>;
   } catch {
     throw new Error("登录响应解析失败");
+  }
+
+  if (response.status === 401) {
+    expireAdminSession();
   }
 
   if (!response.ok) {

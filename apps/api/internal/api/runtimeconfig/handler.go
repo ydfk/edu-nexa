@@ -9,6 +9,7 @@ import (
 type payload struct {
 	SystemNamePrefix    string `json:"systemNamePrefix"`
 	HomeworkSubjects    string `json:"homeworkSubjects"`
+	PaymentTypes        string `json:"paymentTypes"`
 	ImageSecurityEnable bool   `json:"imageSecurityEnable"`
 	ImageSecurityStrict bool   `json:"imageSecurityStrict"`
 	TextSecurityEnable  bool   `json:"textSecurityEnable"`
@@ -34,6 +35,7 @@ func Update(c *fiber.Ctx) error {
 	snapshot, err := service.SaveSnapshot(&service.Snapshot{
 		SystemNamePrefix:    req.SystemNamePrefix,
 		HomeworkSubjects:    req.HomeworkSubjects,
+		PaymentTypes:        req.PaymentTypes,
 		ImageSecurityEnable: req.ImageSecurityEnable,
 		ImageSecurityStrict: req.ImageSecurityStrict,
 		TextSecurityEnable:  req.TextSecurityEnable,

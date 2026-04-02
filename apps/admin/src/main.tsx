@@ -16,12 +16,14 @@ import SchoolsPage from "@/pages/schools";
 import StudentsPage from "@/pages/students";
 import MealRecordsPage from "@/pages/meal-records";
 import HomeworkRecordsPage from "@/pages/homework-records";
+import PaymentsPage from "@/pages/payments";
 import ServiceCalendarPage from "@/pages/service-calendar";
 import StatisticsPage from "@/pages/statistics";
 import TeachersPage from "@/pages/teachers";
 import LoginPage from "@/pages/login";
 import NotFoundPage from "@/pages/errors/not-found";
 import ForbiddenPage from "@/pages/errors/forbidden";
+import UnauthorizedPage from "@/components/error/unauthorized";
 import SettingsProfilePage from "@/pages/settings/index";
 import SettingsSystemPage from "@/pages/settings/system";
 import { PageContent } from "@/components/page-content";
@@ -95,6 +97,14 @@ const router = createBrowserRouter([
           { path: "meal-records", element: <MealRecordsPage /> },
           { path: "homework-records", element: <HomeworkRecordsPage /> },
           {
+            path: "payments",
+            element: (
+              <RequireRoles allowedRoles={["admin", "teacher"]}>
+                <PaymentsPage />
+              </RequireRoles>
+            ),
+          },
+          {
             path: "daily-homework",
             element: (
               <RequireRoles allowedRoles={["admin", "teacher"]}>
@@ -128,6 +138,10 @@ const router = createBrowserRouter([
   },
   {
     path: "/401",
+    element: <UnauthorizedPage />,
+  },
+  {
+    path: "/403",
     element: <ForbiddenPage />,
   },
   {

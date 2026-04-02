@@ -53,8 +53,8 @@ func Create(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		return response.Error(c, "参数不正确")
 	}
-	if strings.TrimSpace(req.Name) == "" {
-		return response.Error(c, "班级名称不能为空")
+	if err := validateClassPayload(req); err != nil {
+		return response.Error(c, err.Error())
 	}
 	if err := ensureClassNameUnique(strings.TrimSpace(req.Name), strings.TrimSpace(req.GradeID), ""); err != nil {
 		return response.Error(c, err.Error())
@@ -85,8 +85,8 @@ func Update(c *fiber.Ctx) error {
 	if err := db.DB.First(&item, "id = ?", c.Params("id")).Error; err != nil {
 		return response.Error(c, "班级不存在")
 	}
-	if strings.TrimSpace(req.Name) == "" {
-		return response.Error(c, "班级名称不能为空")
+	if err := validateClassPayload(req); err != nil {
+		return response.Error(c, err.Error())
 	}
 	if err := ensureClassNameUnique(strings.TrimSpace(req.Name), strings.TrimSpace(req.GradeID), item.Id.String()); err != nil {
 		return response.Error(c, err.Error())
@@ -127,6 +127,20 @@ func defaultClassStatus(status string) string {
 	}
 
 	return strings.TrimSpace(status)
+}
+
+func validateClassPayload(req classPayload) error {
+	if strings.TrimSpace(req.Name) == "" {
+		return errors.New("班级名称不能为空")
+	}
+	if strings.TrimSpace(req.SchoolID) == "" || strings.TrimSpace(req.SchoolName) == "" {
+		return errors.New("学校不能为空")
+	}
+	if strings.TrimSpace(req.GradeID) == "" || strings.TrimSpace(req.GradeName) == "" {
+		return errors.New("年级不能为空")
+	}
+
+	return nil
 }
 
 func ensureClassNameUnique(name string, gradeID string, excludeID string) error {

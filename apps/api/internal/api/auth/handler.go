@@ -52,6 +52,7 @@ func Register(c *fiber.Ctx) error {
 		DisplayName: req.DisplayName,
 		Phone:       req.Phone,
 		Roles:       strings.Join(req.Roles, ","),
+		Status:      "active",
 		Password:    string(hash),
 	}
 
@@ -85,6 +86,9 @@ func Login(c *fiber.Ctx) error {
 	if err := db.DB.Where("phone = ?", req.Phone).First(&user).Error; err != nil {
 		return response.Error(c, "手机号不存在")
 	}
+	if err := service.EnsureUserActive(user); err != nil {
+		return response.Error(c, err.Error())
+	}
 
 	if user.Password == "" {
 		return response.Error(c, "该账号未设置管理端密码")
@@ -105,7 +109,7 @@ func Login(c *fiber.Ctx) error {
 func Profile(c *fiber.Ctx) error {
 	user, err := service.CurrentUser(c)
 	if err != nil {
-		return response.Error(c, "用户未找到")
+		return response.Error(c, err.Error())
 	}
 
 	return response.Success(c, buildUserPayload(*user))
@@ -114,7 +118,7 @@ func Profile(c *fiber.Ctx) error {
 func UpdateProfile(c *fiber.Ctx) error {
 	user, err := service.CurrentUser(c)
 	if err != nil {
-		return response.Error(c, "用户未找到")
+		return response.Error(c, err.Error())
 	}
 
 	var req updateProfilePayload
@@ -138,7 +142,7 @@ func UpdateProfile(c *fiber.Ctx) error {
 func ChangePassword(c *fiber.Ctx) error {
 	user, err := service.CurrentUser(c)
 	if err != nil {
-		return response.Error(c, "用户未找到")
+		return response.Error(c, err.Error())
 	}
 
 	var req changePasswordPayload
@@ -196,7 +200,7 @@ func WeappPhoneLogin(c *fiber.Ctx) error {
 
 	user, err := service.EnsureUserByPhone(phone, req.RoleHint)
 	if err != nil {
-		return response.Error(c, "微信手机号登录失败")
+		return response.Error(c, err.Error())
 	}
 
 	token, err := service.GenerateJWT(user)
@@ -213,6 +217,7 @@ func buildUserPayload(user model.User) fiber.Map {
 		"id":          user.Id,
 		"phone":       user.Phone,
 		"roles":       splitRoles(user.Roles),
+		"status":      defaultUserStatus(user.Status),
 	}
 }
 
@@ -240,4 +245,12 @@ func buildLoginPayload(user model.User, token string, loginType string) fiber.Ma
 		"token":     token,
 		"user":      buildUserPayload(user),
 	}
+}
+
+func defaultUserStatus(status string) string {
+	if strings.TrimSpace(status) == "" {
+		return "active"
+	}
+
+	return strings.TrimSpace(status)
 }

@@ -1,10 +1,13 @@
 package homeworkrecord
 
 import (
+	"errors"
 	"strings"
 
 	"github.com/ydfk/edu-nexa/apps/api/internal/api/response"
 	model "github.com/ydfk/edu-nexa/apps/api/internal/model/homeworkrecord"
+	studentModel "github.com/ydfk/edu-nexa/apps/api/internal/model/student"
+	"github.com/ydfk/edu-nexa/apps/api/internal/service"
 	"github.com/ydfk/edu-nexa/apps/api/internal/service/contentsafety"
 	"github.com/ydfk/edu-nexa/apps/api/pkg/db"
 
@@ -67,8 +70,12 @@ func Create(c *fiber.Ctx) error {
 		return response.Error(c, "参数不正确")
 	}
 
-	if req.StudentID == "" || req.ServiceDate == "" {
-		return response.Error(c, "学生和日期不能为空")
+	if err := validateHomeworkRecordPayload(req); err != nil {
+		return response.Error(c, err.Error())
+	}
+	student, err := findHomeworkStudent(req.StudentID, "")
+	if err != nil {
+		return response.Error(c, err.Error())
 	}
 	if err := contentsafety.CheckText(req.Remark + "\n" + req.SubjectSummary); err != nil {
 		return response.Error(c, err.Error())
@@ -76,16 +83,16 @@ func Create(c *fiber.Ctx) error {
 
 	record := model.Record{
 		CampusID:      strings.TrimSpace(req.CampusID),
-		ClassName:      req.ClassName,
+		ClassName:      student.ClassName,
 		ImageURLs:      strings.Join(req.ImageURLs, ","),
 		RecordedBy:     req.RecordedBy,
 		RecordedByID:   req.RecordedByID,
 		Remark:         req.Remark,
-		SchoolName:     req.SchoolName,
+		SchoolName:     student.SchoolName,
 		ServiceDate:    req.ServiceDate,
 		Status:         defaultHomeworkStatus(req.Status),
-		StudentID:      req.StudentID,
-		StudentName:    req.StudentName,
+		StudentID:      student.Id.String(),
+		StudentName:    student.Name,
 		SubjectSummary: req.SubjectSummary,
 	}
 
@@ -106,21 +113,28 @@ func Update(c *fiber.Ctx) error {
 	if err := db.DB.First(&record, "id = ?", c.Params("id")).Error; err != nil {
 		return response.Error(c, "作业记录不存在")
 	}
+	if err := validateHomeworkRecordPayload(req); err != nil {
+		return response.Error(c, err.Error())
+	}
+	student, err := findHomeworkStudent(req.StudentID, record.StudentID)
+	if err != nil {
+		return response.Error(c, err.Error())
+	}
 	if err := contentsafety.CheckText(req.Remark + "\n" + req.SubjectSummary); err != nil {
 		return response.Error(c, err.Error())
 	}
 
 	record.CampusID = strings.TrimSpace(req.CampusID)
-	record.ClassName = req.ClassName
+	record.ClassName = student.ClassName
 	record.ImageURLs = strings.Join(req.ImageURLs, ",")
 	record.RecordedBy = req.RecordedBy
 	record.RecordedByID = req.RecordedByID
 	record.Remark = req.Remark
-	record.SchoolName = req.SchoolName
+	record.SchoolName = student.SchoolName
 	record.ServiceDate = req.ServiceDate
 	record.Status = defaultHomeworkStatus(req.Status)
-	record.StudentID = req.StudentID
-	record.StudentName = req.StudentName
+	record.StudentID = student.Id.String()
+	record.StudentName = student.Name
 	record.SubjectSummary = req.SubjectSummary
 
 	if err := db.DB.Save(&record).Error; err != nil {
@@ -185,4 +199,27 @@ func defaultHomeworkStatus(status string) string {
 	}
 
 	return status
+}
+
+func validateHomeworkRecordPayload(req homeworkRecordPayload) error {
+	if strings.TrimSpace(req.StudentID) == "" {
+		return errors.New("学生不能为空")
+	}
+	if strings.TrimSpace(req.ServiceDate) == "" {
+		return errors.New("日期不能为空")
+	}
+
+	return nil
+}
+
+func findHomeworkStudent(studentID string, currentStudentID string) (*studentModel.Student, error) {
+	var item studentModel.Student
+	if err := db.DB.First(&item, "id = ?", strings.TrimSpace(studentID)).Error; err != nil {
+		return nil, errors.New("学生不存在")
+	}
+	if strings.TrimSpace(currentStudentID) != item.Id.String() && !service.IsActiveStatus(item.Status) {
+		return nil, errors.New("学生已禁用")
+	}
+
+	return &item, nil
 }

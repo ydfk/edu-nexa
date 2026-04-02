@@ -33,6 +33,9 @@ func EnsureUserByPhone(phone string, roleHint string) (*model.User, error) {
 	var user model.User
 	result := db.DB.Where("phone = ?", phone).First(&user)
 	if result.Error == nil {
+		if err := EnsureUserActive(user); err != nil {
+			return nil, err
+		}
 		normalizedRole := normalizeRole(roleHint)
 		mergedRoles := mergeRoles(user.Roles, normalizedRole)
 		if mergedRoles != user.Roles {
@@ -52,6 +55,7 @@ func EnsureUserByPhone(phone string, roleHint string) (*model.User, error) {
 		DisplayName: defaultDisplayName(roleHint),
 		Phone:       phone,
 		Roles:       normalizeRole(roleHint),
+		Status:      "active",
 	}
 	if err := db.DB.Create(&user).Error; err != nil {
 		return nil, err

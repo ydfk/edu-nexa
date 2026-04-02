@@ -13,7 +13,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { CircleCheck, CircleX, Clock, Pencil, Plus, Trash2 } from "lucide-react";
+import { CircleCheck, CircleX, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   DataTableColumnHeader,
@@ -47,6 +47,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import useDialogState from "@/hooks/use-dialog-state";
 import { useAdminSession } from "@/lib/auth/session";
@@ -58,6 +64,7 @@ import {
   type MealRecordItem,
   type StudentItem,
 } from "@/lib/server-data";
+import MealRecordBoard from "./meal-record-board";
 
 // ---------------------------------------------------------------------------
 // 常量 & 类型
@@ -66,9 +73,8 @@ import {
 type MealRecordDialogType = "create" | "edit";
 
 const statusOptions = [
-  { label: "待处理", value: "pending", icon: Clock },
-  { label: "已完成", value: "completed", icon: CircleCheck },
-  { label: "请假", value: "leave", icon: CircleX },
+  { label: "已用餐", value: "completed", icon: CircleCheck },
+  { label: "未用餐", value: "absent", icon: CircleX },
 ] as const;
 
 const statusMap: Record<
@@ -76,17 +82,21 @@ const statusMap: Record<
   { label: string; variant: "default" | "secondary" | "destructive" }
 > = {
   pending: { label: "待处理", variant: "secondary" },
-  completed: { label: "已完成", variant: "default" },
-  leave: { label: "请假", variant: "destructive" },
+  completed: { label: "已用餐", variant: "default" },
+  absent: { label: "未用餐", variant: "destructive" },
 };
 
 const initialForm = {
   id: "",
   remark: "",
   serviceDate: "",
-  status: "pending",
+  status: "completed",
   studentId: "",
 };
+
+function isActiveStudent(item: StudentItem) {
+  return !item.status || item.status === "active";
+}
 
 // ---------------------------------------------------------------------------
 // Context – 弹窗状态 & 共享数据（shadcn-admin 模式）
@@ -230,6 +240,15 @@ function MealRecordFormDialog() {
 
   const [form, setForm] = useState(initialForm);
   const [saving, setSaving] = useState(false);
+  const selectableStudents = useMemo(() => {
+    const activeItems = students.filter(isActiveStudent);
+    if (!form.studentId || activeItems.some((item) => item.id === form.studentId)) {
+      return activeItems;
+    }
+
+    const currentStudent = students.find((item) => item.id === form.studentId);
+    return currentStudent ? [...activeItems, currentStudent] : activeItems;
+  }, [form.studentId, students]);
 
   useEffect(() => {
     if (isEdit && currentItem) {
@@ -241,12 +260,9 @@ function MealRecordFormDialog() {
         studentId: currentItem.studentId,
       });
     } else if (open === "create") {
-      setForm({
-        ...initialForm,
-        studentId: students[0]?.id || "",
-      });
+      setForm(initialForm);
     }
-  }, [open, currentItem, isEdit, students]);
+  }, [open, currentItem, isEdit]);
 
   async function handleSave() {
     const student = students.find((item) => item.id === form.studentId);
@@ -288,7 +304,7 @@ function MealRecordFormDialog() {
         </DialogHeader>
         <div className="grid gap-4 py-2 md:grid-cols-2">
           <div className="grid gap-2">
-            <Label>学生</Label>
+            <Label required>学生</Label>
             <Select
               value={form.studentId}
               onValueChange={(value) =>
@@ -299,7 +315,7 @@ function MealRecordFormDialog() {
                 <SelectValue placeholder="选择学生" />
               </SelectTrigger>
               <SelectContent>
-                {students.map((student) => (
+                {selectableStudents.map((student) => (
                   <SelectItem key={student.id} value={student.id}>
                     {student.name}
                   </SelectItem>
@@ -308,7 +324,7 @@ function MealRecordFormDialog() {
             </Select>
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="meal-service-date">日期</Label>
+            <Label htmlFor="meal-service-date" required>日期</Label>
             <Input
               id="meal-service-date"
               placeholder="2026-03-31"
@@ -333,9 +349,8 @@ function MealRecordFormDialog() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="pending">待处理</SelectItem>
-                <SelectItem value="completed">已完成</SelectItem>
-                <SelectItem value="leave">请假</SelectItem>
+                <SelectItem value="completed">已用餐</SelectItem>
+                <SelectItem value="absent">未用餐</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -368,6 +383,34 @@ function MealRecordFormDialog() {
 // ---------------------------------------------------------------------------
 
 export default function MealRecordsPage() {
+  return (
+    <PageContent>
+      <div className="mb-2">
+        <h2 className="text-2xl font-bold tracking-tight">用餐记录</h2>
+        <p className="text-muted-foreground">管理学生用餐登记信息</p>
+      </div>
+
+      <Tabs defaultValue="board" className="flex-1">
+        <TabsList>
+          <TabsTrigger value="board">面板视图</TabsTrigger>
+          <TabsTrigger value="list">列表视图</TabsTrigger>
+        </TabsList>
+        <TabsContent value="board" className="mt-4">
+          <MealRecordBoard />
+        </TabsContent>
+        <TabsContent value="list" className="mt-4">
+          <MealRecordListView />
+        </TabsContent>
+      </Tabs>
+    </PageContent>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 列表视图（原有逻辑）
+// ---------------------------------------------------------------------------
+
+function MealRecordListView() {
   const session = useAdminSession();
   const [open, setOpen] = useDialogState<MealRecordDialogType>();
   const [currentItem, setCurrentItem] = useState<MealRecordItem | null>(null);
@@ -467,13 +510,9 @@ export default function MealRecordsPage() {
 
   return (
     <MealRecordsContext.Provider value={contextValue}>
-      <PageContent>
-        {/* 标题区 */}
-        <div className="mb-2 flex flex-wrap items-center justify-between gap-x-4 space-y-2">
-          <div>
-            <h2 className="text-2xl font-bold tracking-tight">用餐记录</h2>
-            <p className="text-muted-foreground">管理学生用餐登记信息</p>
-          </div>
+      <div className="space-y-4">
+        {/* 工具栏 */}
+        <div className="flex items-center justify-end">
           {canEdit && (
             <Button className="space-x-1" onClick={() => setOpen("create")}>
               <span>新增记录</span> <Plus size={18} />
@@ -482,86 +521,84 @@ export default function MealRecordsPage() {
         </div>
 
         {/* 数据表格 */}
-        <div className="-mx-4 flex-1 overflow-auto px-4 py-1 lg:flex-row lg:space-x-12 lg:space-y-0">
-          {loading ? (
-            <div className="py-8 text-center text-sm text-muted-foreground">
-              加载中…
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <DataTableToolbar
-                table={table}
-                searchPlaceholder="搜索学生 / 日期 / 学校 / 班级…"
-                filters={[
-                  {
-                    columnId: "status",
-                    title: "状态",
-                    options: statusOptions.map((o) => ({
-                      label: o.label,
-                      value: o.value,
-                      icon: o.icon,
-                    })),
-                  },
-                ]}
-              />
+        {loading ? (
+          <div className="py-8 text-center text-sm text-muted-foreground">
+            加载中…
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <DataTableToolbar
+              table={table}
+              searchPlaceholder="搜索学生 / 日期 / 学校 / 班级…"
+              filters={[
+                {
+                  columnId: "status",
+                  title: "状态",
+                  options: statusOptions.map((o) => ({
+                    label: o.label,
+                    value: o.value,
+                    icon: o.icon,
+                  })),
+                },
+              ]}
+            />
 
-              <div className="overflow-hidden rounded-md border">
-                <Table>
-                  <TableHeader>
-                    {table.getHeaderGroups().map((headerGroup) => (
-                      <TableRow key={headerGroup.id}>
-                        {headerGroup.headers.map((header) => (
-                          <TableHead key={header.id} colSpan={header.colSpan}>
-                            {header.isPlaceholder
-                              ? null
-                              : flexRender(
-                                  header.column.columnDef.header,
-                                  header.getContext(),
-                                )}
-                          </TableHead>
+            <div className="overflow-hidden rounded-md border">
+              <Table>
+                <TableHeader>
+                  {table.getHeaderGroups().map((headerGroup) => (
+                    <TableRow key={headerGroup.id}>
+                      {headerGroup.headers.map((header) => (
+                        <TableHead key={header.id} colSpan={header.colSpan}>
+                          {header.isPlaceholder
+                            ? null
+                            : flexRender(
+                                header.column.columnDef.header,
+                                header.getContext(),
+                              )}
+                        </TableHead>
+                      ))}
+                    </TableRow>
+                  ))}
+                </TableHeader>
+                <TableBody>
+                  {table.getRowModel().rows?.length ? (
+                    table.getRowModel().rows.map((row) => (
+                      <TableRow key={row.id} className="group/row">
+                        {row.getVisibleCells().map((cell) => (
+                          <TableCell
+                            key={cell.id}
+                            className="bg-background group-hover/row:bg-muted"
+                          >
+                            {flexRender(
+                              cell.column.columnDef.cell,
+                              cell.getContext(),
+                            )}
+                          </TableCell>
                         ))}
                       </TableRow>
-                    ))}
-                  </TableHeader>
-                  <TableBody>
-                    {table.getRowModel().rows?.length ? (
-                      table.getRowModel().rows.map((row) => (
-                        <TableRow key={row.id} className="group/row">
-                          {row.getVisibleCells().map((cell) => (
-                            <TableCell
-                              key={cell.id}
-                              className="bg-background group-hover/row:bg-muted"
-                            >
-                              {flexRender(
-                                cell.column.columnDef.cell,
-                                cell.getContext(),
-                              )}
-                            </TableCell>
-                          ))}
-                        </TableRow>
-                      ))
-                    ) : (
-                      <TableRow>
-                        <TableCell
-                          colSpan={columns.length}
-                          className="h-24 text-center"
-                        >
-                          暂无数据
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-
-              <DataTablePagination table={table} />
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell
+                        colSpan={columns.length}
+                        className="h-24 text-center"
+                      >
+                        暂无数据
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
             </div>
-          )}
-        </div>
+
+            <DataTablePagination table={table} />
+          </div>
+        )}
 
         {/* 弹窗 */}
         <MealRecordFormDialog />
-      </PageContent>
+      </div>
     </MealRecordsContext.Provider>
   );
 }

@@ -2,6 +2,7 @@ import { getAdminSessionSnapshot } from "@/lib/auth/session";
 
 export type RuntimeSettings = {
   homeworkSubjects: string;
+  paymentTypes: string;
   imageSecurityEnable: boolean;
   imageSecurityStrict: boolean;
   scene: string;
@@ -12,9 +13,11 @@ export type RuntimeSettings = {
 };
 
 const defaultHomeworkSubjects = '["语文","数学","英语","其他"]';
+const defaultPaymentTypes = '["晚餐+晚辅","打印费"]';
 
 const defaultSettings: RuntimeSettings = {
   homeworkSubjects: defaultHomeworkSubjects,
+  paymentTypes: defaultPaymentTypes,
   imageSecurityEnable: false,
   imageSecurityStrict: false,
   scene: "app-runtime",
@@ -93,6 +96,7 @@ function normalizeRuntimeSettings(
 
   return {
     homeworkSubjects: value?.homeworkSubjects || defaultHomeworkSubjects,
+    paymentTypes: value?.paymentTypes || defaultPaymentTypes,
     imageSecurityEnable: !!value?.imageSecurityEnable,
     imageSecurityStrict: !!value?.imageSecurityStrict,
     scene: value?.scene || defaultSettings.scene,
@@ -165,4 +169,16 @@ export function parseHomeworkSubjects(settings: RuntimeSettings): string[] {
     // ignore
   }
   return ["语文", "数学", "英语", "其他"];
+}
+
+export function parsePaymentTypes(settings: RuntimeSettings): string[] {
+  try {
+    const parsed = JSON.parse(settings.paymentTypes);
+    if (Array.isArray(parsed)) {
+      return parsed.filter((item: unknown) => typeof item === "string" && item.trim());
+    }
+  } catch {
+    // ignore
+  }
+  return ["晚餐+晚辅", "打印费"];
 }

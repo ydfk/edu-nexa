@@ -17,6 +17,7 @@ import { Separator } from "@/components/ui/separator";
 import {
   fetchRuntimeSettings,
   getDefaultRuntimeSettings,
+  parsePaymentTypes,
   getSystemDisplayName,
   parseHomeworkSubjects,
   saveRuntimeSettings,
@@ -119,6 +120,13 @@ export default function SettingsSystemPage() {
         </Card>
 
         <HomeworkSubjectsCard
+          runtimeSettings={runtimeSettings}
+          setRuntimeSettings={setRuntimeSettings}
+          loading={loadingSettings}
+          saving={savingSettings}
+          onSave={handleSaveRuntimeSettings}
+        />
+        <PaymentTypesCard
           runtimeSettings={runtimeSettings}
           setRuntimeSettings={setRuntimeSettings}
           loading={loadingSettings}
@@ -229,6 +237,108 @@ function HomeworkSubjectsCard({
         <div className="flex justify-end">
           <Button disabled={loading || saving} onClick={onSave}>
             {saving ? "保存中..." : "保存科目设置"}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function PaymentTypesCard({
+  runtimeSettings,
+  setRuntimeSettings,
+  loading,
+  saving,
+  onSave,
+}: {
+  runtimeSettings: RuntimeSettings;
+  setRuntimeSettings: React.Dispatch<React.SetStateAction<RuntimeSettings>>;
+  loading: boolean;
+  saving: boolean;
+  onSave: () => void;
+}) {
+  const [newType, setNewType] = useState("");
+  const paymentTypes = useMemo(
+    () => parsePaymentTypes(runtimeSettings),
+    [runtimeSettings],
+  );
+
+  function addPaymentType() {
+    const trimmed = newType.trim();
+    if (!trimmed) return;
+    if (paymentTypes.includes(trimmed)) {
+      toast.error("缴费类型已存在");
+      return;
+    }
+    const updated = [...paymentTypes, trimmed];
+    setRuntimeSettings((current) => ({
+      ...current,
+      paymentTypes: JSON.stringify(updated),
+    }));
+    setNewType("");
+  }
+
+  function removePaymentType(index: number) {
+    const updated = paymentTypes.filter((_, i) => i !== index);
+    setRuntimeSettings((current) => ({
+      ...current,
+      paymentTypes: JSON.stringify(updated),
+    }));
+  }
+
+  return (
+    <Card className="max-w-2xl">
+      <CardHeader>
+        <CardTitle>缴费类型</CardTitle>
+        <CardDescription>
+          配置缴费管理中可选的缴费类型，例如晚餐+晚辅、打印费
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex flex-wrap gap-2">
+          {paymentTypes.map((paymentType, index) => (
+            <Badge
+              key={`${paymentType}-${index}`}
+              variant="secondary"
+              className="gap-1 px-3 py-1.5 text-sm"
+            >
+              {paymentType}
+              <button
+                type="button"
+                className="ml-1 rounded-full hover:bg-muted"
+                onClick={() => removePaymentType(index)}
+                disabled={loading || saving}
+              >
+                <X className="size-3" />
+              </button>
+            </Badge>
+          ))}
+        </div>
+        <div className="flex gap-2">
+          <Input
+            placeholder="输入新缴费类型"
+            value={newType}
+            disabled={loading || saving}
+            onChange={(event) => setNewType(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                addPaymentType();
+              }
+            }}
+          />
+          <Button
+            variant="outline"
+            size="icon"
+            disabled={loading || saving || !newType.trim()}
+            onClick={addPaymentType}
+          >
+            <Plus className="size-4" />
+          </Button>
+        </div>
+        <div className="flex justify-end">
+          <Button disabled={loading || saving} onClick={onSave}>
+            {saving ? "保存中..." : "保存缴费类型"}
           </Button>
         </div>
       </CardContent>

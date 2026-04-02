@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -26,6 +27,10 @@ func GenerateJWT(user *model.User) (string, error) {
 }
 
 func CurrentUser(c *fiber.Ctx) (user *model.User, err error) {
+	if cached, ok := c.Locals("current_user_model").(*model.User); ok && cached != nil {
+		return cached, nil
+	}
+
 	raw := c.Locals("user")
 	if raw == nil {
 		return nil, errors.New("no jwt token in context")
@@ -53,8 +58,26 @@ func CurrentUser(c *fiber.Ctx) (user *model.User, err error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := EnsureUserActive(dbUser); err != nil {
+		return nil, err
+	}
+
+	c.Locals("current_user_model", &dbUser)
 
 	return &dbUser, nil
+}
+
+func EnsureUserActive(user model.User) error {
+	if IsActiveStatus(user.Status) {
+		return nil
+	}
+
+	return errors.New("账号已禁用")
+}
+
+func IsActiveStatus(status string) bool {
+	trimmed := strings.TrimSpace(status)
+	return trimmed == "" || trimmed == "active"
 }
 
 func parseUserIDClaim(claims jwt.MapClaims) (string, error) {

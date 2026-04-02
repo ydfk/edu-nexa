@@ -87,6 +87,10 @@ const initialForm = {
   subjectSummary: "",
 };
 
+function isActiveStudent(item: StudentItem) {
+  return !item.status || item.status === "active";
+}
+
 // ---------------------------------------------------------------------------
 // Context – dialog state provider (shadcn-admin pattern)
 // ---------------------------------------------------------------------------
@@ -209,6 +213,15 @@ function HomeworkRecordFormDialog() {
 
   const [form, setForm] = useState(initialForm);
   const [saving, setSaving] = useState(false);
+  const selectableStudents = useMemo(() => {
+    const activeItems = students.filter(isActiveStudent);
+    if (!form.studentId || activeItems.some((item) => item.id === form.studentId)) {
+      return activeItems;
+    }
+
+    const currentStudent = students.find((item) => item.id === form.studentId);
+    return currentStudent ? [...activeItems, currentStudent] : activeItems;
+  }, [form.studentId, students]);
 
   useEffect(() => {
     if (isEdit && currentItem) {
@@ -221,9 +234,9 @@ function HomeworkRecordFormDialog() {
         subjectSummary: currentItem.subjectSummary,
       });
     } else if (open === "create") {
-      setForm({ ...initialForm, studentId: students[0]?.id || "" });
+      setForm(initialForm);
     }
-  }, [open, currentItem, isEdit, students]);
+  }, [open, currentItem, isEdit]);
 
   async function handleSave() {
     const student = students.find((item) => item.id === form.studentId);
@@ -266,7 +279,7 @@ function HomeworkRecordFormDialog() {
         </DialogHeader>
         <div className="grid gap-4 py-2 md:grid-cols-2">
           <div className="grid gap-2">
-            <Label>学生</Label>
+            <Label required>学生</Label>
             <Select
               value={form.studentId}
               onValueChange={(value) => setForm((current) => ({ ...current, studentId: value }))}
@@ -275,7 +288,7 @@ function HomeworkRecordFormDialog() {
                 <SelectValue placeholder="选择学生" />
               </SelectTrigger>
               <SelectContent>
-                {students.map((student) => (
+                {selectableStudents.map((student) => (
                   <SelectItem key={student.id} value={student.id}>
                     {student.name}
                   </SelectItem>
@@ -284,7 +297,7 @@ function HomeworkRecordFormDialog() {
             </Select>
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="hw-date">日期</Label>
+            <Label htmlFor="hw-date" required>日期</Label>
             <Input
               id="hw-date"
               placeholder="2026-03-31"

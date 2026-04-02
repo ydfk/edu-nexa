@@ -60,7 +60,7 @@ import {
 import DailyHomeworkBoard from "./daily-homework-board";
 
 // ---------------------------------------------------------------------------
-// Constants & types
+// 常量与类型
 // ---------------------------------------------------------------------------
 
 type DailyHomeworkDialogType = "create" | "edit";
@@ -72,10 +72,33 @@ const initialForm = {
   remark: "",
   schoolId: "",
   serviceDate: "",
+  subject: "",
 };
 
+function findHomeworkClass(
+  item: DailyHomeworkItem,
+  schools: SchoolItem[],
+  classes: ClassItem[],
+) {
+  const school =
+    schools.find((entry) => entry.id === item.schoolId) ||
+    schools.find((entry) => entry.name === item.schoolName);
+  const matchedByID = classes.find((entry) => entry.id === item.classId);
+  if (matchedByID) {
+    return matchedByID;
+  }
+
+  const candidates = classes.filter(
+    (entry) =>
+      entry.name === item.className &&
+      (!item.gradeName || entry.gradeName === item.gradeName) &&
+      ((school?.id && entry.schoolId === school.id) || entry.schoolName === item.schoolName),
+  );
+  return candidates.length === 1 ? candidates[0] : undefined;
+}
+
 // ---------------------------------------------------------------------------
-// Context – dialog state provider (shadcn-admin pattern)
+// 上下文与弹窗状态
 // ---------------------------------------------------------------------------
 
 type DailyHomeworkContextValue = {
@@ -97,7 +120,7 @@ function useDailyHomework() {
 }
 
 // ---------------------------------------------------------------------------
-// Column definitions
+// 列定义
 // ---------------------------------------------------------------------------
 
 const columns: ColumnDef<DailyHomeworkItem>[] = [
@@ -175,7 +198,7 @@ const columns: ColumnDef<DailyHomeworkItem>[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// Daily homework form dialog
+// 每日作业表单弹窗
 // ---------------------------------------------------------------------------
 
 function DailyHomeworkFormDialog() {
@@ -189,10 +212,10 @@ function DailyHomeworkFormDialog() {
 
   useEffect(() => {
     if (isEdit && currentItem) {
-      const school = schools.find((entry) => entry.name === currentItem.schoolName);
-      const classItem = classes.find(
-        (entry) => entry.schoolName === currentItem.schoolName && entry.name === currentItem.className,
-      );
+      const school =
+        schools.find((entry) => entry.id === currentItem.schoolId) ||
+        schools.find((entry) => entry.name === currentItem.schoolName);
+      const classItem = findHomeworkClass(currentItem, schools, classes);
       setForm({
         classId: classItem?.id || "",
         content: currentItem.content,
@@ -200,32 +223,34 @@ function DailyHomeworkFormDialog() {
         remark: currentItem.remark,
         schoolId: school?.id || "",
         serviceDate: currentItem.serviceDate,
+        subject: currentItem.subject || "",
       });
     } else if (open === "create") {
-      setForm({
-        ...initialForm,
-        schoolId: schools[0]?.id || "",
-      });
+      setForm(initialForm);
     }
   }, [open, currentItem, isEdit, schools, classes]);
 
   async function handleSave() {
     const school = schools.find((item) => item.id === form.schoolId);
     const classItem = classes.find((item) => item.id === form.classId);
-    if (!school || !classItem || !form.serviceDate.trim()) {
-      toast.error("学校、班级、日期不能为空");
+    if (!school || !classItem || !form.serviceDate.trim() || !form.subject.trim()) {
+      toast.error("学校、年级、班级、日期、科目不能为空");
       return;
     }
 
     setSaving(true);
     try {
       await saveDailyHomework({
+        classId: classItem.id,
         className: classItem.name,
         content: form.content.trim(),
+        gradeName: classItem.gradeName,
         id: form.id || undefined,
         remark: form.remark.trim(),
+        schoolId: school.id,
         schoolName: school.name,
         serviceDate: form.serviceDate.trim(),
+        subject: form.subject.trim(),
         teacherId: session.user?.id || "",
         teacherName: session.user?.displayName || "",
       });
@@ -247,7 +272,7 @@ function DailyHomeworkFormDialog() {
         </DialogHeader>
         <div className="grid gap-4 py-2 md:grid-cols-2">
           <div className="grid gap-2 md:col-span-2">
-            <Label>学校 / 班级</Label>
+            <Label required>学校 / 年级 / 班级</Label>
             <SchoolClassCascader
               schools={schools}
               classes={classes}
@@ -259,13 +284,24 @@ function DailyHomeworkFormDialog() {
             />
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="hw-service-date">日期</Label>
+            <Label htmlFor="hw-service-date" required>日期</Label>
             <Input
               id="hw-service-date"
               placeholder="2026-03-31"
               value={form.serviceDate}
               onChange={(event) =>
                 setForm((current) => ({ ...current, serviceDate: event.target.value }))
+              }
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="hw-subject" required>科目</Label>
+            <Input
+              id="hw-subject"
+              placeholder="例如：语文"
+              value={form.subject}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, subject: event.target.value }))
               }
             />
           </div>
@@ -301,7 +337,7 @@ function DailyHomeworkFormDialog() {
 }
 
 // ---------------------------------------------------------------------------
-// Page component
+// 页面组件
 // ---------------------------------------------------------------------------
 
 export default function DailyHomeworkPage() {
@@ -395,20 +431,20 @@ function DailyHomeworkListView() {
 
   const contextValue = useMemo<DailyHomeworkContextValue>(
     () => ({ open, setOpen, currentItem, setCurrentItem, reloadData: loadData, schools, classes }),
-    [open, setOpen, currentItem, schools, classes],
+    [open, setOpen, currentItem, schools, classes, loadData],
   );
 
   return (
     <DailyHomeworkContext.Provider value={contextValue}>
       <div>
-        {/* Header */}
+        {/* 头部操作区 */}
         <div className="mb-4 flex flex-wrap items-center justify-end gap-x-4">
           <Button className="space-x-1" onClick={() => setOpen("create")}>
             <span>新增作业</span> <Plus size={18} />
           </Button>
         </div>
 
-        {/* Data table */}
+        {/* 数据表格 */}
         <div className="flex-1 overflow-auto py-1 lg:flex-row lg:space-x-12 lg:space-y-0">
           {loading ? (
             <div className="py-8 text-center text-sm text-muted-foreground">
@@ -475,7 +511,7 @@ function DailyHomeworkListView() {
           )}
         </div>
 
-        {/* Dialogs */}
+        {/* 弹窗 */}
         <DailyHomeworkFormDialog />
       </div>
     </DailyHomeworkContext.Provider>

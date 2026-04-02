@@ -12,6 +12,7 @@ import (
 	"github.com/ydfk/edu-nexa/apps/api/internal/api/homeworkrecord"
 	"github.com/ydfk/edu-nexa/apps/api/internal/api/mealrecord"
 	"github.com/ydfk/edu-nexa/apps/api/internal/api/overview"
+	"github.com/ydfk/edu-nexa/apps/api/internal/api/paymentrecord"
 	"github.com/ydfk/edu-nexa/apps/api/internal/api/runtimeconfig"
 	"github.com/ydfk/edu-nexa/apps/api/internal/api/school"
 	"github.com/ydfk/edu-nexa/apps/api/internal/api/serviceday"
@@ -21,6 +22,7 @@ import (
 	"github.com/ydfk/edu-nexa/apps/api/internal/api/upload"
 	"github.com/ydfk/edu-nexa/apps/api/internal/api/usermanagement"
 	"github.com/ydfk/edu-nexa/apps/api/internal/middleware"
+	"github.com/ydfk/edu-nexa/apps/api/internal/service"
 	"github.com/ydfk/edu-nexa/apps/api/pkg/config"
 	"github.com/ydfk/edu-nexa/apps/api/pkg/logger"
 
@@ -58,11 +60,23 @@ func api() {
 		ErrorHandler: func(c *fiber.Ctx, err error) error {
 			logger.Error("JWT 验证失败: %v", err)
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-				"code":    fiber.StatusUnauthorized,
-				"message": "认证失败，请先登录",
+				"code": fiber.StatusUnauthorized,
+				"flag": false,
+				"msg":  "认证失败，请先登录",
 			})
 		},
 	}))
+	protectedAPI.Use(func(c *fiber.Ctx) error {
+		if _, err := service.CurrentUser(c); err != nil {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"code": fiber.StatusUnauthorized,
+				"flag": false,
+				"msg":  err.Error(),
+			})
+		}
+
+		return c.Next()
+	})
 
 	auth.RegisterRoutes(protectedAPI)
 	overview.RegisterRoutes(protectedAPI)
@@ -75,6 +89,7 @@ func api() {
 	teacher.RegisterRoutes(protectedAPI)
 	usermanagement.RegisterRoutes(protectedAPI)
 	studentservice.RegisterRoutes(protectedAPI)
+	paymentrecord.RegisterRoutes(protectedAPI)
 	runtimeconfig.RegisterRoutes(protectedAPI)
 	serviceday.RegisterRoutes(protectedAPI)
 	homeworkassignment.RegisterRoutes(protectedAPI)

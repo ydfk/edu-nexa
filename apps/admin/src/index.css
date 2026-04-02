@@ -189,3 +189,25 @@
     height: 0;
   }
 }
+
+/* ── Print styles ── */
+@media print {
+  aside[data-sidebar] {
+    display: none !important;
+  }
+  header {
+    display: none !important;
+  }
+  main {
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+  body,
+  html,
+  #root {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    background: white !important;
+  }
+}

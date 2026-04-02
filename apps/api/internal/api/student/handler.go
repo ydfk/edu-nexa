@@ -5,10 +5,15 @@ import (
 	"strings"
 
 	"github.com/ydfk/edu-nexa/apps/api/internal/api/response"
+	classgroupModel "github.com/ydfk/edu-nexa/apps/api/internal/model/classgroup"
+	gradelevelModel "github.com/ydfk/edu-nexa/apps/api/internal/model/gradelevel"
+	guardianprofileModel "github.com/ydfk/edu-nexa/apps/api/internal/model/guardianprofile"
 	homeworkrecordModel "github.com/ydfk/edu-nexa/apps/api/internal/model/homeworkrecord"
 	mealrecordModel "github.com/ydfk/edu-nexa/apps/api/internal/model/mealrecord"
+	schoolModel "github.com/ydfk/edu-nexa/apps/api/internal/model/school"
 	model "github.com/ydfk/edu-nexa/apps/api/internal/model/student"
 	studentserviceModel "github.com/ydfk/edu-nexa/apps/api/internal/model/studentservice"
+	"github.com/ydfk/edu-nexa/apps/api/internal/service"
 	"github.com/ydfk/edu-nexa/apps/api/pkg/db"
 
 	"github.com/gofiber/fiber/v2"
@@ -129,8 +134,11 @@ func Create(c *fiber.Ctx) error {
 		return response.Error(c, "参数不正确")
 	}
 
-	if strings.TrimSpace(req.Name) == "" {
-		return response.Error(c, "学生姓名不能为空")
+	if err := validateStudentPayload(req); err != nil {
+		return response.Error(c, err.Error())
+	}
+	if err := ensureStudentReferencesAvailable(req, nil); err != nil {
+		return response.Error(c, err.Error())
 	}
 	if err := ensureStudentNameUnique(
 		strings.TrimSpace(req.Name),
@@ -168,13 +176,16 @@ func Update(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		return response.Error(c, "参数不正确")
 	}
-	if strings.TrimSpace(req.Name) == "" {
-		return response.Error(c, "学生姓名不能为空")
+	if err := validateStudentPayload(req); err != nil {
+		return response.Error(c, err.Error())
 	}
 
 	var student model.Student
 	if err := db.DB.First(&student, "id = ?", c.Params("id")).Error; err != nil {
 		return response.Error(c, "学生不存在")
+	}
+	if err := ensureStudentReferencesAvailable(req, &student); err != nil {
+		return response.Error(c, err.Error())
 	}
 	if err := ensureStudentNameUnique(
 		strings.TrimSpace(req.Name),
@@ -229,6 +240,28 @@ func defaultStudentStatus(status string) string {
 	return strings.TrimSpace(status)
 }
 
+func validateStudentPayload(req studentPayload) error {
+	if strings.TrimSpace(req.Name) == "" {
+		return errors.New("学生姓名不能为空")
+	}
+	if strings.TrimSpace(req.SchoolID) == "" || strings.TrimSpace(req.SchoolName) == "" {
+		return errors.New("学校不能为空")
+	}
+	if strings.TrimSpace(req.GradeID) == "" || strings.TrimSpace(req.Grade) == "" {
+		return errors.New("年级不能为空")
+	}
+	if strings.TrimSpace(req.ClassID) == "" || strings.TrimSpace(req.ClassName) == "" {
+		return errors.New("班级不能为空")
+	}
+	if strings.TrimSpace(req.GuardianID) == "" ||
+		strings.TrimSpace(req.GuardianName) == "" ||
+		strings.TrimSpace(req.GuardianPhone) == "" {
+		return errors.New("家长不能为空")
+	}
+
+	return nil
+}
+
 func ensureStudentNameUnique(name string, guardianID string, guardianPhone string, excludeID string) error {
 	if guardianID == "" && guardianPhone == "" {
 		return errors.New("家长不能为空")
@@ -279,4 +312,84 @@ func ensureStudentDeletable(student model.Student) error {
 	}
 
 	return nil
+}
+
+func ensureStudentReferencesAvailable(req studentPayload, current *model.Student) error {
+	if shouldValidateReference(req.SchoolID, currentSchoolID(current)) {
+		var school schoolModel.School
+		if err := db.DB.Select("id", "status").First(&school, "id = ?", strings.TrimSpace(req.SchoolID)).Error; err != nil {
+			return errors.New("学校不存在")
+		}
+		if !service.IsActiveStatus(school.Status) {
+			return errors.New("学校已禁用")
+		}
+	}
+
+	if shouldValidateReference(req.GradeID, currentGradeID(current)) {
+		var grade gradelevelModel.Grade
+		if err := db.DB.Select("id", "status").First(&grade, "id = ?", strings.TrimSpace(req.GradeID)).Error; err != nil {
+			return errors.New("年级不存在")
+		}
+		if !service.IsActiveStatus(grade.Status) {
+			return errors.New("年级已禁用")
+		}
+	}
+
+	if shouldValidateReference(req.ClassID, currentClassID(current)) {
+		var classItem classgroupModel.Class
+		if err := db.DB.Select("id", "status").First(&classItem, "id = ?", strings.TrimSpace(req.ClassID)).Error; err != nil {
+			return errors.New("班级不存在")
+		}
+		if !service.IsActiveStatus(classItem.Status) {
+			return errors.New("班级已禁用")
+		}
+	}
+
+	if shouldValidateReference(req.GuardianID, currentGuardianID(current)) {
+		var guardian guardianprofileModel.Profile
+		if err := db.DB.Select("id", "status").First(&guardian, "id = ?", strings.TrimSpace(req.GuardianID)).Error; err != nil {
+			return errors.New("家长不存在")
+		}
+		if !service.IsActiveStatus(guardian.Status) {
+			return errors.New("家长已禁用")
+		}
+	}
+
+	return nil
+}
+
+func shouldValidateReference(nextID string, currentID string) bool {
+	return strings.TrimSpace(currentID) == "" || strings.TrimSpace(nextID) != strings.TrimSpace(currentID)
+}
+
+func currentSchoolID(current *model.Student) string {
+	if current == nil {
+		return ""
+	}
+
+	return current.SchoolID
+}
+
+func currentGradeID(current *model.Student) string {
+	if current == nil {
+		return ""
+	}
+
+	return current.GradeID
+}
+
+func currentClassID(current *model.Student) string {
+	if current == nil {
+		return ""
+	}
+
+	return current.ClassID
+}
+
+func currentGuardianID(current *model.Student) string {
+	if current == nil {
+		return ""
+	}
+
+	return current.GuardianID
 }

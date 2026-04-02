@@ -15,6 +15,7 @@ const runtimeScene = "app-runtime"
 type Snapshot struct {
 	SystemNamePrefix    string `json:"systemNamePrefix"`
 	HomeworkSubjects    string `json:"homeworkSubjects"`
+	PaymentTypes        string `json:"paymentTypes"`
 	ImageSecurityEnable bool   `json:"imageSecurityEnable"`
 	ImageSecurityStrict bool   `json:"imageSecurityStrict"`
 	Scene               string `json:"scene"`
@@ -24,6 +25,7 @@ type Snapshot struct {
 }
 
 const defaultHomeworkSubjects = `["语文","数学","英语","其他"]`
+const defaultPaymentTypes = `["晚餐+晚辅","打印费"]`
 
 func GetSnapshot() (*Snapshot, error) {
 	record, err := getOrCreate()
@@ -34,6 +36,7 @@ func GetSnapshot() (*Snapshot, error) {
 	return &Snapshot{
 		SystemNamePrefix:    normalizeSystemNamePrefix(record.SystemNamePrefix),
 		HomeworkSubjects:    normalizeHomeworkSubjects(record.HomeworkSubjects),
+		PaymentTypes:        normalizePaymentTypes(record.PaymentTypes),
 		ImageSecurityEnable: record.ImageSecurityEnable,
 		ImageSecurityStrict: record.ImageSecurityStrict,
 		Scene:               record.Scene,
@@ -51,6 +54,7 @@ func SaveSnapshot(snapshot *Snapshot) (*Snapshot, error) {
 
 	record.SystemNamePrefix = normalizeSystemNamePrefix(snapshot.SystemNamePrefix)
 	record.HomeworkSubjects = normalizeHomeworkSubjects(snapshot.HomeworkSubjects)
+	record.PaymentTypes = normalizePaymentTypes(snapshot.PaymentTypes)
 	record.ImageSecurityEnable = snapshot.ImageSecurityEnable
 	record.ImageSecurityStrict = snapshot.ImageSecurityStrict
 	record.TextSecurityEnable = snapshot.TextSecurityEnable
@@ -106,6 +110,14 @@ func normalizeHomeworkSubjects(subjects string) string {
 	trimmed := strings.TrimSpace(subjects)
 	if trimmed == "" || trimmed == "[]" {
 		return defaultHomeworkSubjects
+	}
+	return trimmed
+}
+
+func normalizePaymentTypes(raw string) string {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" || trimmed == "[]" {
+		return defaultPaymentTypes
 	}
 	return trimmed
 }
