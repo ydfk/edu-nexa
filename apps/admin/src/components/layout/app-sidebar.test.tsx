@@ -3,7 +3,7 @@ import { MemoryRouter } from "react-router-dom";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "./app-sidebar";
 
-test("shows product navigation entries", () => {
+test("shows product navigation entries without statistics board", () => {
   window.localStorage.setItem(
     "edunexa.admin.session.v1",
     JSON.stringify({
@@ -26,7 +26,7 @@ test("shows product navigation entries", () => {
   );
 
   expect(screen.getByText("工作台")).toBeInTheDocument();
-  expect(screen.getByText("统计看板")).toBeInTheDocument();
+  expect(screen.queryByText("统计看板")).not.toBeInTheDocument();
   expect(screen.getByText("教师管理")).toBeInTheDocument();
   expect(screen.getByText("学校管理")).toBeInTheDocument();
   expect(screen.getByText("家长管理")).toBeInTheDocument();

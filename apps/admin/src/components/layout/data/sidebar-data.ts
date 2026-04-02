@@ -1,5 +1,4 @@
 import {
-  BarChart3,
   BookOpenCheck,
   CalendarRange,
   ClipboardList,
@@ -34,12 +33,7 @@ export function buildSidebarData(
     navGroups: [
       {
         title: "概览",
-        items: [
-          { title: "工作台", url: "/", icon: LayoutDashboard },
-          ...(isAdminOrTeacher
-            ? [{ title: "统计看板", url: "/statistics", icon: BarChart3 }]
-            : []),
-        ],
+        items: [{ title: "工作台", url: "/", icon: LayoutDashboard }],
       },
       {
         title: "管理",

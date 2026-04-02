@@ -17,4 +17,5 @@ type Assignment struct {
 	Remark      string `gorm:"size:255" json:"remark"`
 	TeacherID   string `gorm:"size:36" json:"teacherId"`
 	TeacherName string `gorm:"size:32" json:"teacherName"`
+	Items       []Item `gorm:"foreignKey:AssignmentID" json:"items"`
 }

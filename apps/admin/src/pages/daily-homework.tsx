@@ -57,6 +57,7 @@ import {
   type DailyHomeworkItem,
   type SchoolItem,
 } from "@/lib/server-data";
+import { findHomeworkClass, getHomeworkContentLines } from "./daily-homework-helpers";
 import DailyHomeworkBoard from "./daily-homework-board";
 
 // ---------------------------------------------------------------------------
@@ -74,28 +75,6 @@ const initialForm = {
   serviceDate: "",
   subject: "",
 };
-
-function findHomeworkClass(
-  item: DailyHomeworkItem,
-  schools: SchoolItem[],
-  classes: ClassItem[],
-) {
-  const school =
-    schools.find((entry) => entry.id === item.schoolId) ||
-    schools.find((entry) => entry.name === item.schoolName);
-  const matchedByID = classes.find((entry) => entry.id === item.classId);
-  if (matchedByID) {
-    return matchedByID;
-  }
-
-  const candidates = classes.filter(
-    (entry) =>
-      entry.name === item.className &&
-      (!item.gradeName || entry.gradeName === item.gradeName) &&
-      ((school?.id && entry.schoolId === school.id) || entry.schoolName === item.schoolName),
-  );
-  return candidates.length === 1 ? candidates[0] : undefined;
-}
 
 // ---------------------------------------------------------------------------
 // 上下文与弹窗状态
@@ -144,7 +123,9 @@ const columns: ColumnDef<DailyHomeworkItem>[] = [
     accessorKey: "content",
     header: ({ column }) => <DataTableColumnHeader column={column} title="作业内容" />,
     cell: ({ row }) => (
-      <LongText className="max-w-[300px]">{row.getValue("content") || "-"}</LongText>
+      <LongText className="max-w-[300px]">
+        {getHomeworkContentLines(row.original).join("\n") || "-"}
+      </LongText>
     ),
     enableSorting: false,
   },
@@ -218,7 +199,7 @@ function DailyHomeworkFormDialog() {
       const classItem = findHomeworkClass(currentItem, schools, classes);
       setForm({
         classId: classItem?.id || "",
-        content: currentItem.content,
+        content: getHomeworkContentLines(currentItem).join("\n"),
         id: currentItem.id,
         remark: currentItem.remark,
         schoolId: school?.id || "",
@@ -238,14 +219,19 @@ function DailyHomeworkFormDialog() {
       return;
     }
 
+    const contentLines = form.content
+      .split("\n")
+      .map((item) => item.trim())
+      .filter(Boolean);
     setSaving(true);
     try {
       await saveDailyHomework({
         classId: classItem.id,
         className: classItem.name,
-        content: form.content.trim(),
+        content: contentLines.join("\n"),
         gradeName: classItem.gradeName,
         id: form.id || undefined,
+        items: contentLines.map((item) => ({ content: item })),
         remark: form.remark.trim(),
         schoolId: school.id,
         schoolName: school.name,

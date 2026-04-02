@@ -1,6 +1,5 @@
 import type { LucideIcon } from "lucide-react";
 import {
-  BarChart3,
   BookOpenCheck,
   CalendarRange,
   ClipboardList,
@@ -27,19 +26,13 @@ type AppNavGroup = {
 
 export const appNavigation: AppNavGroup[] = [
   {
-    title: "统计",
+    title: "概览",
     items: [
       {
         href: "/",
         icon: LayoutDashboard,
         label: "工作台",
         roles: ["admin", "teacher", "guardian"],
-      },
-      {
-        href: "/statistics",
-        icon: BarChart3,
-        label: "统计看板",
-        roles: ["admin", "teacher"],
       },
     ],
   },

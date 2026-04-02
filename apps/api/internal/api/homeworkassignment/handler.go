@@ -13,7 +13,12 @@ import (
 	"github.com/ydfk/edu-nexa/apps/api/pkg/db"
 
 	"github.com/gofiber/fiber/v2"
+	"gorm.io/gorm"
 )
+
+type assignmentItemPayload struct {
+	Content string `json:"content"`
+}
 
 type assignmentPayload struct {
 	CampusID    string `json:"campusId"`
@@ -21,6 +26,7 @@ type assignmentPayload struct {
 	ClassName   string `json:"className"`
 	Subject     string `json:"subject"`
 	Content     string `json:"content"`
+	Items       []assignmentItemPayload `json:"items"`
 	Attachments string `json:"attachments"`
 	Remark      string `json:"remark"`
 	SchoolID    string `json:"schoolId"`
@@ -33,7 +39,11 @@ type assignmentPayload struct {
 
 func List(c *fiber.Ctx) error {
 	var assignments []model.Assignment
-	query := db.DB.Order("service_date desc, created_at desc")
+	query := db.DB.
+		Preload("Items", func(tx *gorm.DB) *gorm.DB {
+			return tx.Order("sort asc, created_at asc")
+		}).
+		Order("service_date desc, created_at desc")
 
 	if schoolName := strings.TrimSpace(c.Query("schoolName")); schoolName != "" {
 		query = query.Where("school_name = ?", schoolName)
@@ -61,7 +71,12 @@ func List(c *fiber.Ctx) error {
 		return response.Error(c, "查询每日作业失败")
 	}
 
-	return response.Success(c, assignments)
+	items := make([]fiber.Map, 0, len(assignments))
+	for _, assignment := range assignments {
+		items = append(items, buildAssignmentPayload(assignment))
+	}
+
+	return response.Success(c, items)
 }
 
 func Create(c *fiber.Ctx) error {
@@ -71,10 +86,12 @@ func Create(c *fiber.Ctx) error {
 	}
 
 	serviceDate := strings.TrimSpace(req.ServiceDate)
-	if err := validateAssignmentPayload(req, serviceDate); err != nil {
+	itemContents := normalizeAssignmentItems(req.Items, req.Content)
+	if err := validateAssignmentPayload(req, serviceDate, itemContents); err != nil {
 		return response.Error(c, err.Error(), fiber.StatusBadRequest)
 	}
-	if err := contentsafety.CheckText(req.Content + "\n" + req.Remark); err != nil {
+	content := joinAssignmentContent(itemContents)
+	if err := contentsafety.CheckText(content + "\n" + req.Remark); err != nil {
 		return response.Error(c, err.Error())
 	}
 	classInfo, err := resolveAssignmentClass(req)
@@ -93,7 +110,7 @@ func Create(c *fiber.Ctx) error {
 		ClassID:     classInfo.ClassID,
 		ClassName:   classInfo.ClassName,
 		Subject:     strings.TrimSpace(req.Subject),
-		Content:     strings.TrimSpace(req.Content),
+		Content:     content,
 		Attachments: strings.TrimSpace(req.Attachments),
 		Remark:      strings.TrimSpace(req.Remark),
 		SchoolID:    classInfo.SchoolID,
@@ -104,11 +121,20 @@ func Create(c *fiber.Ctx) error {
 		TeacherName: strings.TrimSpace(req.TeacherName),
 	}
 
-	if err := db.DB.Create(&assignment).Error; err != nil {
+	if err := db.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&assignment).Error; err != nil {
+			return err
+		}
+		if err := replaceAssignmentItems(tx, assignment.Id.String(), itemContents); err != nil {
+			return err
+		}
+		assignment.Items = buildAssignmentItems(assignment.Id.String(), itemContents)
+		return nil
+	}); err != nil {
 		return response.Error(c, "创建每日作业失败")
 	}
 
-	return response.Success(c, assignment)
+	return response.Success(c, buildAssignmentPayload(assignment))
 }
 
 func Update(c *fiber.Ctx) error {
@@ -121,12 +147,14 @@ func Update(c *fiber.Ctx) error {
 	if err := db.DB.First(&assignment, "id = ?", c.Params("id")).Error; err != nil {
 		return response.Error(c, "每日作业不存在")
 	}
-	if err := contentsafety.CheckText(req.Content + "\n" + req.Remark); err != nil {
-		return response.Error(c, err.Error())
-	}
 	serviceDate := strings.TrimSpace(req.ServiceDate)
-	if err := validateAssignmentPayload(req, serviceDate); err != nil {
+	itemContents := normalizeAssignmentItems(req.Items, req.Content)
+	if err := validateAssignmentPayload(req, serviceDate, itemContents); err != nil {
 		return response.Error(c, err.Error(), fiber.StatusBadRequest)
+	}
+	content := joinAssignmentContent(itemContents)
+	if err := contentsafety.CheckText(content + "\n" + req.Remark); err != nil {
+		return response.Error(c, err.Error())
 	}
 	classInfo, err := resolveAssignmentClass(req)
 	if err != nil {
@@ -142,7 +170,7 @@ func Update(c *fiber.Ctx) error {
 	assignment.ClassID = classInfo.ClassID
 	assignment.ClassName = classInfo.ClassName
 	assignment.Subject = strings.TrimSpace(req.Subject)
-	assignment.Content = strings.TrimSpace(req.Content)
+	assignment.Content = content
 	assignment.Attachments = strings.TrimSpace(req.Attachments)
 	assignment.Remark = strings.TrimSpace(req.Remark)
 	assignment.SchoolID = classInfo.SchoolID
@@ -152,11 +180,20 @@ func Update(c *fiber.Ctx) error {
 	assignment.TeacherID = strings.TrimSpace(req.TeacherID)
 	assignment.TeacherName = strings.TrimSpace(req.TeacherName)
 
-	if err := db.DB.Save(&assignment).Error; err != nil {
+	if err := db.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Save(&assignment).Error; err != nil {
+			return err
+		}
+		if err := replaceAssignmentItems(tx, assignment.Id.String(), itemContents); err != nil {
+			return err
+		}
+		assignment.Items = buildAssignmentItems(assignment.Id.String(), itemContents)
+		return nil
+	}); err != nil {
 		return response.Error(c, "更新每日作业失败")
 	}
 
-	return response.Success(c, assignment)
+	return response.Success(c, buildAssignmentPayload(assignment))
 }
 
 func Delete(c *fiber.Ctx) error {
@@ -165,7 +202,12 @@ func Delete(c *fiber.Ctx) error {
 		return response.Error(c, "每日作业不存在")
 	}
 
-	if err := db.DB.Delete(&assignment).Error; err != nil {
+	if err := db.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("assignment_id = ?", assignment.Id.String()).Delete(&model.Item{}).Error; err != nil {
+			return err
+		}
+		return tx.Delete(&assignment).Error
+	}); err != nil {
 		return response.Error(c, "删除每日作业失败")
 	}
 
@@ -181,14 +223,14 @@ type assignmentClassInfo struct {
 	Status     string
 }
 
-func validateAssignmentPayload(req assignmentPayload, serviceDate string) error {
+func validateAssignmentPayload(req assignmentPayload, serviceDate string, itemContents []string) error {
 	if serviceDate == "" {
 		return errors.New("日期不能为空")
 	}
 	if strings.TrimSpace(req.Subject) == "" {
 		return errors.New("科目不能为空")
 	}
-	if strings.TrimSpace(req.Content) == "" {
+	if len(itemContents) == 0 {
 		return errors.New("作业内容不能为空")
 	}
 	if strings.TrimSpace(req.ClassID) == "" &&
@@ -295,4 +337,93 @@ func ensureAssignmentUnique(serviceDate string, subject string, classInfo assign
 		}
 	}
 	return nil
+}
+
+func normalizeAssignmentItems(items []assignmentItemPayload, fallbackContent string) []string {
+	results := make([]string, 0, len(items))
+	for _, item := range items {
+		content := strings.TrimSpace(item.Content)
+		if content == "" {
+			continue
+		}
+		results = append(results, content)
+	}
+	if len(results) > 0 {
+		return results
+	}
+
+	lines := strings.Split(fallbackContent, "\n")
+	results = make([]string, 0, len(lines))
+	for _, line := range lines {
+		content := strings.TrimSpace(line)
+		if content == "" {
+			continue
+		}
+		results = append(results, content)
+	}
+	return results
+}
+
+func joinAssignmentContent(items []string) string {
+	return strings.Join(items, "\n")
+}
+
+func buildAssignmentItems(assignmentID string, itemContents []string) []model.Item {
+	items := make([]model.Item, 0, len(itemContents))
+	for index, itemContent := range itemContents {
+		items = append(items, model.Item{
+			AssignmentID: assignmentID,
+			Sort:         index + 1,
+			Content:      itemContent,
+		})
+	}
+	return items
+}
+
+func replaceAssignmentItems(tx *gorm.DB, assignmentID string, itemContents []string) error {
+	if err := tx.Where("assignment_id = ?", assignmentID).Delete(&model.Item{}).Error; err != nil {
+		return err
+	}
+	items := buildAssignmentItems(assignmentID, itemContents)
+	if len(items) == 0 {
+		return nil
+	}
+	return tx.Create(&items).Error
+}
+
+func buildAssignmentPayload(assignment model.Assignment) fiber.Map {
+	items := assignment.Items
+	if len(items) == 0 {
+		items = buildAssignmentItems(assignment.Id.String(), normalizeAssignmentItems(nil, assignment.Content))
+	}
+
+	payloadItems := make([]fiber.Map, 0, len(items))
+	for _, item := range items {
+		payloadItems = append(payloadItems, fiber.Map{
+			"id":           item.Id,
+			"assignmentId": item.AssignmentID,
+			"sort":         item.Sort,
+			"content":      item.Content,
+		})
+	}
+
+	return fiber.Map{
+		"id":          assignment.Id,
+		"campusId":    assignment.CampusID,
+		"classId":     assignment.ClassID,
+		"className":   assignment.ClassName,
+		"subject":     assignment.Subject,
+		"content":     assignment.Content,
+		"items":       payloadItems,
+		"attachments": assignment.Attachments,
+		"remark":      assignment.Remark,
+		"schoolId":    assignment.SchoolID,
+		"schoolName":  assignment.SchoolName,
+		"gradeName":   assignment.GradeName,
+		"serviceDate": assignment.ServiceDate,
+		"teacherId":   assignment.TeacherID,
+		"teacherName": assignment.TeacherName,
+		"createdAt":   assignment.CreatedAt,
+		"updatedAt":   assignment.UpdatedAt,
+	}
 }

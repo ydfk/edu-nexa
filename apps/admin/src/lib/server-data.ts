@@ -121,6 +121,7 @@ export type MealRecordItem = {
 };
 
 export type HomeworkRecordItem = {
+  assignmentId: string;
   className: string;
   id: string;
   imageUrls: string[];
@@ -132,7 +133,15 @@ export type HomeworkRecordItem = {
   status: string;
   studentId: string;
   studentName: string;
+  subject: string;
   subjectSummary: string;
+};
+
+export type HomeworkContentItem = {
+  assignmentId: string;
+  content: string;
+  id: string;
+  sort: number;
 };
 
 export type DailyHomeworkItem = {
@@ -142,6 +151,7 @@ export type DailyHomeworkItem = {
   content: string;
   gradeName: string;
   id: string;
+  items?: HomeworkContentItem[];
   remark: string;
   schoolId: string;
   schoolName: string;
@@ -428,6 +438,7 @@ export async function fetchHomeworkRecords(query?: ListQuery) {
 }
 
 export async function saveHomeworkRecord(input: {
+  assignmentId?: string;
   className: string;
   id?: string;
   imageUrls: string[];
@@ -439,6 +450,7 @@ export async function saveHomeworkRecord(input: {
   status: string;
   studentId: string;
   studentName: string;
+  subject?: string;
   subjectSummary: string;
 }) {
   const path = input.id ? `/api/homework-records/${input.id}` : "/api/homework-records";
@@ -465,6 +477,7 @@ export async function saveDailyHomework(input: {
   content: string;
   gradeName: string;
   id?: string;
+  items?: Array<{ content: string }>;
   remark: string;
   schoolId: string;
   schoolName: string;

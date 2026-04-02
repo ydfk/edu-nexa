@@ -16,6 +16,7 @@ import {
   type DailyHomeworkItem,
   type StudentItem,
 } from "@/lib/server-data";
+import { getHomeworkContentLines } from "./daily-homework-helpers";
 
 // ---------------------------------------------------------------------------
 // 类型
@@ -43,7 +44,7 @@ function groupBySubjectOrdered(
   for (const item of items) {
     const key = item.subject || "未分类";
     if (!map.has(key)) map.set(key, []);
-    map.get(key)!.push(...item.content.split("\n").filter(Boolean));
+    map.get(key)!.push(...getHomeworkContentLines(item));
   }
 
   const result: SubjectGroup[] = [];

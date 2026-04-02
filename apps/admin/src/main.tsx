@@ -18,7 +18,6 @@ import MealRecordsPage from "@/pages/meal-records";
 import HomeworkRecordsPage from "@/pages/homework-records";
 import PaymentsPage from "@/pages/payments";
 import ServiceCalendarPage from "@/pages/service-calendar";
-import StatisticsPage from "@/pages/statistics";
 import TeachersPage from "@/pages/teachers";
 import LoginPage from "@/pages/login";
 import NotFoundPage from "@/pages/errors/not-found";
@@ -38,14 +37,6 @@ const router = createBrowserRouter([
         element: <Layout />,
         children: [
           { index: true, element: <DashboardPage /> },
-          {
-            path: "statistics",
-            element: (
-              <RequireRoles allowedRoles={["admin", "teacher"]}>
-                <StatisticsPage />
-              </RequireRoles>
-            ),
-          },
           {
             path: "teachers",
             element: (

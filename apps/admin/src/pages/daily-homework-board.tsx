@@ -63,6 +63,7 @@ import {
   type SchoolItem,
   type ServiceDayItem,
 } from "@/lib/server-data";
+import { findHomeworkClass, getHomeworkContentLines } from "./daily-homework-helpers";
 
 // ---------------------------------------------------------------------------
 // 类型
@@ -89,28 +90,6 @@ const emptyForm: HomeworkFormState = {
   schoolId: "",
   subject: "",
 };
-
-function findHomeworkClass(
-  item: DailyHomeworkItem,
-  schools: SchoolItem[],
-  classes: ClassItem[],
-) {
-  const school =
-    schools.find((entry) => entry.id === item.schoolId) ||
-    schools.find((entry) => entry.name === item.schoolName);
-  const matchedByID = classes.find((entry) => entry.id === item.classId);
-  if (matchedByID) {
-    return matchedByID;
-  }
-
-  const candidates = classes.filter(
-    (entry) =>
-      entry.name === item.className &&
-      (!item.gradeName || entry.gradeName === item.gradeName) &&
-      ((school?.id && entry.schoolId === school.id) || entry.schoolName === item.schoolName),
-  );
-  return candidates.length === 1 ? candidates[0] : undefined;
-}
 
 type HomeworkGroup = {
   key: string;
@@ -204,10 +183,7 @@ function HomeworkFormDialog({
         schools.find((entry) => entry.name === editItem.schoolName);
       const cls = findHomeworkClass(editItem, schools, classes);
       // 将 content 解析为多条（按换行符分割）
-      const lines = editItem.content
-        .split("\n")
-        .map((t) => t.trim())
-        .filter(Boolean);
+      const lines = getHomeworkContentLines(editItem);
       setForm({
         attachments: parseAttachments(editItem.attachments),
         classId: cls?.id || "",
@@ -253,6 +229,7 @@ function HomeworkFormDialog({
         content: contentLines.join("\n"),
         gradeName: cls.gradeName,
         id: form.id || undefined,
+        items: contentLines.map((item) => ({ content: item })),
         remark: form.remark.trim(),
         schoolId: school.id,
         schoolName: school.name,
@@ -428,7 +405,7 @@ function HomeworkCard({
   showLocation?: boolean;
 }) {
   const attachments = useMemo(() => parseAttachments(item.attachments), [item.attachments]);
-  const contentLines = item.content.split("\n").filter(Boolean);
+  const contentLines = getHomeworkContentLines(item);
 
   return (
     <div className="rounded-lg border bg-card p-4 shadow-sm">

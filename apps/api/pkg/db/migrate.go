@@ -38,6 +38,7 @@ func autoMigrate() error {
 		&paymentrecordModel.Record{},
 		&servicedayModel.Day{},
 		&homeworkassignmentModel.Assignment{},
+		&homeworkassignmentModel.Item{},
 		&mealrecordModel.Record{},
 		&homeworkrecordModel.Record{},
 	); err != nil {
@@ -53,8 +54,14 @@ func autoMigrate() error {
 	if err := migrateLegacyPaymentRecords(); err != nil {
 		return err
 	}
+	if err := migrateLegacyHomeworkAssignmentItems(); err != nil {
+		return err
+	}
+	if err := migrateLegacyRecords(); err != nil {
+		return err
+	}
 
-	return migrateLegacyRecords()
+	return backfillHomeworkRecordAssignments()
 }
 
 func migrateLegacyProfiles() error {
@@ -238,4 +245,152 @@ func migrateLegacyPaymentRecords() error {
 	}
 
 	return nil
+}
+
+func migrateLegacyHomeworkAssignmentItems() error {
+	migrator := DB.Migrator()
+	if !migrator.HasTable(&homeworkassignmentModel.Assignment{}) || !migrator.HasTable(homeworkassignmentModel.Item{}.TableName()) {
+		return nil
+	}
+
+	var assignments []homeworkassignmentModel.Assignment
+	if err := DB.Unscoped().Find(&assignments).Error; err != nil {
+		return err
+	}
+
+	for _, assignment := range assignments {
+		var count int64
+		if err := DB.Unscoped().
+			Model(&homeworkassignmentModel.Item{}).
+			Where("assignment_id = ?", assignment.Id.String()).
+			Count(&count).Error; err != nil {
+			return err
+		}
+		if count > 0 {
+			continue
+		}
+
+		lines := splitLegacyHomeworkContent(assignment.Content)
+		if len(lines) == 0 {
+			continue
+		}
+
+		items := buildHomeworkAssignmentItems(assignment.Id.String(), lines)
+		if err := DB.Create(&items).Error; err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func backfillHomeworkRecordAssignments() error {
+	migrator := DB.Migrator()
+	if !migrator.HasTable(homeworkrecordModel.Record{}.TableName()) || !migrator.HasTable(&homeworkassignmentModel.Assignment{}) {
+		return nil
+	}
+
+	var records []homeworkrecordModel.Record
+	if err := DB.Find(&records).Error; err != nil {
+		return err
+	}
+
+	for _, record := range records {
+		if strings.TrimSpace(record.Subject) != "" && strings.TrimSpace(record.AssignmentID) != "" {
+			continue
+		}
+
+		var student studentModel.Student
+		if err := DB.Select("id", "school_name", "class_id", "class_name", "grade").First(&student, "id = ?", record.StudentID).Error; err != nil {
+			continue
+		}
+
+		assignment, ok := matchLegacyHomeworkAssignment(record, student)
+		if !ok {
+			continue
+		}
+
+		updates := map[string]interface{}{}
+		if strings.TrimSpace(record.Subject) == "" {
+			updates["subject"] = assignment.Subject
+		}
+		if strings.TrimSpace(record.AssignmentID) == "" {
+			updates["assignment_id"] = assignment.Id.String()
+		}
+		if strings.TrimSpace(record.SubjectSummary) == "" {
+			updates["subject_summary"] = assignment.Content
+		}
+		if len(updates) == 0 {
+			continue
+		}
+
+		if err := DB.Model(&record).Updates(updates).Error; err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func splitLegacyHomeworkContent(content string) []string {
+	parts := strings.Split(content, "\n")
+	lines := make([]string, 0, len(parts))
+	for _, part := range parts {
+		trimmed := strings.TrimSpace(part)
+		if trimmed == "" {
+			continue
+		}
+		lines = append(lines, trimmed)
+	}
+	return lines
+}
+
+func buildHomeworkAssignmentItems(assignmentID string, lines []string) []homeworkassignmentModel.Item {
+	items := make([]homeworkassignmentModel.Item, 0, len(lines))
+	for index, line := range lines {
+		items = append(items, homeworkassignmentModel.Item{
+			AssignmentID: assignmentID,
+			Sort:         index + 1,
+			Content:      line,
+		})
+	}
+	return items
+}
+
+func matchLegacyHomeworkAssignment(record homeworkrecordModel.Record, student studentModel.Student) (homeworkassignmentModel.Assignment, bool) {
+	query := DB.Model(&homeworkassignmentModel.Assignment{}).
+		Where("service_date = ?", record.ServiceDate)
+
+	if student.ClassID != "" {
+		query = query.Where("class_id = ?", student.ClassID)
+	} else {
+		query = query.Where("school_name = ? AND class_name = ?", student.SchoolName, student.ClassName)
+	}
+
+	var candidates []homeworkassignmentModel.Assignment
+	if err := query.Find(&candidates).Error; err != nil || len(candidates) == 0 {
+		return homeworkassignmentModel.Assignment{}, false
+	}
+
+	subjectSummary := strings.TrimSpace(record.SubjectSummary)
+	subject := strings.TrimSpace(record.Subject)
+	if subject != "" {
+		for _, candidate := range candidates {
+			if strings.TrimSpace(candidate.Subject) == subject {
+				return candidate, true
+			}
+		}
+	}
+	if subjectSummary != "" {
+		for _, candidate := range candidates {
+			if strings.TrimSpace(candidate.Subject) == subjectSummary || strings.TrimSpace(candidate.Content) == subjectSummary {
+				return candidate, true
+			}
+		}
+	}
+	if len(candidates) == 1 {
+		return candidates[0], true
+	}
+
+	return homeworkassignmentModel.Assignment{}, false
 }

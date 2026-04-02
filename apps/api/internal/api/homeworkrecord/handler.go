@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/ydfk/edu-nexa/apps/api/internal/api/response"
+	assignmentModel "github.com/ydfk/edu-nexa/apps/api/internal/model/homeworkassignment"
 	model "github.com/ydfk/edu-nexa/apps/api/internal/model/homeworkrecord"
 	studentModel "github.com/ydfk/edu-nexa/apps/api/internal/model/student"
 	"github.com/ydfk/edu-nexa/apps/api/internal/service"
@@ -16,6 +17,7 @@ import (
 
 type homeworkRecordPayload struct {
 	CampusID      string   `json:"campusId"`
+	AssignmentID   string   `json:"assignmentId"`
 	ClassName      string   `json:"className"`
 	ImageURLs      []string `json:"imageUrls"`
 	RecordedBy     string   `json:"recordedBy"`
@@ -26,6 +28,7 @@ type homeworkRecordPayload struct {
 	Status         string   `json:"status"`
 	StudentID      string   `json:"studentId"`
 	StudentName    string   `json:"studentName"`
+	Subject        string   `json:"subject"`
 	SubjectSummary string   `json:"subjectSummary"`
 }
 
@@ -71,11 +74,18 @@ func Create(c *fiber.Ctx) error {
 	}
 
 	if err := validateHomeworkRecordPayload(req); err != nil {
-		return response.Error(c, err.Error())
+		return response.Error(c, err.Error(), fiber.StatusBadRequest)
 	}
 	student, err := findHomeworkStudent(req.StudentID, "")
 	if err != nil {
-		return response.Error(c, err.Error())
+		return response.Error(c, err.Error(), fiber.StatusBadRequest)
+	}
+	assignment, err := findHomeworkAssignment(req, student)
+	if err != nil {
+		return response.Error(c, err.Error(), fiber.StatusBadRequest)
+	}
+	if err := ensureHomeworkRecordUnique(student.Id.String(), req.ServiceDate, assignment.Subject, assignment.Id.String(), ""); err != nil {
+		return response.Error(c, err.Error(), fiber.StatusBadRequest)
 	}
 	if err := contentsafety.CheckText(req.Remark + "\n" + req.SubjectSummary); err != nil {
 		return response.Error(c, err.Error())
@@ -83,6 +93,7 @@ func Create(c *fiber.Ctx) error {
 
 	record := model.Record{
 		CampusID:      strings.TrimSpace(req.CampusID),
+		AssignmentID:   assignment.Id.String(),
 		ClassName:      student.ClassName,
 		ImageURLs:      strings.Join(req.ImageURLs, ","),
 		RecordedBy:     req.RecordedBy,
@@ -93,7 +104,8 @@ func Create(c *fiber.Ctx) error {
 		Status:         defaultHomeworkStatus(req.Status),
 		StudentID:      student.Id.String(),
 		StudentName:    student.Name,
-		SubjectSummary: req.SubjectSummary,
+		Subject:        assignment.Subject,
+		SubjectSummary: buildHomeworkSubjectSummary(req.SubjectSummary, assignment),
 	}
 
 	if err := db.DB.Create(&record).Error; err != nil {
@@ -114,17 +126,25 @@ func Update(c *fiber.Ctx) error {
 		return response.Error(c, "作业记录不存在")
 	}
 	if err := validateHomeworkRecordPayload(req); err != nil {
-		return response.Error(c, err.Error())
+		return response.Error(c, err.Error(), fiber.StatusBadRequest)
 	}
 	student, err := findHomeworkStudent(req.StudentID, record.StudentID)
 	if err != nil {
-		return response.Error(c, err.Error())
+		return response.Error(c, err.Error(), fiber.StatusBadRequest)
+	}
+	assignment, err := findHomeworkAssignment(req, student)
+	if err != nil {
+		return response.Error(c, err.Error(), fiber.StatusBadRequest)
+	}
+	if err := ensureHomeworkRecordUnique(student.Id.String(), req.ServiceDate, assignment.Subject, assignment.Id.String(), record.Id.String()); err != nil {
+		return response.Error(c, err.Error(), fiber.StatusBadRequest)
 	}
 	if err := contentsafety.CheckText(req.Remark + "\n" + req.SubjectSummary); err != nil {
 		return response.Error(c, err.Error())
 	}
 
 	record.CampusID = strings.TrimSpace(req.CampusID)
+	record.AssignmentID = assignment.Id.String()
 	record.ClassName = student.ClassName
 	record.ImageURLs = strings.Join(req.ImageURLs, ",")
 	record.RecordedBy = req.RecordedBy
@@ -135,7 +155,8 @@ func Update(c *fiber.Ctx) error {
 	record.Status = defaultHomeworkStatus(req.Status)
 	record.StudentID = student.Id.String()
 	record.StudentName = student.Name
-	record.SubjectSummary = req.SubjectSummary
+	record.Subject = assignment.Subject
+	record.SubjectSummary = buildHomeworkSubjectSummary(req.SubjectSummary, assignment)
 
 	if err := db.DB.Save(&record).Error; err != nil {
 		return response.Error(c, "更新作业记录失败")
@@ -160,6 +181,7 @@ func Delete(c *fiber.Ctx) error {
 func buildHomeworkRecordPayload(item model.Record) fiber.Map {
 	return fiber.Map{
 		"campusId":       item.CampusID,
+		"assignmentId":   item.AssignmentID,
 		"className":      item.ClassName,
 		"id":             item.Id,
 		"imageUrls":      splitHomeworkCommaField(item.ImageURLs),
@@ -171,6 +193,7 @@ func buildHomeworkRecordPayload(item model.Record) fiber.Map {
 		"status":         item.Status,
 		"studentId":      item.StudentID,
 		"studentName":    item.StudentName,
+		"subject":        item.Subject,
 		"subjectSummary": item.SubjectSummary,
 	}
 }
@@ -194,11 +217,12 @@ func splitHomeworkCommaField(raw string) []string {
 }
 
 func defaultHomeworkStatus(status string) string {
-	if status == "" {
+	switch strings.TrimSpace(status) {
+	case "completed", "partial", "pending":
+		return strings.TrimSpace(status)
+	default:
 		return "pending"
 	}
-
-	return status
 }
 
 func validateHomeworkRecordPayload(req homeworkRecordPayload) error {
@@ -207,6 +231,9 @@ func validateHomeworkRecordPayload(req homeworkRecordPayload) error {
 	}
 	if strings.TrimSpace(req.ServiceDate) == "" {
 		return errors.New("日期不能为空")
+	}
+	if strings.TrimSpace(req.AssignmentID) == "" && strings.TrimSpace(req.Subject) == "" {
+		return errors.New("作业科目不能为空")
 	}
 
 	return nil
@@ -222,4 +249,80 @@ func findHomeworkStudent(studentID string, currentStudentID string) (*studentMod
 	}
 
 	return &item, nil
+}
+
+func findHomeworkAssignment(req homeworkRecordPayload, student *studentModel.Student) (*assignmentModel.Assignment, error) {
+	assignmentID := strings.TrimSpace(req.AssignmentID)
+	subject := strings.TrimSpace(req.Subject)
+	serviceDate := strings.TrimSpace(req.ServiceDate)
+
+	query := db.DB.Model(&assignmentModel.Assignment{})
+	var item assignmentModel.Assignment
+
+	if assignmentID != "" {
+		if err := query.First(&item, "id = ?", assignmentID).Error; err != nil {
+			return nil, errors.New("每日作业不存在")
+		}
+	} else {
+		query = query.Where("service_date = ? AND subject = ?", serviceDate, subject)
+		if student.ClassID != "" {
+			query = query.Where("class_id = ?", student.ClassID)
+		} else {
+			query = query.Where("school_name = ? AND class_name = ?", student.SchoolName, student.ClassName)
+		}
+		if err := query.First(&item).Error; err != nil {
+			return nil, errors.New("请先创建当天该科目的每日作业")
+		}
+	}
+
+	if item.ServiceDate != serviceDate {
+		return nil, errors.New("请先创建当天该科目的每日作业")
+	}
+	if item.ClassID != "" && student.ClassID != "" && item.ClassID != student.ClassID {
+		return nil, errors.New("作业不属于当前学生班级")
+	}
+	if item.ClassID == "" && (item.SchoolName != student.SchoolName || item.ClassName != student.ClassName) {
+		return nil, errors.New("作业不属于当前学生班级")
+	}
+	if subject != "" && strings.TrimSpace(item.Subject) != subject {
+		return nil, errors.New("作业科目不匹配")
+	}
+
+	return &item, nil
+}
+
+func ensureHomeworkRecordUnique(studentID string, serviceDate string, subject string, assignmentID string, excludeID string) error {
+	var records []model.Record
+	if err := db.DB.Where("student_id = ? AND service_date = ?", studentID, serviceDate).Find(&records).Error; err != nil {
+		return errors.New("校验作业记录失败")
+	}
+
+	trimmedSubject := strings.TrimSpace(subject)
+	trimmedAssignmentID := strings.TrimSpace(assignmentID)
+	for _, item := range records {
+		if excludeID != "" && item.Id.String() == excludeID {
+			continue
+		}
+		if strings.TrimSpace(item.Subject) == trimmedSubject && trimmedSubject != "" {
+			return errors.New("同一个学生同一天同一科目只能有一条作业记录")
+		}
+		if strings.TrimSpace(item.Subject) == "" &&
+			((trimmedAssignmentID != "" && strings.TrimSpace(item.AssignmentID) == trimmedAssignmentID) ||
+				strings.TrimSpace(item.SubjectSummary) == trimmedSubject) {
+			return errors.New("同一个学生同一天同一科目只能有一条作业记录")
+		}
+	}
+
+	return nil
+}
+
+func buildHomeworkSubjectSummary(raw string, assignment *assignmentModel.Assignment) string {
+	summary := strings.TrimSpace(raw)
+	if summary != "" {
+		return summary
+	}
+	if assignment == nil {
+		return ""
+	}
+	return strings.TrimSpace(assignment.Content)
 }
