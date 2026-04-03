@@ -1,0 +1,110 @@
+<view class="page page--no-pad safe-bottom">
+  <!-- 日期导航 -->
+  <view class="date-nav mx-lg mt-sm">
+    <view class="date-nav__arrow" bindtap="prevDay">
+      <van-icon name="arrow-left" />
+    </view>
+    <view class="date-nav__text" bindtap="openCalendar">{{dateDisplay}}</view>
+    <view class="date-nav__arrow" bindtap="nextDay">
+      <van-icon name="arrow" />
+    </view>
+  </view>
+
+  <!-- Tab 切换 -->
+  <van-tabs active="{{activeTab}}" bind:change="onTabChange" color="#07C160" title-active-color="#07C160">
+    <van-tab title="用餐记录">
+      <!-- 筛选 -->
+      <view class="records-filter px-lg" wx:if="{{showFilter}}">
+        <van-dropdown-menu active-color="#07C160">
+          <van-dropdown-item value="{{mealStatus}}" options="{{statusOptions}}" bind:change="onMealStatusChange" />
+        </van-dropdown-menu>
+      </view>
+
+      <!-- 列表 -->
+      <view class="px-lg mt-sm">
+        <view class="list" wx:if="{{mealRecords.length > 0}}">
+          <view
+            class="record-card"
+            wx:for="{{mealRecords}}"
+            wx:key="id"
+            bindtap="goMealEdit"
+            data-id="{{item.id}}"
+          >
+            <view class="record-card__header">
+              <text class="record-card__name">{{item.studentName}}</text>
+              <view class="tag tag--{{item.tagType}}">{{item.statusText}}</view>
+            </view>
+            <view class="record-card__meta">
+              <text>{{item.schoolName}} {{item.className}}</text>
+            </view>
+            <view class="record-card__images" wx:if="{{item.imageUrls && item.imageUrls.length > 0}}">
+              <image
+                wx:for="{{item.imageUrls}}"
+                wx:for-item="img"
+                wx:key="*this"
+                src="{{img}}"
+                mode="aspectFill"
+                class="record-card__thumb"
+              />
+            </view>
+            <view class="record-card__remark text-sm text-secondary mt-xs" wx:if="{{item.remark}}">
+              {{item.remark}}
+            </view>
+          </view>
+        </view>
+        <van-empty wx:else description="暂无用餐记录" image="search" />
+      </view>
+    </van-tab>
+
+    <van-tab title="作业记录">
+      <view class="px-lg mt-sm">
+        <view class="list" wx:if="{{homeworkRecords.length > 0}}">
+          <view
+            class="record-card"
+            wx:for="{{homeworkRecords}}"
+            wx:key="id"
+            bindtap="goHomeworkEdit"
+            data-id="{{item.id}}"
+          >
+            <view class="record-card__header">
+              <text class="record-card__name">{{item.studentName}}</text>
+              <view class="tag tag--{{item.tagType}}">{{item.statusText}}</view>
+            </view>
+            <view class="record-card__meta">
+              <text>{{item.schoolName}} {{item.className}}</text>
+              <text wx:if="{{item.subject}}"> · {{item.subject}}</text>
+            </view>
+            <view class="record-card__images" wx:if="{{item.imageUrls && item.imageUrls.length > 0}}">
+              <image
+                wx:for="{{item.imageUrls}}"
+                wx:for-item="img"
+                wx:key="*this"
+                src="{{img}}"
+                mode="aspectFill"
+                class="record-card__thumb"
+              />
+            </view>
+            <view class="record-card__remark text-sm text-secondary mt-xs" wx:if="{{item.remark}}">
+              {{item.remark}}
+            </view>
+          </view>
+        </view>
+        <van-empty wx:else description="暂无作业记录" image="search" />
+      </view>
+    </van-tab>
+  </van-tabs>
+
+  <!-- FAB 新增按钮 -->
+  <view class="fab" wx:if="{{canEdit}}" bindtap="onAdd">
+    <text class="fab-icon">+</text>
+  </view>
+
+  <!-- 日历弹窗 -->
+  <van-calendar
+    show="{{showCalendar}}"
+    bind:close="closeCalendar"
+    bind:confirm="onCalendarConfirm"
+    default-date="{{calendarDate}}"
+    color="#07C160"
+  />
+</view>

@@ -1,0 +1,48 @@
+.records-filter {
+  margin-top: var(--spacing-sm);
+}
+
+.record-card {
+  padding: var(--spacing-md);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-card);
+  box-shadow: var(--shadow-card);
+  margin-bottom: var(--spacing-sm);
+}
+
+.record-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.record-card__name {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.record-card__meta {
+  margin-top: 4rpx;
+  font-size: 24rpx;
+  color: var(--color-text-secondary);
+}
+
+.record-card__images {
+  display: flex;
+  gap: var(--spacing-xs);
+  margin-top: var(--spacing-sm);
+}
+
+.record-card__thumb {
+  width: 120rpx;
+  height: 120rpx;
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-secondary);
+}
+
+.record-card__remark {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

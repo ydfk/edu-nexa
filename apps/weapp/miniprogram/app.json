@@ -1,43 +1,76 @@
 {
   "pages": [
-    "pages/dashboard/index",
-    "pages/meal/index",
-    "pages/homework/index",
+    "pages/home/index",
+    "pages/records/index",
+    "pages/features/index",
     "pages/mine/index",
-    "pages/student-management/index",
-    "pages/service-calendar/index"
+    "pages/login/index",
+    "pages/students/index",
+    "pages/students/detail",
+    "pages/guardians/index",
+    "pages/guardians/detail",
+    "pages/teachers/index",
+    "pages/teachers/detail",
+    "pages/schools/index",
+    "pages/meal-record/edit",
+    "pages/homework-record/edit",
+    "pages/daily-homework/index",
+    "pages/daily-homework/detail",
+    "pages/payments/index",
+    "pages/payments/detail",
+    "pages/settings/profile",
+    "pages/settings/password",
+    "pages/settings/about"
   ],
   "window": {
-    "navigationBarTitleText": "学栖 · EduNexa",
+    "navigationBarTitleText": "学栖",
     "navigationBarBackgroundColor": "#FFFFFF",
     "navigationBarTextStyle": "black",
-    "backgroundColor": "#F4F7FB",
-    "backgroundTextStyle": "light"
+    "backgroundColor": "#F7F8FA",
+    "backgroundTextStyle": "dark"
   },
   "tabBar": {
-    "color": "#66758A",
+    "color": "#969799",
     "selectedColor": "#07C160",
     "backgroundColor": "#FFFFFF",
     "borderStyle": "black",
     "list": [
       {
-        "pagePath": "pages/dashboard/index",
-        "text": "工作台"
+        "pagePath": "pages/home/index",
+        "text": "首页",
+        "iconPath": "assets/tab-home.png",
+        "selectedIconPath": "assets/tab-home-active.png"
       },
       {
-        "pagePath": "pages/meal/index",
-        "text": "用餐"
+        "pagePath": "pages/records/index",
+        "text": "记录",
+        "iconPath": "assets/tab-records.png",
+        "selectedIconPath": "assets/tab-records-active.png"
       },
       {
-        "pagePath": "pages/homework/index",
-        "text": "作业"
+        "pagePath": "pages/features/index",
+        "text": "功能",
+        "iconPath": "assets/tab-features.png",
+        "selectedIconPath": "assets/tab-features-active.png"
       },
       {
         "pagePath": "pages/mine/index",
-        "text": "我的"
+        "text": "我的",
+        "iconPath": "assets/tab-mine.png",
+        "selectedIconPath": "assets/tab-mine-active.png"
       }
     ]
   },
   "style": "v2",
-  "sitemapLocation": "sitemap.json"
+  "sitemapLocation": "sitemap.json",
+  "lazyCodeLoading": "requiredComponents",
+  "permission": {
+    "scope.camera": {
+      "desc": "用于拍照上传用餐和作业记录"
+    },
+    "scope.writePhotosAlbum": {
+      "desc": "用于保存图片到相册"
+    }
+  },
+  "__usePrivacyCheck__": true
 }

@@ -1,0 +1,49 @@
+<view class="page safe-bottom">
+  <!-- 未登录提示 -->
+  <view wx:if="{{!loggedIn}}" class="empty-state" style="padding-top: 200rpx;">
+    <van-icon name="info-o" size="80rpx" color="#C8C9CC" />
+    <view class="empty-state__text">登录后查看完整功能</view>
+    <button class="btn btn--primary btn--small btn--round mt-md" bindtap="goLogin">去登录</button>
+  </view>
+
+  <!-- 功能入口 -->
+  <view wx:else>
+    <view class="section">
+      <view class="section-header">
+        <text class="section-title">全部功能</text>
+      </view>
+      <van-grid column-num="4" border="{{false}}" gutter="{{16}}">
+        <van-grid-item
+          wx:for="{{features}}"
+          wx:key="id"
+          icon="{{item.icon}}"
+          text="{{item.title}}"
+          icon-color="#07C160"
+          bindtap="goFeature"
+          data-url="{{item.url}}"
+        />
+      </van-grid>
+    </view>
+
+    <!-- 快捷操作 -->
+    <view class="section" wx:if="{{quickActions.length > 0}}">
+      <view class="section-header">
+        <text class="section-title">快捷操作</text>
+      </view>
+      <view class="list">
+        <view
+          class="list-item list-item--clickable"
+          wx:for="{{quickActions}}"
+          wx:key="id"
+          bindtap="goFeature"
+          data-url="{{item.url}}"
+        >
+          <view class="list-content">
+            <view class="list-title">{{item.title}}</view>
+            <view class="list-desc">{{item.desc}}</view>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+</view>

@@ -1,0 +1,85 @@
+<view class="page safe-bottom">
+  <view class="card">
+    <!-- 学生选择 -->
+    <view class="form-group">
+      <view class="form-label form-label--required">选择学生</view>
+      <van-cell
+        title="{{selectedStudent.name || '请选择学生'}}"
+        is-link
+        bindtap="openStudentPicker"
+        title-class="{{selectedStudent.name ? '' : 'text-secondary'}}"
+      />
+    </view>
+
+    <!-- 服务日期 -->
+    <view class="form-group">
+      <view class="form-label form-label--required">服务日期</view>
+      <van-cell title="{{serviceDate}}" is-link bindtap="openDatePicker" />
+    </view>
+
+    <!-- 状态选择 -->
+    <view class="form-group">
+      <view class="form-label form-label--required">用餐状态</view>
+      <van-radio-group value="{{status}}" bind:change="onStatusChange" direction="horizontal">
+        <van-radio name="completed" icon-size="36rpx">已完成</van-radio>
+        <van-radio name="absent" icon-size="36rpx">缺勤</van-radio>
+      </van-radio-group>
+    </view>
+
+    <!-- 照片上传 -->
+    <view class="form-group">
+      <view class="form-label">照片记录</view>
+      <van-uploader
+        file-list="{{fileList}}"
+        bind:after-read="afterRead"
+        bind:delete="onDeleteImage"
+        max-count="9"
+        accept="image"
+        upload-text="拍照/选图"
+      />
+    </view>
+
+    <!-- 备注 -->
+    <view class="form-group">
+      <view class="form-label">备注</view>
+      <textarea
+        class="form-textarea"
+        value="{{remark}}"
+        bindinput="onRemarkInput"
+        placeholder="选填备注信息"
+        maxlength="200"
+      />
+    </view>
+  </view>
+
+  <!-- 操作栏 -->
+  <view class="mt-lg flex gap-sm">
+    <button class="btn btn--primary btn--block btn--round" bindtap="onSubmit" disabled="{{submitting}}">
+      {{isEdit ? '保存修改' : '提交记录'}}
+    </button>
+  </view>
+  <view class="mt-sm" wx:if="{{isEdit}}">
+    <button class="btn btn--ghost btn--block btn--round" bindtap="onDelete">删除记录</button>
+  </view>
+
+  <!-- 学生选择弹窗 -->
+  <van-popup show="{{showStudentPicker}}" position="bottom" round bind:close="closeStudentPicker">
+    <van-picker
+      columns="{{studentColumns}}"
+      bind:confirm="onStudentConfirm"
+      bind:cancel="closeStudentPicker"
+      show-toolbar
+      title="选择学生"
+    />
+  </van-popup>
+
+  <!-- 日期选择 -->
+  <van-calendar
+    show="{{showDatePicker}}"
+    bind:close="closeDatePicker"
+    bind:confirm="onDateConfirm"
+    color="#07C160"
+  />
+
+  <van-dialog id="van-dialog" />
+</view>

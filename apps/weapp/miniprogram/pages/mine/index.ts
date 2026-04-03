@@ -1,236 +1,62 @@
-const { weappPhoneLogin } = require("../../services/auth");
-const { getStudents } = require("../../services/records");
-const {
-  clearSession,
-  getSession,
-  setActiveRole,
-  setSession,
-} = require("../../store/session");
-
-const roleOptions = [
-  { label: "管理员", value: "admin" },
-  { label: "监护人", value: "guardian" },
-  { label: "教师", value: "teacher" },
-];
+const { getSession, isLoggedIn, clearSession, setActiveRole, getUserRoles, hasMultipleRoles } = require("../../store/session");
+const { getRoleName } = require("../../utils/permission");
+const Dialog = require("@vant/weapp/dialog/dialog");
 
 Page({
   data: {
-    activeRole: "",
-    boundStudents: [],
-    canSwitchRole: false,
-    isLoggedIn: false,
-    loginState: "",
-    managementEntries: [],
-    roleHintValue: "guardian",
-    roleOptions,
-    switchRoleOptions: [],
-    userInfo: {
-      name: "",
-      phone: "",
-      role: "",
-      roleList: [],
-    },
-    wxCode: "",
+    loggedIn: false,
+    displayName: "",
+    phone: "",
+    roleName: "",
+    hasMultiRoles: false,
+    roleList: [],
   },
+
   onShow() {
-    this.syncSessionState();
-  },
-  handleRoleHintChange(event) {
-    this.setData({
-      roleHintValue: event.detail.name,
-    });
-  },
-  handleRoleHintTap(event) {
-    this.setData({
-      roleHintValue: event.currentTarget.dataset.role,
-    });
-  },
-  handleWeChatLogin() {
-    wx.login({
-      success: (result) => {
-        if (!result.code) {
-          wx.showToast({
-            title: "获取失败",
-            icon: "none",
-          });
-          return;
-        }
-
-        this.setData({
-          loginState: "已获取登录态",
-          wxCode: result.code,
-        });
-      },
-    });
-  },
-  handleGetPhoneNumber(event) {
-    if (event.detail.errMsg !== "getPhoneNumber:ok") {
-      wx.showToast({
-        title: "未授权",
-        icon: "none",
-      });
+    const logged = isLoggedIn();
+    if (!logged) {
+      this.setData({ loggedIn: false });
       return;
     }
-
-    if (!this.data.wxCode) {
-      wx.showToast({
-        title: "请先获取登录态",
-        icon: "none",
-      });
-      return;
-    }
-
-    weappPhoneLogin({
-      phoneCode: event.detail.code,
-      roleHint: this.data.roleHintValue,
-      wxCode: this.data.wxCode,
-    })
-      .then((payload) => {
-        setSession({
-          ...payload,
-          activeRole: this.data.roleHintValue,
-        });
-        this.syncSessionState();
-        wx.showToast({
-          title: "成功",
-          icon: "success",
-        });
-      })
-      .catch((error) => {
-        wx.showToast({
-          title: error.message || "登录失败",
-          icon: "none",
-        });
-      });
-  },
-  handleSwitchRole(event) {
-    const role = event.currentTarget.dataset.role;
-    setActiveRole(role);
-    this.syncSessionState();
-  },
-  handleSwitchRoleChange(event) {
-    setActiveRole(event.detail.name);
-    this.syncSessionState();
-  },
-  handleLogout() {
-    clearSession();
-    this.setData({
-      activeRole: "",
-      boundStudents: [],
-      canSwitchRole: false,
-      isLoggedIn: false,
-      loginState: "",
-      managementEntries: [],
-      switchRoleOptions: [],
-      userInfo: {
-        name: "",
-        phone: "",
-        role: "",
-        roleList: [],
-      },
-      wxCode: "",
-    });
-  },
-  syncSessionState() {
     const session = getSession();
-    if (!session.token || !session.user) {
-      this.setData({
-        activeRole: "",
-        boundStudents: [],
-        canSwitchRole: false,
-        isLoggedIn: false,
-        loginState: "",
-        managementEntries: [],
-        switchRoleOptions: [],
-        userInfo: {
-          name: "",
-          phone: "",
-          role: "",
-          roleList: [],
-        },
-      });
-      return;
-    }
-
-    const roles = session.user.roles || [];
-    const activeRole = session.activeRole || roles[0] || "";
-    const activeRoleLabel = formatRoleLabel(activeRole);
-
+    const roles = getUserRoles();
     this.setData({
-      activeRole,
-      canSwitchRole: roles.length > 1,
-      isLoggedIn: true,
-      loginState: "已登录",
-      managementEntries: buildManagementEntries(activeRole),
-      switchRoleOptions: buildSwitchRoleOptions(roles),
-      userInfo: {
-        name: session.user.displayName || activeRoleLabel,
-        phone: session.user.phone || "",
-        role: activeRoleLabel,
-        roleList: roles.map(formatRoleLabel),
-      },
+      loggedIn: true,
+      displayName: session.user?.displayName || "用户",
+      phone: maskPhone(session.user?.phone || ""),
+      roleName: getRoleName(session.activeRole),
+      hasMultiRoles: hasMultipleRoles(),
+      roleList: roles.map((r) => ({
+        role: r,
+        name: getRoleName(r),
+        active: r === session.activeRole,
+      })),
     });
+  },
 
-    getStudents({ guardianPhone: session.user.phone }).then((students) => {
-      this.setData({
-        boundStudents: students,
-      });
-    });
+  goLogin() {
+    wx.navigateTo({ url: "/pages/login/index" });
   },
-  openStudentManagement() {
-    wx.navigateTo({
-      url: "/pages/student-management/index",
-    });
+
+  switchRole(e) {
+    const role = e.currentTarget.dataset.role;
+    setActiveRole(role);
+    this.onShow();
+    wx.showToast({ title: `已切换为${getRoleName(role)}`, icon: "none" });
   },
-  openServiceCalendar() {
-    wx.navigateTo({
-      url: "/pages/service-calendar/index",
-    });
-  },
-  handleOpenEntry(event) {
-    const entry = event.currentTarget.dataset.entry;
-    if (entry === "students") {
-      this.openStudentManagement();
-      return;
-    }
-    if (entry === "calendar") {
-      this.openServiceCalendar();
-    }
+
+  onLogout() {
+    Dialog.confirm({ title: "确认退出", message: "退出后需要重新登录" })
+      .then(() => {
+        clearSession();
+        this.onShow();
+        wx.showToast({ title: "已退出登录", icon: "success" });
+      })
+      .catch(() => {});
   },
 });
 
-function formatRoleLabel(role) {
-  switch (role) {
-    case "teacher":
-      return "教师";
-    case "guardian":
-      return "监护人";
-    case "admin":
-      return "管理员";
-    default:
-      return role || "未分配";
-  }
-}
-
-function buildSwitchRoleOptions(roles) {
-  return roleOptions.filter((item) => roles.includes(item.value));
-}
-
-function buildManagementEntries(activeRole) {
-  const entries = [];
-  if (activeRole === "teacher" || activeRole === "admin") {
-    entries.push({
-      action: "students",
-      title: "学生",
-      value: "",
-    });
-  }
-  if (activeRole === "admin") {
-    entries.push({
-      action: "calendar",
-      title: "服务日历",
-      value: "",
-    });
-  }
-  return entries;
+function maskPhone(phone) {
+  if (!phone || phone.length < 7) return phone;
+  return phone.substring(0, 3) + "****" + phone.substring(7);
 }

@@ -1,0 +1,65 @@
+<view class="login-page">
+  <!-- 品牌区域 -->
+  <view class="login-brand">
+    <view class="login-logo">
+      <van-icon name="shop-o" size="80rpx" color="#07C160" />
+    </view>
+    <view class="login-app-name">学栖</view>
+    <view class="login-slogan">智慧教育，用心守护</view>
+  </view>
+
+  <!-- 角色选择 -->
+  <view class="login-role-section" wx:if="{{step === 'role'}}">
+    <view class="section-title mb-md">选择您的身份</view>
+    <view class="login-role-list">
+      <view
+        class="login-role-card {{selectedRole === 'teacher' ? 'login-role-card--active' : ''}}"
+        bindtap="selectRole"
+        data-role="teacher"
+      >
+        <van-icon name="friends-o" size="48rpx" />
+        <text class="login-role-name">教师</text>
+        <text class="login-role-desc">管理学生和教学事务</text>
+      </view>
+      <view
+        class="login-role-card {{selectedRole === 'guardian' ? 'login-role-card--active' : ''}}"
+        bindtap="selectRole"
+        data-role="guardian"
+      >
+        <van-icon name="contact" size="48rpx" />
+        <text class="login-role-name">家长</text>
+        <text class="login-role-desc">关注孩子学习与生活</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 登录按钮区 -->
+  <view class="login-actions" wx:if="{{step === 'role'}}">
+    <view class="login-privacy flex flex-center gap-xs mb-md" bindtap="togglePrivacy">
+      <van-checkbox value="{{agreedPrivacy}}" shape="round" icon-size="32rpx" bind:change="onPrivacyChange" />
+      <text class="text-sm text-secondary">
+        我已阅读并同意
+        <text class="text-primary" catchtap="goPrivacy">《隐私协议》</text>
+      </text>
+    </view>
+
+    <button
+      class="btn btn--primary btn--block btn--round"
+      open-type="getPhoneNumber"
+      bindgetphonenumber="onGetPhoneNumber"
+      disabled="{{!agreedPrivacy || !selectedRole}}"
+    >
+      微信手机号快捷登录
+    </button>
+
+    <view class="login-tip text-sm text-secondary mt-md">
+      首次使用将自动创建账号
+    </view>
+  </view>
+
+  <!-- 登录中 -->
+  <view class="login-loading flex flex-col flex-center" wx:if="{{step === 'loading'}}">
+    <van-icon name="loading" size="48rpx" color="#07C160" class="login-spin" />
+    <text class="mt-sm text-secondary">正在登录...</text>
+  </view>
+</view>

@@ -1,76 +1,72 @@
-<view class="page">
-  <van-cell-group inset>
-    <van-cell title="手机号" value="{{userInfo.phone || '-'}}" />
-    <van-cell title="角色" value="{{isLoggedIn ? userInfo.role : '-'}}" />
-  </van-cell-group>
-
-  <van-tabs
-    wx:if="{{!isLoggedIn}}"
-    custom-class="block-gap"
-    active="{{roleHintValue}}"
-    bind:change="handleRoleHintChange"
-  >
-    <block wx:for="{{roleOptions}}" wx:key="value">
-      <van-tab title="{{item.label}}" name="{{item.value}}" />
-    </block>
-  </van-tabs>
-
-  <view wx:if="{{!isLoggedIn}}" class="block-gap">
-    <van-button round custom-class="full-button" bind:click="handleWeChatLogin">
-      获取登录态
-    </van-button>
-    <van-button
-      round
-      type="primary"
-      custom-class="full-button block-gap-sm"
-      open-type="getPhoneNumber"
-      bindgetphonenumber="handleGetPhoneNumber"
-    >
-      微信手机号登录
-    </van-button>
+<view class="page page--no-pad safe-bottom">
+  <!-- 未登录状态 -->
+  <view class="mine-header mine-header--guest" wx:if="{{!loggedIn}}">
+    <view class="mine-avatar">
+      <van-icon name="user-o" size="64rpx" color="#C8C9CC" />
+    </view>
+    <view class="mine-info">
+      <view class="mine-name text-lg font-bold">未登录</view>
+      <view class="mine-desc text-sm text-secondary">登录后查看完整功能</view>
+    </view>
+    <button class="btn btn--primary btn--small btn--round" bindtap="goLogin">去登录</button>
   </view>
 
-  <van-tabs
-    wx:if="{{isLoggedIn && canSwitchRole}}"
-    custom-class="block-gap"
-    active="{{activeRole}}"
-    bind:change="handleSwitchRoleChange"
-  >
-    <block wx:for="{{switchRoleOptions}}" wx:key="value">
-      <van-tab title="{{item.label}}" name="{{item.value}}" />
-    </block>
-  </van-tabs>
+  <!-- 已登录状态 -->
+  <view class="mine-header" wx:if="{{loggedIn}}">
+    <view class="mine-avatar mine-avatar--active">
+      <van-icon name="contact" size="64rpx" color="#07C160" />
+    </view>
+    <view class="mine-info">
+      <view class="mine-name text-lg font-bold">{{displayName}}</view>
+      <view class="mine-meta flex gap-xs mt-xs">
+        <van-tag type="success" round>{{roleName}}</van-tag>
+        <text class="text-sm text-secondary">{{phone}}</text>
+      </view>
+    </view>
+  </view>
 
-  <van-panel wx:if="{{boundStudents.length > 0}}" custom-class="block-gap" title="学生">
-    <van-cell-group border="{{false}}">
-      <block wx:for="{{boundStudents}}" wx:key="id">
-        <van-cell
-          title="{{item.name}}"
-          label="{{item.schoolName}} {{item.className}}"
-          value="{{item.serviceSummary.serviceEndDate || '-'}}"
-        />
-      </block>
+  <!-- 角色切换 -->
+  <view class="section mx-lg" wx:if="{{hasMultiRoles}}">
+    <view class="section-header">
+      <text class="section-title">切换角色</text>
+    </view>
+    <view class="mine-roles">
+      <view
+        class="mine-role-chip {{item.active ? 'mine-role-chip--active' : ''}}"
+        wx:for="{{roleList}}"
+        wx:key="role"
+        bindtap="switchRole"
+        data-role="{{item.role}}"
+      >
+        {{item.name}}
+      </view>
+    </view>
+  </view>
+
+  <!-- 功能列表 -->
+  <view class="mx-lg mt-md" wx:if="{{loggedIn}}">
+    <van-cell-group inset round>
+      <van-cell title="个人资料" icon="edit" is-link url="/pages/settings/profile" />
+      <van-cell title="修改密码" icon="lock" is-link url="/pages/settings/password" />
     </van-cell-group>
-  </van-panel>
-
-  <van-cell-group wx:if="{{managementEntries.length > 0}}" custom-class="block-gap" inset>
-    <block wx:for="{{managementEntries}}" wx:key="action">
-      <van-cell
-        title="{{item.title}}"
-        is-link
-        data-entry="{{item.action}}"
-        bind:click="handleOpenEntry"
-      />
-    </block>
-  </van-cell-group>
-
-  <view wx:if="{{isLoggedIn}}" class="block-gap">
-    <van-button round custom-class="full-button" bind:click="handleLogout">
-      退出
-    </van-button>
   </view>
 
-  <view wx:if="{{!isLoggedIn && !loginState}}" class="block-gap">
-    <van-empty description="未登录" />
+  <view class="mx-lg mt-md">
+    <van-cell-group inset round>
+      <van-cell title="关于学栖" icon="info-o" is-link url="/pages/settings/about" />
+      <van-cell title="隐私协议" icon="shield-o" is-link url="/pages/settings/about" />
+    </van-cell-group>
   </view>
+
+  <!-- 退出登录 -->
+  <view class="mx-lg mt-lg" wx:if="{{loggedIn}}">
+    <button class="btn btn--ghost btn--block btn--round" bindtap="onLogout">退出登录</button>
+  </view>
+
+  <!-- 版本号 -->
+  <view class="mine-footer text-xs text-secondary">
+    学栖 v1.0.0
+  </view>
+
+  <van-dialog id="van-dialog" />
 </view>

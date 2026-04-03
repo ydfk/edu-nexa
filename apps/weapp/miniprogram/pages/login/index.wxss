@@ -1,0 +1,105 @@
+.login-page {
+  min-height: 100vh;
+  padding: var(--spacing-xl) var(--spacing-lg);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg-card);
+}
+
+.login-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 80rpx 0 60rpx;
+}
+
+.login-logo {
+  width: 140rpx;
+  height: 140rpx;
+  border-radius: var(--radius-lg);
+  background: var(--color-primary-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.login-app-name {
+  margin-top: var(--spacing-md);
+  font-size: 48rpx;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.login-slogan {
+  margin-top: var(--spacing-xs);
+  font-size: 26rpx;
+  color: var(--color-text-secondary);
+}
+
+.login-role-section {
+  margin-top: var(--spacing-xl);
+}
+
+.login-role-list {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--spacing-md);
+}
+
+.login-role-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--spacing-lg) var(--spacing-md);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-secondary);
+  border: 3rpx solid transparent;
+  transition: all 0.2s;
+}
+
+.login-role-card--active {
+  background: var(--color-primary-light);
+  border-color: var(--color-primary);
+}
+
+.login-role-name {
+  margin-top: var(--spacing-sm);
+  font-size: 30rpx;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.login-role-desc {
+  margin-top: 4rpx;
+  font-size: 22rpx;
+  color: var(--color-text-secondary);
+  text-align: center;
+}
+
+.login-actions {
+  margin-top: auto;
+  padding-top: var(--spacing-xl);
+}
+
+.login-privacy {
+  justify-content: center;
+}
+
+.login-tip {
+  text-align: center;
+}
+
+.login-loading {
+  flex: 1;
+  margin-top: 120rpx;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.login-spin {
+  animation: spin 1s linear infinite;
+}
