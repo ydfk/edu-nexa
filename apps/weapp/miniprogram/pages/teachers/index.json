@@ -1,0 +1,9 @@
+{
+  "usingComponents": {
+    "van-search": "@vant/weapp/search/index",
+    "van-empty": "@vant/weapp/empty/index",
+    "van-icon": "@vant/weapp/icon/index"
+  },
+  "navigationBarTitleText": "教师管理",
+  "enablePullDownRefresh": true
+}

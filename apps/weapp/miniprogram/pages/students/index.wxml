@@ -1,0 +1,37 @@
+<view class="page page--no-pad safe-bottom">
+  <view class="search-bar">
+    <van-search
+      value="{{keyword}}"
+      placeholder="搜索学生姓名"
+      bind:change="onSearchChange"
+      bind:search="onSearch"
+      shape="round"
+    />
+  </view>
+
+  <view class="px-lg mt-sm">
+    <view class="list" wx:if="{{students.length > 0}}">
+      <view
+        class="list-item list-item--clickable"
+        wx:for="{{students}}"
+        wx:key="id"
+        bindtap="goDetail"
+        data-id="{{item.id}}"
+      >
+        <view class="list-content">
+          <view class="flex flex-between">
+            <text class="list-title">{{item.name}}</text>
+            <view class="tag tag--{{item.tagType}}">{{item.statusText}}</view>
+          </view>
+          <view class="list-desc">{{item.schoolName}} {{item.gradeName}} {{item.className}}</view>
+          <view class="list-desc" wx:if="{{item.guardianName}}">家长：{{item.guardianName}} {{item.guardianPhone}}</view>
+        </view>
+      </view>
+    </view>
+    <van-empty wx:else description="暂无学生数据" image="search" />
+  </view>
+
+  <view class="fab" wx:if="{{canEdit}}" bindtap="onAdd">
+    <text class="fab-icon">+</text>
+  </view>
+</view>

@@ -1,0 +1,32 @@
+<view class="page safe-bottom">
+  <!-- 应用信息 -->
+  <view class="about-header">
+    <view class="about-logo">
+      <van-icon name="home-o" size="80rpx" color="#07C160" />
+    </view>
+    <view class="about-name">学栖</view>
+    <view class="about-version">版本 1.0.0</view>
+  </view>
+
+  <view class="card mt-lg">
+    <view class="section-title mb-md">应用简介</view>
+    <view class="text-sm text-secondary" style="line-height: 1.8;">
+      学栖是一款专为教育机构打造的综合管理小程序，提供学生管理、用餐记录、作业管理、缴费管理等功能，帮助教师和家长高效协作，共同关注孩子的成长。
+    </view>
+  </view>
+
+  <view class="card mt-md">
+    <view class="section-title mb-md">隐私政策</view>
+    <view class="text-sm text-secondary" style="line-height: 1.8;">
+      我们重视您的隐私保护。本应用仅收集提供服务所必需的信息，包括用户基本资料、学生信息和服务记录。所有数据均加密存储，不会向第三方分享您的个人信息。如需了解更多信息，请联系管理员。
+    </view>
+  </view>
+
+  <view class="card mt-md">
+    <view class="section-title mb-md">联系我们</view>
+    <van-cell-group>
+      <van-cell title="技术支持" value="请联系管理员" />
+      <van-cell title="意见反馈" value="请联系管理员" />
+    </van-cell-group>
+  </view>
+</view>

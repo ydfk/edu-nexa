@@ -1,0 +1,19 @@
+<view class="page safe-bottom">
+  <view class="card">
+    <van-cell-group>
+      <van-cell title="手机号" value="{{phone}}" />
+      <van-cell title="角色" value="{{roleName}}" />
+    </van-cell-group>
+  </view>
+
+  <view class="card mt-md">
+    <view class="form-group">
+      <view class="form-label">显示名称</view>
+      <input class="form-input" value="{{displayName}}" bindinput="onNameInput" placeholder="请输入显示名称" />
+    </view>
+  </view>
+
+  <view class="mt-lg">
+    <button class="btn btn--primary btn--block btn--round" bindtap="onSave" disabled="{{submitting}}">保存</button>
+  </view>
+</view>

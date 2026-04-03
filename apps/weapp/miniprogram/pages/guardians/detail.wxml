@@ -1,0 +1,66 @@
+<view class="page safe-bottom">
+  <view class="card">
+    <!-- 姓名 -->
+    <view class="form-group">
+      <view class="form-label form-label--required">姓名</view>
+      <input class="form-input" value="{{name}}" bindinput="onInput" data-field="name" placeholder="请输入家长姓名" />
+    </view>
+
+    <!-- 手机号 -->
+    <view class="form-group">
+      <view class="form-label form-label--required">手机号</view>
+      <input class="form-input" value="{{phone}}" bindinput="onInput" data-field="phone" placeholder="请输入手机号" type="number" maxlength="11" />
+    </view>
+
+    <!-- 关系 -->
+    <view class="form-group">
+      <view class="form-label">与学生关系</view>
+      <van-cell
+        title="{{relationship || '请选择关系'}}"
+        is-link
+        bindtap="openRelPicker"
+        title-class="{{relationship ? '' : 'text-secondary'}}"
+      />
+    </view>
+
+    <!-- 状态 -->
+    <view class="form-group">
+      <view class="form-label">状态</view>
+      <van-radio-group value="{{status}}" bind:change="onStatusChange" direction="horizontal">
+        <van-radio name="active" icon-size="36rpx">正常</van-radio>
+        <van-radio name="paused" icon-size="36rpx">暂停</van-radio>
+      </van-radio-group>
+    </view>
+
+    <!-- 密码（新增模式） -->
+    <view class="form-group" wx:if="{{!isEdit}}">
+      <view class="form-label form-label--required">初始密码</view>
+      <input class="form-input" value="{{password}}" bindinput="onInput" data-field="password" placeholder="请设置初始密码" password="{{true}}" />
+    </view>
+
+    <!-- 备注 -->
+    <view class="form-group">
+      <view class="form-label">备注</view>
+      <textarea class="form-textarea" value="{{remark}}" bindinput="onInput" data-field="remark" placeholder="选填备注信息" maxlength="200" />
+    </view>
+  </view>
+
+  <view class="mt-lg">
+    <button class="btn btn--primary btn--block btn--round" bindtap="onSubmit" disabled="{{submitting}}">
+      {{isEdit ? '保存修改' : '新增家长'}}
+    </button>
+  </view>
+  <view class="mt-sm" wx:if="{{isEdit}}">
+    <button class="btn btn--ghost btn--block btn--round" bindtap="onResetPassword">重置密码</button>
+  </view>
+  <view class="mt-sm" wx:if="{{isEdit}}">
+    <button class="btn btn--ghost btn--block btn--round" bindtap="onDelete">删除家长</button>
+  </view>
+
+  <!-- 关系选择器 -->
+  <van-popup show="{{showRelPicker}}" position="bottom" round bind:close="closeRelPicker">
+    <van-picker columns="{{relColumns}}" bind:confirm="onRelConfirm" bind:cancel="closeRelPicker" show-toolbar title="选择关系" />
+  </van-popup>
+
+  <van-dialog id="van-dialog" />
+</view>

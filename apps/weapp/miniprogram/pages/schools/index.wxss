@@ -1,0 +1,24 @@
+.grade-list {
+  padding-left: var(--spacing-sm);
+}
+
+.grade-item {
+  padding: var(--spacing-sm) 0;
+  border-bottom: 1rpx solid var(--color-border);
+}
+
+.grade-item:last-child {
+  border-bottom: none;
+}
+
+.class-list {
+  padding: var(--spacing-sm) 0 var(--spacing-sm) var(--spacing-md);
+}
+
+.class-item {
+  padding: var(--spacing-xs) 0;
+}
+
+.ml-xs {
+  margin-left: var(--spacing-xs);
+}

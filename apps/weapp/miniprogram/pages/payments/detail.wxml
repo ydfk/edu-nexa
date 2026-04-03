@@ -1,0 +1,97 @@
+<view class="page safe-bottom">
+  <view class="card">
+    <!-- 学生 -->
+    <view class="form-group">
+      <view class="form-label form-label--required">学生</view>
+      <van-cell
+        title="{{selectedStudent.name || '请选择学生'}}"
+        is-link
+        bindtap="openStudentPicker"
+        title-class="{{selectedStudent.name ? '' : 'text-secondary'}}"
+      />
+    </view>
+
+    <!-- 缴费日期 -->
+    <view class="form-group">
+      <view class="form-label form-label--required">缴费日期</view>
+      <van-cell title="{{paidAt || '请选择日期'}}" is-link bindtap="openPaidAtPicker" />
+    </view>
+
+    <!-- 缴费类型 -->
+    <view class="form-group">
+      <view class="form-label form-label--required">缴费类型</view>
+      <van-cell
+        title="{{paymentType || '请选择类型'}}"
+        is-link
+        bindtap="openTypePicker"
+        title-class="{{paymentType ? '' : 'text-secondary'}}"
+      />
+    </view>
+
+    <!-- 缴费金额 -->
+    <view class="form-group">
+      <view class="form-label form-label--required">缴费金额（元）</view>
+      <input class="form-input" value="{{paymentAmount}}" bindinput="onInput" data-field="paymentAmount" placeholder="请输入金额" type="digit" />
+    </view>
+
+    <!-- 服务周期 -->
+    <view class="form-group">
+      <view class="form-label">服务开始日期</view>
+      <van-cell title="{{periodStartDate || '请选择日期'}}" is-link bindtap="openStartDatePicker" />
+    </view>
+
+    <view class="form-group">
+      <view class="form-label">服务结束日期</view>
+      <van-cell title="{{periodEndDate || '请选择日期'}}" is-link bindtap="openEndDatePicker" />
+    </view>
+
+    <!-- 备注 -->
+    <view class="form-group">
+      <view class="form-label">备注</view>
+      <textarea class="form-textarea" value="{{remark}}" bindinput="onInput" data-field="remark" placeholder="选填备注信息" maxlength="200" />
+    </view>
+  </view>
+
+  <!-- 退款区域 -->
+  <view class="card mt-md" wx:if="{{isEdit && originalStatus === 'paid'}}">
+    <view class="section-title mb-md">退款信息</view>
+    <view class="form-group">
+      <view class="form-label">退款金额（元）</view>
+      <input class="form-input" value="{{refundAmount}}" bindinput="onInput" data-field="refundAmount" placeholder="请输入退款金额" type="digit" />
+    </view>
+    <view class="form-group">
+      <view class="form-label">退款备注</view>
+      <textarea class="form-textarea" value="{{refundRemark}}" bindinput="onInput" data-field="refundRemark" placeholder="选填退款原因" maxlength="200" />
+    </view>
+  </view>
+
+  <view class="mt-lg">
+    <button class="btn btn--primary btn--block btn--round" bindtap="onSubmit" disabled="{{submitting}}">
+      {{isEdit ? '保存修改' : '新增记录'}}
+    </button>
+  </view>
+  <view class="mt-sm" wx:if="{{isEdit}}">
+    <button class="btn btn--ghost btn--block btn--round" bindtap="onDelete">删除记录</button>
+  </view>
+
+  <!-- 学生选择器 -->
+  <van-popup show="{{showStudentPicker}}" position="bottom" round bind:close="closeStudentPicker">
+    <van-picker columns="{{studentColumns}}" bind:confirm="onStudentConfirm" bind:cancel="closeStudentPicker" show-toolbar title="选择学生" />
+  </van-popup>
+
+  <!-- 类型选择器 -->
+  <van-popup show="{{showTypePicker}}" position="bottom" round bind:close="closeTypePicker">
+    <van-picker columns="{{typeColumns}}" bind:confirm="onTypeConfirm" bind:cancel="closeTypePicker" show-toolbar title="选择缴费类型" />
+  </van-popup>
+
+  <!-- 缴费日期 -->
+  <van-calendar show="{{showPaidAtPicker}}" bind:close="closePaidAtPicker" bind:confirm="onPaidAtConfirm" color="#07C160" />
+
+  <!-- 服务开始日期 -->
+  <van-calendar show="{{showStartDatePicker}}" bind:close="closeStartDatePicker" bind:confirm="onStartDateConfirm" color="#07C160" />
+
+  <!-- 服务结束日期 -->
+  <van-calendar show="{{showEndDatePicker}}" bind:close="closeEndDatePicker" bind:confirm="onEndDateConfirm" color="#07C160" />
+
+  <van-dialog id="van-dialog" />
+</view>

@@ -1,0 +1,53 @@
+<view class="page safe-bottom">
+  <view class="card">
+    <!-- 姓名 -->
+    <view class="form-group">
+      <view class="form-label form-label--required">姓名</view>
+      <input class="form-input" value="{{displayName}}" bindinput="onInput" data-field="displayName" placeholder="请输入教师姓名" />
+    </view>
+
+    <!-- 手机号 -->
+    <view class="form-group">
+      <view class="form-label form-label--required">手机号</view>
+      <input class="form-input" value="{{phone}}" bindinput="onInput" data-field="phone" placeholder="请输入手机号" type="number" maxlength="11" />
+    </view>
+
+    <!-- 角色 -->
+    <view class="form-group">
+      <view class="form-label form-label--required">角色</view>
+      <van-radio-group value="{{role}}" bind:change="onRoleChange" direction="horizontal">
+        <van-radio name="admin" icon-size="36rpx">管理员</van-radio>
+        <van-radio name="teacher" icon-size="36rpx">教师</van-radio>
+      </van-radio-group>
+    </view>
+
+    <!-- 状态 -->
+    <view class="form-group">
+      <view class="form-label">状态</view>
+      <van-radio-group value="{{status}}" bind:change="onStatusChange" direction="horizontal">
+        <van-radio name="active" icon-size="36rpx">正常</van-radio>
+        <van-radio name="paused" icon-size="36rpx">暂停</van-radio>
+      </van-radio-group>
+    </view>
+
+    <!-- 密码（新增模式） -->
+    <view class="form-group" wx:if="{{!isEdit}}">
+      <view class="form-label form-label--required">初始密码</view>
+      <input class="form-input" value="{{password}}" bindinput="onInput" data-field="password" placeholder="请设置初始密码" password="{{true}}" />
+    </view>
+  </view>
+
+  <view class="mt-lg">
+    <button class="btn btn--primary btn--block btn--round" bindtap="onSubmit" disabled="{{submitting}}">
+      {{isEdit ? '保存修改' : '新增教师'}}
+    </button>
+  </view>
+  <view class="mt-sm" wx:if="{{isEdit}}">
+    <button class="btn btn--ghost btn--block btn--round" bindtap="onResetPassword">重置密码</button>
+  </view>
+  <view class="mt-sm" wx:if="{{isEdit}}">
+    <button class="btn btn--ghost btn--block btn--round" bindtap="onDelete">删除教师</button>
+  </view>
+
+  <van-dialog id="van-dialog" />
+</view>

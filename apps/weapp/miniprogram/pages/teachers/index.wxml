@@ -1,0 +1,39 @@
+<view class="page page--no-pad safe-bottom">
+  <view class="search-bar">
+    <van-search
+      value="{{keyword}}"
+      placeholder="搜索教师姓名或手机号"
+      bind:change="onSearchChange"
+      bind:search="onSearch"
+      shape="round"
+    />
+  </view>
+
+  <view class="px-lg mt-sm">
+    <view class="list" wx:if="{{users.length > 0}}">
+      <view
+        class="list-item list-item--clickable"
+        wx:for="{{users}}"
+        wx:key="id"
+        bindtap="goDetail"
+        data-id="{{item.id}}"
+      >
+        <view class="list-content">
+          <view class="flex flex-between">
+            <text class="list-title">{{item.displayName}}</text>
+            <view class="tag tag--{{item.tagType}}">{{item.statusText}}</view>
+          </view>
+          <view class="list-desc">
+            <text>{{item.phone}}</text>
+            <text class="ml-sm" wx:for="{{item.roleNames}}" wx:for-item="role" wx:key="*this"> · {{role}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+    <van-empty wx:else description="暂无教师数据" image="search" />
+  </view>
+
+  <view class="fab" wx:if="{{isAdmin}}" bindtap="onAdd">
+    <text class="fab-icon">+</text>
+  </view>
+</view>

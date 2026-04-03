@@ -1,0 +1,48 @@
+<view class="page page--no-pad safe-bottom">
+  <view class="search-bar">
+    <van-search
+      value="{{keyword}}"
+      placeholder="搜索学生姓名"
+      bind:change="onSearchChange"
+      bind:search="onSearch"
+      shape="round"
+    />
+  </view>
+
+  <!-- 状态筛选 -->
+  <view class="px-lg" wx:if="{{canEdit}}">
+    <van-dropdown-menu active-color="#07C160">
+      <van-dropdown-item value="{{statusFilter}}" options="{{statusOptions}}" bind:change="onStatusChange" />
+    </van-dropdown-menu>
+  </view>
+
+  <view class="px-lg mt-sm">
+    <view class="list" wx:if="{{payments.length > 0}}">
+      <view
+        class="list-item list-item--clickable"
+        wx:for="{{payments}}"
+        wx:key="id"
+        bindtap="goDetail"
+        data-id="{{item.id}}"
+      >
+        <view class="list-content">
+          <view class="flex flex-between">
+            <text class="list-title">{{item.studentName}}</text>
+            <view class="tag tag--{{item.tagType}}">{{item.statusText}}</view>
+          </view>
+          <view class="list-desc">
+            <text>{{item.paidAt}} · {{item.paymentType}}</text>
+          </view>
+          <view class="list-desc">
+            <text class="text-primary font-bold">¥{{item.paymentAmount}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+    <van-empty wx:else description="暂无缴费记录" image="search" />
+  </view>
+
+  <view class="fab" wx:if="{{canEdit}}" bindtap="onAdd">
+    <text class="fab-icon">+</text>
+  </view>
+</view>

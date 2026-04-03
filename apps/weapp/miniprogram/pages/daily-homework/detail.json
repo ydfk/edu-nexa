@@ -1,0 +1,12 @@
+{
+  "usingComponents": {
+    "van-cell": "@vant/weapp/cell/index",
+    "van-picker": "@vant/weapp/picker/index",
+    "van-popup": "@vant/weapp/popup/index",
+    "van-calendar": "@vant/weapp/calendar/index",
+    "van-uploader": "@vant/weapp/uploader/index",
+    "van-dialog": "@vant/weapp/dialog/index",
+    "van-icon": "@vant/weapp/icon/index"
+  },
+  "navigationBarTitleText": "作业详情"
+}

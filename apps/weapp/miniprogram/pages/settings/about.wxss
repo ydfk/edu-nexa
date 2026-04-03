@@ -1,0 +1,29 @@
+.about-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--spacing-xl) 0 var(--spacing-lg);
+}
+
+.about-logo {
+  width: 160rpx;
+  height: 160rpx;
+  border-radius: var(--radius-lg);
+  background: var(--color-primary-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.about-name {
+  margin-top: var(--spacing-md);
+  font-size: 36rpx;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.about-version {
+  margin-top: var(--spacing-xs);
+  font-size: 24rpx;
+  color: var(--color-text-secondary);
+}

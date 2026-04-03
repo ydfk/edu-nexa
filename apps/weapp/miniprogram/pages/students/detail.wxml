@@ -1,0 +1,93 @@
+<view class="page safe-bottom">
+  <view class="card">
+    <!-- 姓名 -->
+    <view class="form-group">
+      <view class="form-label form-label--required">姓名</view>
+      <input class="form-input" value="{{name}}" bindinput="onInput" data-field="name" placeholder="请输入学生姓名" />
+    </view>
+
+    <!-- 学校 -->
+    <view class="form-group">
+      <view class="form-label form-label--required">学校</view>
+      <van-cell
+        title="{{selectedSchool.name || '请选择学校'}}"
+        is-link
+        bindtap="openSchoolPicker"
+        title-class="{{selectedSchool.name ? '' : 'text-secondary'}}"
+      />
+    </view>
+
+    <!-- 年级 -->
+    <view class="form-group">
+      <view class="form-label form-label--required">年级</view>
+      <van-cell
+        title="{{selectedGrade.name || '请选择年级'}}"
+        is-link
+        bindtap="openGradePicker"
+        title-class="{{selectedGrade.name ? '' : 'text-secondary'}}"
+      />
+    </view>
+
+    <!-- 班级 -->
+    <view class="form-group">
+      <view class="form-label form-label--required">班级</view>
+      <van-cell
+        title="{{selectedClass.name || '请选择班级'}}"
+        is-link
+        bindtap="openClassPicker"
+        title-class="{{selectedClass.name ? '' : 'text-secondary'}}"
+      />
+    </view>
+
+    <!-- 家长 -->
+    <view class="form-group">
+      <view class="form-label">关联家长</view>
+      <van-cell
+        title="{{selectedGuardian.name || '请选择家长'}}"
+        is-link
+        bindtap="openGuardianPicker"
+        title-class="{{selectedGuardian.name ? '' : 'text-secondary'}}"
+      />
+    </view>
+
+    <!-- 状态 -->
+    <view class="form-group">
+      <view class="form-label">状态</view>
+      <van-radio-group value="{{status}}" bind:change="onStatusChange" direction="horizontal">
+        <van-radio name="active" icon-size="36rpx">正常</van-radio>
+        <van-radio name="paused" icon-size="36rpx">暂停</van-radio>
+      </van-radio-group>
+    </view>
+  </view>
+
+  <view class="mt-lg">
+    <button class="btn btn--primary btn--block btn--round" bindtap="onSubmit" disabled="{{submitting}}">
+      {{isEdit ? '保存修改' : '新增学生'}}
+    </button>
+  </view>
+  <view class="mt-sm" wx:if="{{isEdit}}">
+    <button class="btn btn--ghost btn--block btn--round" bindtap="onDelete">删除学生</button>
+  </view>
+
+  <!-- 学校选择器 -->
+  <van-popup show="{{showSchoolPicker}}" position="bottom" round bind:close="closeSchoolPicker">
+    <van-picker columns="{{schoolColumns}}" bind:confirm="onSchoolConfirm" bind:cancel="closeSchoolPicker" show-toolbar title="选择学校" />
+  </van-popup>
+
+  <!-- 年级选择器 -->
+  <van-popup show="{{showGradePicker}}" position="bottom" round bind:close="closeGradePicker">
+    <van-picker columns="{{gradeColumns}}" bind:confirm="onGradeConfirm" bind:cancel="closeGradePicker" show-toolbar title="选择年级" />
+  </van-popup>
+
+  <!-- 班级选择器 -->
+  <van-popup show="{{showClassPicker}}" position="bottom" round bind:close="closeClassPicker">
+    <van-picker columns="{{classColumns}}" bind:confirm="onClassConfirm" bind:cancel="closeClassPicker" show-toolbar title="选择班级" />
+  </van-popup>
+
+  <!-- 家长选择器 -->
+  <van-popup show="{{showGuardianPicker}}" position="bottom" round bind:close="closeGuardianPicker">
+    <van-picker columns="{{guardianColumns}}" bind:confirm="onGuardianConfirm" bind:cancel="closeGuardianPicker" show-toolbar title="选择家长" />
+  </van-popup>
+
+  <van-dialog id="van-dialog" />
+</view>

@@ -1,0 +1,117 @@
+<view class="page safe-bottom">
+  <view class="card">
+    <!-- 学校 -->
+    <view class="form-group">
+      <view class="form-label form-label--required">学校</view>
+      <van-cell
+        title="{{selectedSchool.name || '请选择学校'}}"
+        is-link
+        bindtap="openSchoolPicker"
+        title-class="{{selectedSchool.name ? '' : 'text-secondary'}}"
+      />
+    </view>
+
+    <!-- 年级 -->
+    <view class="form-group">
+      <view class="form-label form-label--required">年级</view>
+      <van-cell
+        title="{{selectedGrade.name || '请选择年级'}}"
+        is-link
+        bindtap="openGradePicker"
+        title-class="{{selectedGrade.name ? '' : 'text-secondary'}}"
+      />
+    </view>
+
+    <!-- 班级 -->
+    <view class="form-group">
+      <view class="form-label form-label--required">班级</view>
+      <van-cell
+        title="{{selectedClass.name || '请选择班级'}}"
+        is-link
+        bindtap="openClassPicker"
+        title-class="{{selectedClass.name ? '' : 'text-secondary'}}"
+      />
+    </view>
+
+    <!-- 日期 -->
+    <view class="form-group">
+      <view class="form-label form-label--required">日期</view>
+      <van-cell title="{{serviceDate}}" is-link bindtap="openDatePicker" />
+    </view>
+
+    <!-- 科目 -->
+    <view class="form-group">
+      <view class="form-label form-label--required">科目</view>
+      <van-cell
+        title="{{subject || '请选择科目'}}"
+        is-link
+        bindtap="openSubjectPicker"
+        title-class="{{subject ? '' : 'text-secondary'}}"
+      />
+    </view>
+
+    <!-- 内容 -->
+    <view class="form-group">
+      <view class="form-label form-label--required">作业内容</view>
+      <textarea class="form-textarea" value="{{content}}" bindinput="onContentInput" placeholder="请输入作业内容" maxlength="1000" style="min-height: 300rpx;" />
+    </view>
+
+    <!-- 附件 -->
+    <view class="form-group">
+      <view class="form-label">附件</view>
+      <van-uploader
+        file-list="{{fileList}}"
+        bind:after-read="afterRead"
+        bind:delete="onDeleteImage"
+        max-count="9"
+        accept="image"
+        upload-text="上传图片"
+      />
+    </view>
+
+    <!-- 备注 -->
+    <view class="form-group">
+      <view class="form-label">备注</view>
+      <textarea class="form-textarea" value="{{remark}}" bindinput="onRemarkInput" placeholder="选填备注信息" maxlength="200" />
+    </view>
+  </view>
+
+  <view class="mt-lg">
+    <button class="btn btn--primary btn--block btn--round" bindtap="onSubmit" disabled="{{submitting}}">
+      {{isEdit ? '保存修改' : '发布作业'}}
+    </button>
+  </view>
+  <view class="mt-sm" wx:if="{{isEdit}}">
+    <button class="btn btn--ghost btn--block btn--round" bindtap="onDelete">删除作业</button>
+  </view>
+
+  <!-- 学校选择器 -->
+  <van-popup show="{{showSchoolPicker}}" position="bottom" round bind:close="closeSchoolPicker">
+    <van-picker columns="{{schoolColumns}}" bind:confirm="onSchoolConfirm" bind:cancel="closeSchoolPicker" show-toolbar title="选择学校" />
+  </van-popup>
+
+  <!-- 年级选择器 -->
+  <van-popup show="{{showGradePicker}}" position="bottom" round bind:close="closeGradePicker">
+    <van-picker columns="{{gradeColumns}}" bind:confirm="onGradeConfirm" bind:cancel="closeGradePicker" show-toolbar title="选择年级" />
+  </van-popup>
+
+  <!-- 班级选择器 -->
+  <van-popup show="{{showClassPicker}}" position="bottom" round bind:close="closeClassPicker">
+    <van-picker columns="{{classColumns}}" bind:confirm="onClassConfirm" bind:cancel="closeClassPicker" show-toolbar title="选择班级" />
+  </van-popup>
+
+  <!-- 科目选择器 -->
+  <van-popup show="{{showSubjectPicker}}" position="bottom" round bind:close="closeSubjectPicker">
+    <van-picker columns="{{subjectColumns}}" bind:confirm="onSubjectConfirm" bind:cancel="closeSubjectPicker" show-toolbar title="选择科目" />
+  </van-popup>
+
+  <!-- 日期选择 -->
+  <van-calendar
+    show="{{showDatePicker}}"
+    bind:close="closeDatePicker"
+    bind:confirm="onDateConfirm"
+    color="#07C160"
+  />
+
+  <van-dialog id="van-dialog" />
+</view>

@@ -1,0 +1,45 @@
+<view class="page page--no-pad safe-bottom">
+  <!-- 日期导航 -->
+  <view class="date-nav mx-lg mt-sm">
+    <view class="date-nav__arrow" bindtap="prevDay">
+      <van-icon name="arrow-left" />
+    </view>
+    <view class="date-nav__text" bindtap="openCalendar">{{dateDisplay}}</view>
+    <view class="date-nav__arrow" bindtap="nextDay">
+      <van-icon name="arrow" />
+    </view>
+  </view>
+
+  <view class="px-lg mt-sm">
+    <view class="list" wx:if="{{homeworkList.length > 0}}">
+      <view
+        class="list-item list-item--clickable"
+        wx:for="{{homeworkList}}"
+        wx:key="id"
+        bindtap="goDetail"
+        data-id="{{item.id}}"
+      >
+        <view class="list-content">
+          <view class="flex flex-between">
+            <text class="list-title">{{item.subject}}</text>
+            <text class="text-sm text-secondary">{{item.schoolName}} {{item.className}}</text>
+          </view>
+          <view class="list-desc truncate">{{item.content}}</view>
+        </view>
+      </view>
+    </view>
+    <van-empty wx:else description="当天暂无作业" image="search" />
+  </view>
+
+  <view class="fab" wx:if="{{canEdit}}" bindtap="onAdd">
+    <text class="fab-icon">+</text>
+  </view>
+
+  <van-calendar
+    show="{{showCalendar}}"
+    bind:close="closeCalendar"
+    bind:confirm="onCalendarConfirm"
+    default-date="{{calendarDate}}"
+    color="#07C160"
+  />
+</view>
