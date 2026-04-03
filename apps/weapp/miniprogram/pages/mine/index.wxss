@@ -6,19 +6,19 @@
 .mine-header {
   display: flex;
   align-items: center;
-  padding: var(--spacing-xl) var(--spacing-lg) var(--spacing-lg);
+  margin: var(--spacing-lg);
+  padding: 32rpx var(--spacing-lg);
   gap: var(--spacing-md);
-}
-
-.mine-header--guest {
-  background: var(--color-bg-secondary);
+  border-radius: 32rpx;
+  background: linear-gradient(145deg, #edf9f2 0%, #c8edda 100%);
+  box-shadow: 0 4rpx 24rpx rgba(7, 193, 96, 0.1);
 }
 
 .mine-avatar {
-  width: 120rpx;
-  height: 120rpx;
+  width: 116rpx;
+  height: 116rpx;
   border-radius: 50%;
-  background: var(--color-bg-secondary);
+  background: rgba(255, 255, 255, 0.8);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -26,7 +26,7 @@
 }
 
 .mine-avatar--active {
-  background: var(--color-primary-light);
+  background: rgba(255, 255, 255, 0.85);
 }
 
 .mine-info {
@@ -38,6 +38,13 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  color: #1a3d2b;
+}
+
+.mine-desc {
+  margin-top: 6rpx;
+  font-size: 24rpx;
+  color: #4a7060;
 }
 
 .mine-roles {

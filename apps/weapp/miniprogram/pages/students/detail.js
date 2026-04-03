@@ -51,8 +51,8 @@ Page({
         name: student.name || "",
         status: student.status || "active",
         selectedSchool: { id: student.schoolId, name: student.schoolName },
-        selectedGrade: { id: student.gradeId, name: student.gradeName },
-        selectedClass: { id: student.classId, name: student.className },
+        selectedGrade: { id: student.gradeId, name: student.gradeName || student.grade },
+        selectedClass: { id: student.classId, name: buildClassLabel(student.gradeName || student.grade, student.className) },
         selectedGuardian: { id: student.guardianId, name: student.guardianName },
       });
       if (student.schoolId) this.loadGrades(student.schoolId);
@@ -94,7 +94,7 @@ Page({
       const list = res.items || res || [];
       this.setData({
         classes: list,
-        classColumns: list.map((c) => ({ text: c.name, value: c.id })),
+        classColumns: list.map((c) => ({ text: buildClassLabel(this.data.selectedGrade.name, c.name), value: c.id })),
       });
     } catch (e) {
       console.warn("加载班级失败", e);
@@ -175,7 +175,7 @@ Page({
     const val = e.detail.value;
     const cls = this.data.classes.find((c) => c.id === val);
     if (cls) {
-      this.setData({ selectedClass: { id: cls.id, name: cls.name } });
+      this.setData({ selectedClass: { id: cls.id, name: buildClassLabel(this.data.selectedGrade.name, cls.name) } });
     }
     this.closeClassPicker();
   },
@@ -232,4 +232,8 @@ Page({
       .catch(() => {});
   },
 });
+
+function buildClassLabel(gradeName, className) {
+  return [gradeName, className].filter(Boolean).join(" ");
+}
 

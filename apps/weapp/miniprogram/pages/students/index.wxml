@@ -12,20 +12,21 @@
   <view class="px-lg mt-sm">
     <view class="list" wx:if="{{students.length > 0}}">
       <view
-        class="list-item list-item--clickable"
+        class="list-item list-item--clickable manage-list-item"
         wx:for="{{students}}"
         wx:key="id"
         bindtap="goDetail"
         data-id="{{item.id}}"
       >
-        <view class="list-content">
-          <view class="flex flex-between">
+        <view class="list-content manage-list-item__content">
+          <view class="manage-list-item__title-row">
             <text class="list-title">{{item.name}}</text>
             <view class="tag tag--{{item.tagType}}">{{item.statusText}}</view>
           </view>
-          <view class="list-desc">{{item.schoolName}} {{item.gradeName}} {{item.className}}</view>
+          <view class="list-desc">{{item.schoolName}} {{item.gradeName || item.grade}} {{item.className}}</view>
           <view class="list-desc" wx:if="{{item.guardianName}}">家长：{{item.guardianName}} {{item.guardianPhone}}</view>
         </view>
+        <view class="manage-list-item__chevron"></view>
       </view>
     </view>
     <van-empty wx:else description="暂无学生数据" image="search" />

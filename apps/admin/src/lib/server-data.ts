@@ -471,6 +471,13 @@ export async function fetchDailyHomework(query?: ListQuery) {
   return request<DailyHomeworkItem[]>("/api/daily-homework", { query });
 }
 
+export async function fetchDailyHomeworkPrintPDF(query?: ListQuery) {
+  return request<{ path: string; serviceDate: string; url: string }>(
+    "/api/daily-homework/print-pdf",
+    { query },
+  );
+}
+
 export async function saveDailyHomework(input: {
   attachments?: string;
   classId: string;

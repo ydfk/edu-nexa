@@ -1,1 +1,25 @@
-/* 页面级样式继承全局 */
+.detail-value {
+  min-height: 44rpx;
+  padding: 8rpx 0;
+  font-size: 26rpx;
+  line-height: 1.7;
+  color: var(--color-text);
+}
+
+.detail-value--muted {
+  color: var(--color-text-secondary);
+}
+
+.detail-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin-top: 8rpx;
+}
+
+.detail-image {
+  width: 144rpx;
+  height: 144rpx;
+  border-radius: 16rpx;
+  background: var(--color-bg-secondary);
+}

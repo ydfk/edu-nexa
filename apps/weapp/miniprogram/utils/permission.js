@@ -32,12 +32,12 @@ function requireAdmin() {
 /** 根据角色获取功能入口列表 */
 function getFeatureEntries() {
   const entries = [
-    { id: "students", title: "学生管理", icon: "friends-o", url: "/pages/students/index", roles: ["admin", "teacher", "guardian"] },
     { id: "daily-homework", title: "每日作业", icon: "notes-o", url: "/pages/daily-homework/index", roles: ["admin", "teacher", "guardian"] },
-    { id: "guardians", title: "家长管理", icon: "contact", url: "/pages/guardians/index", roles: ["admin", "teacher"] },
-    { id: "schools", title: "学校管理", icon: "home-o", url: "/pages/schools/index", roles: ["admin", "teacher"] },
-    { id: "payments", title: "缴费管理", icon: "balance-o", url: "/pages/payments/index", roles: ["admin", "teacher", "guardian"] },
     { id: "teachers", title: "教师管理", icon: "manager-o", url: "/pages/teachers/index", roles: ["admin"] },
+    { id: "schools", title: "学校管理", icon: "home-o", url: "/pages/schools/index", roles: ["admin", "teacher"] },
+    { id: "guardians", title: "家长管理", icon: "contact", url: "/pages/guardians/index", roles: ["admin", "teacher"] },
+    { id: "students", title: "学生管理", icon: "friends-o", url: "/pages/students/index", roles: ["admin", "teacher", "guardian"] },
+    { id: "payments", title: "缴费管理", icon: "balance-o", url: "/pages/payments/index", roles: ["admin", "teacher", "guardian"] },
   ];
 
   const role = isAdmin() ? "admin" : isTeacher() ? "teacher" : "guardian";

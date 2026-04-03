@@ -4,76 +4,94 @@
 }
 
 .home-hero {
-  position: relative;
-  overflow: hidden;
   margin: var(--spacing-lg);
-  padding: 44rpx 36rpx 200rpx;
-  border-radius: 36rpx;
-  background: linear-gradient(135deg, #0f231b 0%, #1e5f41 68%, #3d8e68 100%);
-  box-shadow: 0 20rpx 48rpx rgba(16, 38, 28, 0.18);
+  padding: 36rpx 32rpx 32rpx;
+  border-radius: 32rpx;
+  background: linear-gradient(145deg, #edf9f2 0%, #c8edda 100%);
+  box-shadow: 0 4rpx 24rpx rgba(7, 193, 96, 0.1);
 }
 
-.home-hero__content {
+.home-hero__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20rpx;
+}
+
+.home-hero__left {
   flex: 1;
   min-width: 0;
-  position: relative;
-  z-index: 2;
 }
 
 .home-hero__eyebrow {
-  font-size: 24rpx;
-  color: rgba(255, 255, 255, 0.74);
+  display: inline-block;
+  padding: 8rpx 22rpx;
+  border-radius: 999rpx;
+  background: rgba(7, 193, 96, 0.18);
+  font-size: 22rpx;
+  color: #06a050;
+  font-weight: 500;
 }
 
 .home-hero__title {
-  margin-top: var(--spacing-sm);
-  font-size: 42rpx;
+  margin-top: 18rpx;
+  font-size: 40rpx;
   line-height: 1.3;
   font-weight: 700;
-  color: #ffffff;
-}
-
-.home-hero__desc {
-  max-width: 460rpx;
-  margin-top: var(--spacing-sm);
-  font-size: 24rpx;
-  line-height: 1.8;
-  color: rgba(255, 255, 255, 0.88);
+  color: #1a3d2b;
 }
 
 .home-hero__art {
-  position: absolute;
-  right: 10rpx;
-  bottom: 0;
-  width: 300rpx;
-  height: 220rpx;
-  opacity: 0.98;
+  width: 160rpx;
+  height: 160rpx;
+  flex-shrink: 0;
+}
+
+.home-hero__desc {
+  margin-top: 20rpx;
+  font-size: 26rpx;
+  line-height: 1.8;
+  color: #4a7060;
 }
 
 .home-intro-list {
-  margin-top: var(--spacing-lg);
+  margin-top: 28rpx;
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-sm);
+  gap: 20rpx;
 }
 
-.home-intro-card {
-  max-width: 460rpx;
-  padding: 22rpx 24rpx;
-  border-radius: 24rpx;
-  background: rgba(255, 255, 255, 0.14);
-  backdrop-filter: blur(12rpx);
+.home-intro-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 16rpx;
 }
 
-.home-intro-card__title {
+.home-intro-item__dot {
+  margin-top: 10rpx;
+  width: 16rpx;
+  height: 16rpx;
+  border-radius: 999rpx;
+  background: #07c160;
+  flex-shrink: 0;
+}
+
+.home-intro-item__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.home-intro-item__title {
+  display: block;
   font-size: 28rpx;
   font-weight: 600;
-  color: #ffffff;
+  color: #1a3d2b;
 }
 
-.home-intro-card__desc {
-  margin-top: 8rpx;
+.home-intro-item__desc {
+  display: block;
+  margin-top: 6rpx;
   font-size: 24rpx;
   line-height: 1.7;
-  color: rgba(255, 255, 255, 0.78);
+  color: #6a8878;
 }

@@ -29,14 +29,22 @@ Page({
 
   async loadUsers() {
     try {
-      const params = {};
-      if (this.data.keyword) params.keyword = this.data.keyword;
+      const params = { role: "teacher" };
       const res = await getUsers(params);
-      const list = (res.items || res || []).map((u) => ({
+      const keyword = (this.data.keyword || "").trim();
+      const list = (res.items || res || [])
+        .filter((u) => Array.isArray(u.roles) && u.roles.includes("teacher"))
+        .filter((u) => {
+          if (!keyword) return true;
+          const name = u.displayName || "";
+          const phone = u.phone || "";
+          return name.includes(keyword) || phone.includes(keyword);
+        })
+        .map((u) => ({
         ...u,
         statusText: getStatusName(u.status),
         tagType: getStatusTagType(u.status),
-        roleNames: (u.roles || []).map((r) => getRoleName(r)),
+        roleNames: (u.roles || []).filter((r) => r !== "guardian").map((r) => getRoleName(r)),
       }));
       this.setData({ users: list });
     } catch (e) {

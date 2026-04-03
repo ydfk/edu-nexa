@@ -1,52 +1,57 @@
 <view class="page safe-bottom">
-  <!-- 学校列表 -->
   <view wx:if="{{schools.length > 0}}">
-    <van-collapse value="{{activeSchool}}" bind:change="onSchoolCollapse" accordion>
-      <van-collapse-item wx:for="{{schools}}" wx:key="id" name="{{item.id}}" title="{{item.name}}">
-        <view slot="value" class="text-sm text-secondary">{{item.gradeCount || 0}}个年级</view>
-
-        <!-- 年级列表 -->
-        <view class="grade-list">
-          <view class="grade-item" wx:for="{{item.grades}}" wx:for-item="grade" wx:key="id">
-            <view class="flex flex-between" bindtap="toggleGrade" data-school-id="{{item.id}}" data-grade-id="{{grade.id}}">
-              <text class="text-base font-medium">{{grade.name}}</text>
-              <text class="text-sm text-secondary">{{grade.classCount || 0}}个班级</text>
-            </view>
-
-            <!-- 班级列表 -->
-            <view class="class-list" wx:if="{{grade.expanded}}">
-              <view class="class-item flex flex-between" wx:for="{{grade.classes}}" wx:for-item="cls" wx:key="id">
-                <view>
-                  <text class="text-sm">{{cls.name}}</text>
-                  <text class="text-xs text-secondary ml-xs">（{{cls.studentCount || 0}}人）</text>
-                </view>
-                <view class="flex gap-xs" wx:if="{{canEdit}}">
-                  <text class="text-sm text-primary" bindtap="editClass" data-class="{{cls}}" data-grade-id="{{grade.id}}">编辑</text>
-                  <text class="text-sm text-danger" bindtap="removeClass" data-id="{{cls.id}}">删除</text>
-                </view>
-              </view>
-              <view class="mt-sm" wx:if="{{canEdit}}">
-                <button class="btn btn--outline btn--small" bindtap="addClass" data-grade-id="{{grade.id}}">+ 添加班级</button>
-              </view>
-            </view>
-
-            <view class="flex gap-xs mt-xs" wx:if="{{canEdit}}">
-              <text class="text-sm text-primary" bindtap="editGrade" data-grade="{{grade}}" data-school-id="{{item.id}}">编辑</text>
-              <text class="text-sm text-danger" bindtap="removeGrade" data-id="{{grade.id}}">删除</text>
-            </view>
+    <view class="school-list">
+      <view class="school-card" wx:for="{{schools}}" wx:key="id">
+        <view class="school-card__header">
+          <view class="school-card__title-wrap">
+            <view class="school-card__title">{{item.name}}</view>
+            <view class="school-card__meta">{{item.gradeCount || 0}}个年级 · {{item.classTotal || 0}}个班级</view>
           </view>
-
-          <view class="mt-sm" wx:if="{{canEdit}}">
-            <button class="btn btn--outline btn--small" bindtap="addGrade" data-school-id="{{item.id}}">+ 添加年级</button>
+          <view class="school-card__actions" wx:if="{{canEdit}}">
+            <text class="action-link" bindtap="editSchool" data-school="{{item}}">编辑</text>
+            <text class="action-link action-link--danger" bindtap="removeSchool" data-id="{{item.id}}">删除</text>
           </view>
         </view>
 
-        <view class="flex gap-sm mt-md" wx:if="{{canEdit}}">
-          <button class="btn btn--outline btn--small" bindtap="editSchool" data-school="{{item}}">编辑学校</button>
-          <button class="btn btn--small" style="color: var(--color-danger);" bindtap="removeSchool" data-id="{{item.id}}">删除学校</button>
+        <view class="grade-list" wx:if="{{item.grades.length > 0}}">
+          <view class="grade-block" wx:for="{{item.grades}}" wx:for-item="grade" wx:key="id">
+            <view class="grade-block__header">
+              <view>
+                <view class="grade-block__title">{{grade.name}}</view>
+                <view class="grade-block__meta">{{grade.classCount || 0}}个班级</view>
+              </view>
+              <view class="grade-block__actions" wx:if="{{canEdit}}">
+                <text class="action-link" bindtap="editGrade" data-grade="{{grade}}">编辑</text>
+                <text class="action-link action-link--danger" bindtap="removeGrade" data-id="{{grade.id}}">删除</text>
+              </view>
+            </view>
+
+            <view class="class-list" wx:if="{{grade.classes.length > 0}}">
+              <view class="class-row" wx:for="{{grade.classes}}" wx:for-item="cls" wx:key="id">
+                <view class="class-row__info">
+                  <view class="class-row__name">{{cls.name}}</view>
+                  <view class="class-row__meta">{{cls.studentCount || 0}}人</view>
+                </view>
+                <view class="class-row__actions" wx:if="{{canEdit}}">
+                  <text class="action-link" bindtap="editClass" data-class="{{cls}}" data-grade="{{grade}}" data-school="{{item}}">编辑</text>
+                  <text class="action-link action-link--danger" bindtap="removeClass" data-id="{{cls.id}}">删除</text>
+                </view>
+              </view>
+            </view>
+            <view class="class-empty" wx:else>暂无班级</view>
+
+            <view class="grade-block__footer" wx:if="{{canEdit}}">
+              <text class="subtle-link" bindtap="addClass" data-grade="{{grade}}" data-school="{{item}}">+ 添加班级</text>
+            </view>
+          </view>
         </view>
-      </van-collapse-item>
-    </van-collapse>
+        <view class="school-empty" wx:else>暂无年级与班级</view>
+
+        <view class="school-card__footer" wx:if="{{canEdit}}">
+          <text class="subtle-link" bindtap="addGrade">+ 添加年级</text>
+        </view>
+      </view>
+    </view>
   </view>
   <van-empty wx:else description="暂无学校数据" />
 

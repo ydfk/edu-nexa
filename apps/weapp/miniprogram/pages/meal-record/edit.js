@@ -1,15 +1,18 @@
 const { getStudents, saveMealRecord, getMealRecords, uploadImage } = require("../../services/records");
 const { getSession, isGuardian } = require("../../store/session");
-const { requireEditor } = require("../../utils/permission");
+const { requireAuth, requireEditor } = require("../../utils/permission");
 const { getToday, formatDate } = require("../../utils/date");
 const Dialog = require("@vant/weapp/dialog/dialog");
 
 Page({
   data: {
     isEdit: false,
+    readOnly: false,
+    pendingStudentId: "",
     recordId: "",
     serviceDate: "",
     status: "completed",
+    statusText: "已用餐",
     remark: "",
     fileList: [],
     imageUrls: [],
@@ -22,10 +25,24 @@ Page({
   },
 
   onLoad(options) {
+    const readOnly = options.mode === "view";
+    if (readOnly) {
+      if (!requireAuth()) return;
+    } else if (!requireEditor()) {
+      return;
+    }
+
+    const isEdit = !!options.id;
     this.setData({
       serviceDate: options.date || getToday(),
-      isEdit: !!options.id,
+      isEdit,
+      pendingStudentId: options.studentId || "",
+      readOnly,
       recordId: options.id || "",
+      statusText: getMealStatusText("completed"),
+    });
+    wx.setNavigationBarTitle({
+      title: readOnly ? "查看用餐记录" : isEdit ? "编辑用餐记录" : "新增用餐记录",
     });
     this.loadStudents();
     if (options.id) this.loadRecord(options.id);
@@ -41,10 +58,17 @@ Page({
       params.status = "active";
       const res = await getStudents(params);
       const list = res.items || res || [];
-      this.setData({
+      const nextData = {
         students: list,
-        studentColumns: list.map((s) => ({ text: `${s.name}（${s.className || ""})`, value: s.id })),
-      });
+        studentColumns: list.map((s) => ({ text: buildStudentLabel(s), value: s.id })),
+      };
+      if (!this.data.isEdit && this.data.pendingStudentId) {
+        const selectedStudent = list.find((s) => String(s.id) === String(this.data.pendingStudentId));
+        if (selectedStudent) {
+          nextData.selectedStudent = { id: selectedStudent.id, name: buildStudentLabel(selectedStudent) };
+        }
+      }
+      this.setData(nextData);
     } catch (e) {
       console.warn("加载学生失败", e);
     }
@@ -60,9 +84,10 @@ Page({
       const student = this.data.students.find((s) => String(s.id) === String(record.studentId)) || {};
       this.setData({
         status: record.status || "completed",
+        statusText: getMealStatusText(record.status || "completed"),
         remark: record.remark || "",
         serviceDate: record.serviceDate || getToday(),
-        selectedStudent: { id: record.studentId, name: record.studentName || student.name },
+        selectedStudent: { id: record.studentId, name: buildRecordStudentLabel(record, student) },
         imageUrls: record.imageUrls || [],
         fileList: (record.imageUrls || []).map((url, i) => ({ url, name: `img${i}` })),
       });
@@ -71,29 +96,38 @@ Page({
     }
   },
 
-  openStudentPicker() { this.setData({ showStudentPicker: true }); },
+  openStudentPicker() {
+    if (this.data.readOnly) return;
+    this.setData({ showStudentPicker: true });
+  },
   closeStudentPicker() { this.setData({ showStudentPicker: false }); },
 
   onStudentConfirm(e) {
     const val = e.detail.value;
     const student = this.data.students.find((s) => s.id === val);
     if (student) {
-      this.setData({ selectedStudent: { id: student.id, name: student.name } });
+      this.setData({ selectedStudent: { id: student.id, name: buildStudentLabel(student) } });
     }
     this.closeStudentPicker();
   },
 
-  openDatePicker() { this.setData({ showDatePicker: true }); },
+  openDatePicker() {
+    if (this.data.readOnly) return;
+    this.setData({ showDatePicker: true });
+  },
   closeDatePicker() { this.setData({ showDatePicker: false }); },
 
   onDateConfirm(e) {
     this.setData({ showDatePicker: false, serviceDate: formatDate(new Date(e.detail)) });
   },
 
-  onStatusChange(e) { this.setData({ status: e.detail }); },
+  onStatusChange(e) {
+    this.setData({ status: e.detail, statusText: getMealStatusText(e.detail) });
+  },
   onRemarkInput(e) { this.setData({ remark: e.detail.value }); },
 
   async afterRead(e) {
+    if (this.data.readOnly) return;
     const { file } = e.detail;
     const files = Array.isArray(file) ? file : [file];
     for (const f of files) {
@@ -112,6 +146,7 @@ Page({
   },
 
   onDeleteImage(e) {
+    if (this.data.readOnly) return;
     const idx = e.detail.index;
     const urls = [...this.data.imageUrls];
     const fl = [...this.data.fileList];
@@ -121,6 +156,7 @@ Page({
   },
 
   async onSubmit() {
+    if (this.data.readOnly) return;
     if (!this.data.selectedStudent.id) {
       wx.showToast({ title: "请选择学生", icon: "none" });
       return;
@@ -146,6 +182,7 @@ Page({
   },
 
   onDelete() {
+    if (this.data.readOnly) return;
     Dialog.confirm({ title: "确认删除", message: "删除后不可恢复" })
       .then(async () => {
         try {
@@ -160,4 +197,27 @@ Page({
       .catch(() => {});
   },
 });
+
+function buildStudentLabel(student) {
+  const gradeName = student.gradeName || student.grade || "";
+  const className = student.className || "";
+  const suffix = [gradeName, className].filter(Boolean).join(" ");
+  return suffix ? `${student.name}（${suffix}）` : student.name;
+}
+
+function buildRecordStudentLabel(record, student) {
+  const studentName = record.studentName || student.name || "";
+  const gradeName = record.gradeName || record.grade || student.gradeName || student.grade || "";
+  const className = record.className || student.className || "";
+  const suffix = [gradeName, className].filter(Boolean).join(" ");
+  return suffix ? `${studentName}（${suffix}）` : studentName;
+}
+
+function getMealStatusText(status) {
+  const map = {
+    completed: "已用餐",
+    absent: "未用餐",
+  };
+  return map[status] || status;
+}
 

@@ -1,16 +1,21 @@
 const { getStudents, saveHomeworkRecord, getHomeworkRecords, uploadImage } = require("../../services/records");
 const { getRuntimeSettings } = require("../../services/common");
 const { getSession, isGuardian } = require("../../store/session");
-const { requireEditor } = require("../../utils/permission");
+const { requireAuth, requireEditor } = require("../../utils/permission");
 const { getToday, formatDate } = require("../../utils/date");
 const Dialog = require("@vant/weapp/dialog/dialog");
 
 Page({
   data: {
     isEdit: false,
+    readOnly: false,
+    pendingStudentId: "",
+    pendingSubject: "",
     recordId: "",
+    assignmentId: "",
     serviceDate: "",
     status: "completed",
+    statusText: "已完成",
     subject: "",
     remark: "",
     fileList: [],
@@ -26,10 +31,26 @@ Page({
   },
 
   onLoad(options) {
+    const readOnly = options.mode === "view";
+    if (readOnly) {
+      if (!requireAuth()) return;
+    } else if (!requireEditor()) {
+      return;
+    }
+
+    const isEdit = !!options.id;
     this.setData({
+      assignmentId: options.assignmentId || "",
       serviceDate: options.date || getToday(),
-      isEdit: !!options.id,
+      isEdit,
+      pendingStudentId: options.studentId || "",
+      pendingSubject: decodeURIComponent(options.subject || ""),
+      readOnly,
       recordId: options.id || "",
+      statusText: getHomeworkStatusText("completed"),
+    });
+    wx.setNavigationBarTitle({
+      title: readOnly ? "查看作业记录" : isEdit ? "编辑作业记录" : "新增作业记录",
     });
     this.loadStudents();
     this.loadSubjects();
@@ -44,10 +65,17 @@ Page({
       }
       const res = await getStudents(params);
       const list = res.items || res || [];
-      this.setData({
+      const nextData = {
         students: list,
-        studentColumns: list.map((s) => ({ text: `${s.name}（${s.className || ""})`, value: s.id })),
-      });
+        studentColumns: list.map((s) => ({ text: buildStudentLabel(s), value: s.id })),
+      };
+      if (!this.data.isEdit && this.data.pendingStudentId) {
+        const selectedStudent = list.find((s) => String(s.id) === String(this.data.pendingStudentId));
+        if (selectedStudent) {
+          nextData.selectedStudent = { id: selectedStudent.id, name: buildStudentLabel(selectedStudent) };
+        }
+      }
+      this.setData(nextData);
     } catch (e) {
       console.warn("加载学生失败", e);
     }
@@ -57,9 +85,17 @@ Page({
     try {
       const settings = await getRuntimeSettings();
       const subjects = settings.homeworkSubjects || ["语文", "数学", "英语"];
-      this.setData({ subjectColumns: subjects.map((s) => ({ text: s, value: s })) });
+      const nextData = { subjectColumns: subjects.map((s) => ({ text: s, value: s })) };
+      if (!this.data.isEdit && this.data.pendingSubject) {
+        nextData.subject = this.data.pendingSubject;
+      }
+      this.setData(nextData);
     } catch (e) {
-      this.setData({ subjectColumns: ["语文", "数学", "英语"].map((s) => ({ text: s, value: s })) });
+      const nextData = { subjectColumns: ["语文", "数学", "英语"].map((s) => ({ text: s, value: s })) };
+      if (!this.data.isEdit && this.data.pendingSubject) {
+        nextData.subject = this.data.pendingSubject;
+      }
+      this.setData(nextData);
     }
   },
 
@@ -70,11 +106,13 @@ Page({
       const record = Array.isArray(records) ? records.find((r) => String(r.id) === String(id)) : records;
       if (!record) return;
       this.setData({
+        assignmentId: record.assignmentId || "",
         status: record.status || "completed",
+        statusText: getHomeworkStatusText(record.status || "completed"),
         subject: record.subject || "",
         remark: record.remark || "",
         serviceDate: record.serviceDate || getToday(),
-        selectedStudent: { id: record.studentId, name: record.studentName },
+        selectedStudent: { id: record.studentId, name: buildRecordStudentLabel(record) },
         imageUrls: record.imageUrls || [],
         fileList: (record.imageUrls || []).map((url, i) => ({ url, name: `img${i}` })),
       });
@@ -83,31 +121,41 @@ Page({
     }
   },
 
-  openStudentPicker() { this.setData({ showStudentPicker: true }); },
+  openStudentPicker() {
+    if (this.data.readOnly) return;
+    this.setData({ showStudentPicker: true });
+  },
   closeStudentPicker() { this.setData({ showStudentPicker: false }); },
   onStudentConfirm(e) {
     const val = e.detail.value;
     const student = this.data.students.find((s) => s.id === val);
-    if (student) this.setData({ selectedStudent: { id: student.id, name: student.name } });
+    if (student) this.setData({ selectedStudent: { id: student.id, name: buildStudentLabel(student) } });
     this.closeStudentPicker();
   },
 
-  openSubjectPicker() { this.setData({ showSubjectPicker: true }); },
+  openSubjectPicker() {
+    if (this.data.readOnly) return;
+    this.setData({ showSubjectPicker: true });
+  },
   closeSubjectPicker() { this.setData({ showSubjectPicker: false }); },
   onSubjectConfirm(e) {
     this.setData({ subject: e.detail.value, showSubjectPicker: false });
   },
 
-  openDatePicker() { this.setData({ showDatePicker: true }); },
+  openDatePicker() {
+    if (this.data.readOnly) return;
+    this.setData({ showDatePicker: true });
+  },
   closeDatePicker() { this.setData({ showDatePicker: false }); },
   onDateConfirm(e) {
     this.setData({ showDatePicker: false, serviceDate: formatDate(new Date(e.detail)) });
   },
 
-  onStatusChange(e) { this.setData({ status: e.detail }); },
+  onStatusChange(e) { this.setData({ status: e.detail, statusText: getHomeworkStatusText(e.detail) }); },
   onRemarkInput(e) { this.setData({ remark: e.detail.value }); },
 
   async afterRead(e) {
+    if (this.data.readOnly) return;
     const { file } = e.detail;
     const files = Array.isArray(file) ? file : [file];
     for (const f of files) {
@@ -126,6 +174,7 @@ Page({
   },
 
   onDeleteImage(e) {
+    if (this.data.readOnly) return;
     const idx = e.detail.index;
     const urls = [...this.data.imageUrls];
     const fl = [...this.data.fileList];
@@ -135,6 +184,7 @@ Page({
   },
 
   async onSubmit() {
+    if (this.data.readOnly) return;
     if (!this.data.selectedStudent.id) {
       wx.showToast({ title: "请选择学生", icon: "none" });
       return;
@@ -142,6 +192,7 @@ Page({
     this.setData({ submitting: true });
     try {
       const payload = {
+        assignmentId: this.data.assignmentId,
         studentId: this.data.selectedStudent.id,
         serviceDate: this.data.serviceDate,
         status: this.data.status,
@@ -161,6 +212,7 @@ Page({
   },
 
   onDelete() {
+    if (this.data.readOnly) return;
     Dialog.confirm({ title: "确认删除", message: "删除后不可恢复" })
       .then(async () => {
         try {
@@ -175,4 +227,27 @@ Page({
       .catch(() => {});
   },
 });
+
+function buildStudentLabel(student) {
+  const gradeName = student.gradeName || student.grade || "";
+  const className = student.className || "";
+  const suffix = [gradeName, className].filter(Boolean).join(" ");
+  return suffix ? `${student.name}（${suffix}）` : student.name;
+}
+
+function buildRecordStudentLabel(record) {
+  const gradeName = record.gradeName || record.grade || "";
+  const className = record.className || "";
+  const suffix = [gradeName, className].filter(Boolean).join(" ");
+  return suffix ? `${record.studentName}（${suffix}）` : record.studentName;
+}
+
+function getHomeworkStatusText(status) {
+  const map = {
+    completed: "已完成",
+    partial: "部分完成",
+    pending: "待处理",
+  };
+  return map[status] || status;
+}
 

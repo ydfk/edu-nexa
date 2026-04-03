@@ -82,6 +82,13 @@ function getDailyHomework(params) {
   });
 }
 
+function getDailyHomeworkPrintPDF(params) {
+  return request({
+    method: "GET",
+    url: buildURL("/daily-homework/print-pdf", params),
+  });
+}
+
 function saveDailyHomework(payload) {
   const method = payload.id ? "PUT" : "POST";
   const url = payload.id ? `/daily-homework/${payload.id}` : "/daily-homework";
@@ -158,6 +165,7 @@ function buildURL(path, params) {
 module.exports = {
   getCampuses,
   getDailyHomework,
+  getDailyHomeworkPrintPDF,
   getHomeConfig,
   getHomeworkRecords,
   getMealRecords,

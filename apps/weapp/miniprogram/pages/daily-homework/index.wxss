@@ -1,1 +1,163 @@
-/* 使用全局样式 */
+.homework-datebar {
+  padding-top: 0;
+}
+
+.homework-datebar__inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16rpx;
+  padding: 16rpx 0;
+  background: #ffffff;
+  box-shadow: var(--shadow-card);
+}
+
+.homework-datebar__arrow {
+  width: 52rpx;
+  height: 52rpx;
+  border-radius: 14rpx;
+  background: #edf9f2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #1a3d2b;
+}
+
+.homework-datebar__text {
+  min-width: 260rpx;
+  text-align: center;
+  font-size: 28rpx;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.homework-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 20rpx;
+}
+
+.homework-toolbar__action {
+  padding: 12rpx 22rpx;
+  border-radius: 16rpx;
+  background: #edf7f1;
+  font-size: 22rpx;
+  color: #0b8d4a;
+}
+
+.homework-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 18rpx;
+  padding: 0 20rpx 24rpx;
+}
+
+.school-card {
+  padding: 24rpx;
+  border-radius: 24rpx;
+  background: #ffffff;
+  box-shadow: var(--shadow-card);
+}
+
+.school-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20rpx;
+}
+
+.school-card__title {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.school-card__meta {
+  margin-top: 6rpx;
+  font-size: 22rpx;
+  color: var(--color-text-secondary);
+}
+
+.grade-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14rpx;
+  margin-top: 18rpx;
+}
+
+.grade-block {
+  padding: 18rpx;
+  border-radius: 20rpx;
+  background: linear-gradient(180deg, #f8fbf9 0%, #f1f6f3 100%);
+  border: 1rpx solid rgba(7, 193, 96, 0.1);
+}
+
+.grade-block__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16rpx;
+}
+
+.grade-block__title {
+  font-size: 27rpx;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.grade-block__meta {
+  margin-top: 4rpx;
+  font-size: 20rpx;
+  color: var(--color-text-secondary);
+}
+
+.homework-content {
+  margin-top: 12rpx;
+  font-size: 22rpx;
+  line-height: 1.65;
+  color: var(--color-text);
+}
+
+.homework-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10rpx;
+  margin-top: 12rpx;
+}
+
+.homework-attachment {
+  width: 116rpx;
+  height: 116rpx;
+  border-radius: 14rpx;
+  background: var(--color-bg-secondary);
+}
+
+.homework-attachment--file {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+  padding: 10rpx;
+  box-sizing: border-box;
+  background: #fff7f6;
+  border: 1rpx solid rgba(196, 61, 51, 0.12);
+}
+
+.homework-attachment__name {
+  max-width: 100%;
+  font-size: 18rpx;
+  line-height: 1.35;
+  color: #8a4a43;
+  text-align: center;
+  word-break: break-all;
+}
+
+.homework-remark {
+  margin-top: 10rpx;
+  padding-top: 10rpx;
+  border-top: 1rpx solid rgba(5, 90, 52, 0.08);
+  font-size: 20rpx;
+  line-height: 1.6;
+  color: var(--color-text-secondary);
+}

@@ -49,8 +49,7 @@ Page({
     Dialog.confirm({ title: "确认退出", message: "退出后需要重新登录" })
       .then(() => {
         clearSession();
-        wx.switchTab({ url: "/pages/home/index" });
-        wx.showToast({ title: "已退出登录", icon: "success" });
+        wx.reLaunch({ url: "/pages/home/index" });
       })
       .catch(() => {});
   },

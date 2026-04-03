@@ -1,19 +1,23 @@
 <view class="page page--no-pad safe-bottom">
   <view class="home-hero">
-    <view class="home-hero__content">
-      <view class="home-hero__eyebrow">{{heroBadge}}</view>
-      <view class="home-hero__title">{{heroTitle}}</view>
-      <view class="home-hero__desc">{{heroDesc}}</view>
-      <view class="home-intro-list">
-        <view class="home-intro-card" wx:for="{{introPoints}}" wx:key="id">
-          <view class="home-intro-card__title">{{item.title}}</view>
-          <view class="home-intro-card__desc">{{item.desc}}</view>
+    <view class="home-hero__head">
+      <view class="home-hero__left">
+        <view class="home-hero__eyebrow">{{heroBadge}}</view>
+        <view class="home-hero__title">{{heroTitle}}</view>
+      </view>
+      <image class="home-hero__art" src="{{heroImage}}" mode="aspectFit" />
+    </view>
+    <view class="home-hero__desc">{{heroDesc}}</view>
+    <view class="home-intro-list">
+      <view class="home-intro-item" wx:for="{{introPoints}}" wx:key="id">
+        <view class="home-intro-item__dot" />
+        <view class="home-intro-item__body">
+          <text class="home-intro-item__title">{{item.title}}</text>
+          <text class="home-intro-item__desc">{{item.desc}}</text>
         </view>
       </view>
     </view>
-    <image class="home-hero__art" src="{{heroImage}}" mode="aspectFit" />
   </view>
-
   <view class="section mx-lg">
     <view class="section-header">
       <text class="section-title">最近动态</text>

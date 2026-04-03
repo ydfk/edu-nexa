@@ -1,5 +1,5 @@
-const { getMealRecords, getHomeworkRecords } = require("../../services/records");
-const { isLoggedIn } = require("../../store/session");
+const { getMealRecords, getHomeworkRecords, getStudents } = require("../../services/records");
+const { getSession, isGuardian, isLoggedIn } = require("../../store/session");
 const { getStatusName, getStatusTagType } = require("../../utils/permission");
 const { getToday } = require("../../utils/date");
 
@@ -47,18 +47,25 @@ Page({
 
     try {
       const params = { serviceDate: today, pageSize: 5 };
-      const [meals, homework] = await Promise.all([
+      const studentParams = {};
+      if (isGuardian()) {
+        studentParams.guardianPhone = getSession().user?.phone;
+      }
+
+      const [students, meals, homework] = await Promise.all([
+        getStudents(studentParams).catch(() => []),
         getMealRecords(params).catch(() => ({ items: [] })),
         getHomeworkRecords(params).catch(() => ({ items: [] })),
       ]);
+      const studentMetaMap = buildStudentMetaMap(students);
 
       const recentItems = [];
       (meals.items || meals || []).slice(0, 3).forEach((item) => {
         recentItems.push({
           id: `meal-${item.id}`,
           title: `${item.studentName} · 用餐`,
-          desc: buildRecordDesc(item, "meal"),
-          tagText: getStatusName(item.status),
+          desc: buildRecordDesc(item, "meal", studentMetaMap),
+          tagText: getMealStatusText(item.status),
           tagType: getStatusTagType(item.status),
         });
       });
@@ -66,7 +73,7 @@ Page({
         recentItems.push({
           id: `hw-${item.id}`,
           title: `${item.studentName} · 作业`,
-          desc: buildRecordDesc(item, "homework"),
+          desc: buildRecordDesc(item, "homework", studentMetaMap),
           tagText: getStatusName(item.status),
           tagType: getStatusTagType(item.status),
         });
@@ -82,13 +89,27 @@ Page({
   },
 });
 
-function buildRecordDesc(item, type) {
+function buildRecordDesc(item, type, studentMetaMap) {
+  const studentMeta = (studentMetaMap && studentMetaMap[item.studentId]) || {};
   const parts = [item.serviceDate];
-  if (item.schoolName) parts.push(item.schoolName);
-  if (item.gradeName) parts.push(item.gradeName);
-  if (item.className) parts.push(item.className);
+  if (item.schoolName || studentMeta.schoolName) parts.push(item.schoolName || studentMeta.schoolName);
+  if (item.gradeName || item.grade || studentMeta.grade) parts.push(item.gradeName || item.grade || studentMeta.grade);
+  if (item.className || studentMeta.className) parts.push(item.className || studentMeta.className);
   if (type === "homework" && item.subject) parts.push(item.subject);
   return parts.filter(Boolean).join(" · ");
+}
+
+function buildStudentMetaMap(students) {
+  const map = {};
+  (students || []).forEach((item) => {
+    if (!item || !item.id) return;
+    map[item.id] = {
+      schoolName: item.schoolName || "",
+      grade: item.gradeName || item.grade || "",
+      className: item.className || "",
+    };
+  });
+  return map;
 }
 
 function buildIntroActivities() {
@@ -115,4 +136,12 @@ function buildIntroActivities() {
       tagType: "success",
     },
   ];
+}
+
+function getMealStatusText(status) {
+  const map = {
+    completed: "已用餐",
+    absent: "未用餐",
+  };
+  return map[status] || status;
 }

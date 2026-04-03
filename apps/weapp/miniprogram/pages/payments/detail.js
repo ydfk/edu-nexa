@@ -57,7 +57,7 @@ Page({
       const list = res.items || res || [];
       this.setData({
         students: list,
-        studentColumns: list.map((s) => ({ text: `${s.name}（${s.className || ""})`, value: s.id })),
+        studentColumns: list.map((s) => ({ text: buildStudentLabel(s), value: s.id })),
       });
     } catch (e) {
       console.warn("加载学生失败", e);
@@ -92,7 +92,7 @@ Page({
         originalStatus: record.status || "",
         refundAmount: record.refundAmount ? String(record.refundAmount) : "",
         refundRemark: record.refundRemark || "",
-        selectedStudent: { id: record.studentId, name: record.studentName },
+        selectedStudent: { id: record.studentId, name: buildRecordStudentLabel(record) },
       });
     } catch (e) {
       console.warn("加载缴费记录失败", e);
@@ -110,7 +110,7 @@ Page({
     const val = e.detail.value;
     const student = this.data.students.find((s) => s.id === val);
     if (student) {
-      this.setData({ selectedStudent: { id: student.id, name: student.name } });
+      this.setData({ selectedStudent: { id: student.id, name: buildStudentLabel(student) } });
     }
     this.closeStudentPicker();
   },
@@ -192,4 +192,18 @@ Page({
       .catch(() => {});
   },
 });
+
+function buildStudentLabel(student) {
+  const gradeName = student.gradeName || student.grade || "";
+  const className = student.className || "";
+  const suffix = [gradeName, className].filter(Boolean).join(" ");
+  return suffix ? `${student.name}（${suffix}）` : student.name;
+}
+
+function buildRecordStudentLabel(record) {
+  const gradeName = record.gradeName || record.grade || "";
+  const className = record.className || "";
+  const suffix = [gradeName, className].filter(Boolean).join(" ");
+  return suffix ? `${record.studentName}（${suffix}）` : record.studentName;
+}
 

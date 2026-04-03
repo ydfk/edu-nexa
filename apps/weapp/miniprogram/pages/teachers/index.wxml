@@ -12,14 +12,14 @@
   <view class="px-lg mt-sm">
     <view class="list" wx:if="{{users.length > 0}}">
       <view
-        class="list-item list-item--clickable"
+        class="list-item list-item--clickable manage-list-item"
         wx:for="{{users}}"
         wx:key="id"
         bindtap="goDetail"
         data-id="{{item.id}}"
       >
-        <view class="list-content">
-          <view class="flex flex-between">
+        <view class="list-content manage-list-item__content">
+          <view class="manage-list-item__title-row">
             <text class="list-title">{{item.displayName}}</text>
             <view class="tag tag--{{item.tagType}}">{{item.statusText}}</view>
           </view>
@@ -28,6 +28,7 @@
             <text class="ml-sm" wx:for="{{item.roleNames}}" wx:for-item="role" wx:key="*this"> · {{role}}</text>
           </view>
         </view>
+        <view class="manage-list-item__chevron"></view>
       </view>
     </view>
     <van-empty wx:else description="暂无教师数据" image="search" />

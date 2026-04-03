@@ -1,20 +1,19 @@
 <view class="page page--no-pad safe-bottom">
   <!-- 未登录状态 -->
-  <view class="mine-header mine-header--guest" wx:if="{{!loggedIn}}">
+  <view class="mine-header" wx:if="{{!loggedIn}}">
     <view class="mine-avatar">
-      <van-icon name="user-o" size="64rpx" color="#C8C9CC" />
+      <van-icon name="user-o" size="64rpx" color="#4a7060" />
     </view>
     <view class="mine-info">
       <view class="mine-name text-lg font-bold">游客</view>
-      <view class="mine-desc text-sm text-secondary">登录后查看完整功能与真实数据</view>
+      <view class="mine-desc text-sm">登录后查看完整功能与真实数据</view>
     </view>
-    <button class="btn btn--primary btn--small btn--round" bindtap="goLogin">去登录</button>
+    <button class="btn btn--outline btn--small btn--round" bindtap="goLogin">去登录</button>
   </view>
-
   <!-- 已登录状态 -->
   <view class="mine-header" wx:if="{{loggedIn}}">
     <view class="mine-avatar mine-avatar--active">
-      <van-icon name="contact" size="64rpx" color="#07C160" />
+      <van-icon name="contact" size="64rpx" color="#06a050" />
     </view>
     <view class="mine-info">
       <view class="mine-name text-lg font-bold">{{displayName}}</view>
@@ -24,25 +23,17 @@
       </view>
     </view>
   </view>
-
   <!-- 角色切换 -->
   <view class="section mx-lg" wx:if="{{hasMultiRoles}}">
     <view class="section-header">
       <text class="section-title">切换角色</text>
     </view>
     <view class="mine-roles">
-      <view
-        class="mine-role-chip {{item.active ? 'mine-role-chip--active' : ''}}"
-        wx:for="{{roleList}}"
-        wx:key="role"
-        bindtap="switchRole"
-        data-role="{{item.role}}"
-      >
+      <view class="mine-role-chip {{item.active ? 'mine-role-chip--active' : ''}}" wx:for="{{roleList}}" wx:key="role" bindtap="switchRole" data-role="{{item.role}}">
         {{item.name}}
       </view>
     </view>
   </view>
-
   <!-- 功能列表 -->
   <view class="mx-lg mt-md" wx:if="{{loggedIn}}">
     <van-cell-group inset round>
@@ -50,23 +41,17 @@
       <van-cell title="修改密码" icon="lock" is-link url="/pages/settings/password" />
     </van-cell-group>
   </view>
-
   <view class="mx-lg mt-md">
     <van-cell-group inset round>
       <van-cell title="关于壹一小屋 学栖·EduNexa" icon="info-o" is-link url="/pages/settings/about" />
       <van-cell title="隐私协议" icon="shield-o" is-link url="/pages/settings/about" />
     </van-cell-group>
   </view>
-
   <!-- 退出登录 -->
   <view class="mx-lg mt-lg" wx:if="{{loggedIn}}">
     <button class="btn btn--ghost btn--block btn--round" bindtap="onLogout">退出登录</button>
   </view>
-
   <!-- 版本号 -->
-  <view class="mine-footer text-xs text-secondary">
-    壹一小屋 学栖·EduNexa v1.0.0
-  </view>
-
+  <view class="mine-footer text-xs text-secondary">壹一小屋 学栖·EduNexa v1.0.0</view>
   <van-dialog id="van-dialog" />
 </view>

@@ -67,16 +67,17 @@ Page({
       const list = res.items || res || [];
       const hw = Array.isArray(list) ? list.find((h) => String(h.id) === String(id)) : list;
       if (!hw) return;
+      const attachmentUrls = parseAttachments(hw.attachments);
       this.setData({
         serviceDate: hw.serviceDate || getToday(),
         subject: hw.subject || "",
         content: hw.content || "",
         remark: hw.remark || "",
-        imageUrls: hw.imageUrls || [],
-        fileList: (hw.imageUrls || []).map((url, i) => ({ url, name: `img${i}` })),
+        imageUrls: attachmentUrls,
+        fileList: attachmentUrls.map((url, i) => ({ url, name: `img${i}` })),
         selectedSchool: { id: hw.schoolId, name: hw.schoolName },
-        selectedGrade: { id: hw.gradeId, name: hw.gradeName },
-        selectedClass: { id: hw.classId, name: hw.className },
+        selectedGrade: { id: hw.gradeId, name: hw.gradeName || hw.grade },
+        selectedClass: { id: hw.classId, name: buildClassLabel(hw.gradeName || hw.grade, hw.className) },
       });
       if (hw.schoolId) this.loadGrades(hw.schoolId);
       if (hw.gradeId) this.loadClasses(hw.gradeId);
@@ -117,7 +118,7 @@ Page({
       const list = res.items || res || [];
       this.setData({
         classes: list,
-        classColumns: list.map((c) => ({ text: c.name, value: c.id })),
+        classColumns: list.map((c) => ({ text: buildClassLabel(this.data.selectedGrade.name, c.name), value: c.id })),
       });
     } catch (e) {
       console.warn("加载班级失败", e);
@@ -179,7 +180,7 @@ Page({
     const val = e.detail.value;
     const cls = this.data.classes.find((c) => c.id === val);
     if (cls) {
-      this.setData({ selectedClass: { id: cls.id, name: cls.name } });
+      this.setData({ selectedClass: { id: cls.id, name: buildClassLabel(this.data.selectedGrade.name, cls.name) } });
     }
     this.closeClassPicker();
   },
@@ -246,7 +247,7 @@ Page({
         subject: this.data.subject,
         content: this.data.content.trim(),
         remark: this.data.remark,
-        imageUrls: this.data.imageUrls,
+        attachments: serializeAttachments(this.data.imageUrls),
       };
       if (this.data.isEdit) payload.id = this.data.homeworkId;
       await saveDailyHomework(payload);
@@ -274,4 +275,29 @@ Page({
       .catch(() => {});
   },
 });
+
+function buildClassLabel(gradeName, className) {
+  return [gradeName, className].filter(Boolean).join(" ");
+}
+
+function parseAttachments(raw) {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw.filter(Boolean);
+  try {
+    const items = JSON.parse(String(raw));
+    if (Array.isArray(items)) {
+      return items.filter((item) => typeof item === "string" && item.trim());
+    }
+  } catch (error) {
+    // 兼容旧的逗号分隔格式
+  }
+  return String(raw)
+    .split(",")
+    .map((item) => item.trim().replace(/^\[/, "").replace(/\]$/, "").replace(/^"/, "").replace(/"$/, ""))
+    .filter(Boolean);
+}
+
+function serializeAttachments(items) {
+  return JSON.stringify((items || []).filter(Boolean));
+}
 

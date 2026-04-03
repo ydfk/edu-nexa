@@ -1,1 +1,56 @@
-/* 使用全局样式 */
+.manage-list-item {
+  align-items: center;
+  gap: 16rpx;
+}
+
+.manage-list-item::after {
+  display: none;
+}
+
+.manage-list-item__content {
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
+}
+
+.manage-list-item__title-row {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  min-width: 0;
+}
+
+.manage-list-item__title-row .list-title {
+  flex: 0 1 auto;
+  max-width: 100%;
+}
+
+.manage-list-item__chevron {
+  flex-shrink: 0;
+  width: 40rpx;
+  height: 40rpx;
+  border-radius: 50%;
+  background: #ffffff;
+  position: relative;
+  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.05);
+}
+
+.manage-list-item__chevron::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 12rpx;
+  height: 12rpx;
+  border-top: 2rpx solid var(--color-text-secondary);
+  border-right: 2rpx solid var(--color-text-secondary);
+  transform: translate(-60%, -50%) rotate(45deg);
+}
+
+.manage-list-item .tag {
+  flex-shrink: 0;
+}
+
+.manage-list-item .list-desc {
+  margin-top: 0;
+}

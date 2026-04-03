@@ -14,16 +14,8 @@ Page({
     if (!logged) return;
 
     const features = getFeatureEntries();
-    this.setData({ features });
-
-    const quickActions = [];
-    if (canEdit()) {
-      quickActions.push(
-        { id: "add-meal", title: "记录用餐", desc: "快速记录学生用餐情况", url: "/pages/meal-record/edit" },
-        { id: "add-hw", title: "记录作业", desc: "记录学生作业完成情况", url: "/pages/homework-record/edit" },
-      );
-    }
-    this.setData({ quickActions });
+    const quickActions = buildQuickActions(logged, canEdit());
+    this.setData({ features, quickActions });
   },
 
   goLogin() {
@@ -34,4 +26,27 @@ Page({
     const url = e.currentTarget.dataset.url;
     if (url) wx.navigateTo({ url });
   },
+
+  onQuickActionTap(e) {
+    const action = e.currentTarget.dataset.action || "";
+    if (action === "print-homework") {
+      wx.navigateTo({ url: "/pages/daily-homework/index?entry=print" });
+      return;
+    }
+    const url = e.currentTarget.dataset.url;
+    if (url) {
+      wx.navigateTo({ url });
+    }
+  },
 });
+
+function buildQuickActions(loggedIn, editable) {
+  if (!loggedIn || !editable) {
+    return [];
+  }
+
+  return [
+    { id: "publish-homework", title: "发布作业", desc: "快速进入每日作业页面", url: "/pages/daily-homework/index" },
+    { id: "print-homework", title: "打印作业", desc: "打开作业页面中的打印入口", action: "print-homework" },
+  ];
+}

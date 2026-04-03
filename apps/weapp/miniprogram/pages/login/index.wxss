@@ -2,80 +2,64 @@
   min-height: 100vh;
   padding: var(--spacing-lg);
   box-sizing: border-box;
-  background:
-    radial-gradient(circle at top right, rgba(7, 193, 96, 0.16), transparent 32%),
-    linear-gradient(180deg, #f6fbf8 0%, #f3f6fb 100%);
+  background: var(--color-bg);
 }
 
 .login-hero {
-  position: relative;
-  overflow: hidden;
   margin-top: var(--spacing-md);
-  padding: 44rpx;
-  border-radius: 36rpx;
-  background: linear-gradient(135deg, #10261c 0%, #184530 58%, #236648 100%);
-  box-shadow: 0 20rpx 48rpx rgba(16, 38, 28, 0.18);
-}
-
-.login-hero__badge {
-  display: inline-flex;
-  align-items: center;
-  height: 52rpx;
-  padding: 0 20rpx;
-  border-radius: 999rpx;
-  background: rgba(255, 255, 255, 0.14);
-  color: rgba(255, 255, 255, 0.9);
-  font-size: 22rpx;
-}
-
-.login-brand {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-md);
-  margin-top: 28rpx;
-}
-
-.login-logo {
-  width: 132rpx;
-  height: 132rpx;
+  padding: 36rpx 32rpx 32rpx;
   border-radius: 32rpx;
-  background: rgba(255, 255, 255, 0.14);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
+  background: linear-gradient(145deg, #edf9f2 0%, #c8edda 100%);
+  box-shadow: 0 4rpx 24rpx rgba(7, 193, 96, 0.1);
 }
 
-.login-brand__text {
+.login-hero__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20rpx;
+}
+
+.login-hero__left {
   flex: 1;
   min-width: 0;
 }
 
+.login-hero__eyebrow {
+  display: inline-block;
+  padding: 8rpx 22rpx;
+  border-radius: 999rpx;
+  background: rgba(7, 193, 96, 0.18);
+  font-size: 22rpx;
+  color: #06a050;
+  font-weight: 500;
+}
+
 .login-app-name {
+  margin-top: 18rpx;
   font-size: 44rpx;
   font-weight: 700;
-  color: #ffffff;
+  color: #1a3d2b;
   line-height: 1.2;
 }
 
 .login-app-subtitle {
-  margin-top: 6rpx;
+  margin-top: 8rpx;
   font-size: 24rpx;
-  color: rgba(255, 255, 255, 0.72);
-}
-
-.login-slogan {
-  margin-top: var(--spacing-sm);
-  font-size: 26rpx;
-  line-height: 1.7;
-  color: rgba(255, 255, 255, 0.88);
+  color: #4a7060;
 }
 
 .login-hero__art {
-  width: 100%;
-  height: 220rpx;
-  margin-top: var(--spacing-md);
-  opacity: 0.98;
+  width: 150rpx;
+  height: 150rpx;
+  flex-shrink: 0;
+}
+
+.login-slogan {
+  margin-top: 20rpx;
+  font-size: 26rpx;
+  line-height: 1.7;
+  color: #4a7060;
 }
 
 .login-panel {

@@ -1,34 +1,69 @@
 <view class="page page--no-pad safe-bottom">
-  <!-- 日期导航 -->
-  <view class="date-nav mx-lg mt-sm">
-    <view class="date-nav__arrow" bindtap="prevDay">
-      <van-icon name="arrow-left" />
-    </view>
-    <view class="date-nav__text" bindtap="openCalendar">{{dateDisplay}}</view>
-    <view class="date-nav__arrow" bindtap="nextDay">
-      <van-icon name="arrow" />
+  <view class="homework-datebar">
+    <view class="homework-datebar__inner">
+      <view class="homework-datebar__arrow" bindtap="prevDay">
+        <van-icon name="arrow-left" />
+      </view>
+      <view class="homework-datebar__text" bindtap="openCalendar">{{dateDisplay}}</view>
+      <view class="homework-datebar__arrow" bindtap="nextDay">
+        <van-icon name="arrow" />
+      </view>
     </view>
   </view>
 
-  <view class="px-lg mt-sm">
-    <view class="list" wx:if="{{homeworkList.length > 0}}">
-      <view
-        class="list-item list-item--clickable"
-        wx:for="{{homeworkList}}"
-        wx:key="id"
-        bindtap="goDetail"
-        data-id="{{item.id}}"
-      >
-        <view class="list-content">
-          <view class="flex flex-between">
-            <text class="list-title">{{item.subject}}</text>
-            <text class="text-sm text-secondary">{{item.schoolName}} {{item.className}}</text>
+  <view class="homework-toolbar mt-sm" wx:if="{{canEdit}}">
+    <view class="homework-toolbar__action" bindtap="onPrintHomework">打印作业</view>
+  </view>
+
+  <view class="homework-groups mt-sm" wx:if="{{homeworkGroups.length > 0}}">
+    <view class="school-card" wx:for="{{homeworkGroups}}" wx:key="key">
+      <view class="school-card__header">
+        <view class="school-card__title-wrap">
+          <view class="school-card__title">{{item.schoolName}}</view>
+          <view class="school-card__meta">{{item.gradeName}} {{item.className}}</view>
+        </view>
+      </view>
+
+      <view class="grade-list">
+        <view class="grade-block" wx:for="{{item.items}}" wx:for-item="homework" wx:key="id" bindtap="goDetail" data-id="{{homework.id}}">
+          <view class="grade-block__header">
+            <view>
+              <view class="grade-block__title">{{homework.subject || "未分类"}}</view>
+              <view class="grade-block__meta" wx:if="{{homework.teacherName}}">教师：{{homework.teacherName}}</view>
+            </view>
           </view>
-          <view class="list-desc truncate">{{item.content}}</view>
+          <view class="homework-content">{{homework.contentText}}</view>
+          <view class="homework-attachments" wx:if="{{homework.attachmentItems && homework.attachmentItems.length > 0}}">
+            <block wx:for="{{homework.attachmentItems}}" wx:for-item="attachment" wx:key="url">
+              <image
+                wx:if="{{attachment.type === 'image'}}"
+                src="{{attachment.url}}"
+                mode="aspectFill"
+                class="homework-attachment"
+                catchtap="openAttachment"
+                data-url="{{attachment.url}}"
+                data-type="{{attachment.type}}"
+                data-image-urls="{{homework.imageAttachmentUrls}}"
+              />
+              <view
+                wx:else
+                class="homework-attachment homework-attachment--file"
+                catchtap="openAttachment"
+                data-url="{{attachment.url}}"
+                data-type="{{attachment.type}}"
+              >
+                <van-icon name="description" size="36rpx" color="#c43d33" />
+                <text class="homework-attachment__name">{{attachment.name}}</text>
+              </view>
+            </block>
+          </view>
+          <view class="homework-remark" wx:if="{{homework.remark}}">备注：{{homework.remark}}</view>
         </view>
       </view>
     </view>
-    <van-empty wx:else description="当天暂无作业" image="search" />
+  </view>
+  <view class="mt-sm" wx:else>
+    <van-empty description="当天暂无作业" image="search" />
   </view>
 
   <view class="fab" wx:if="{{canEdit}}" bindtap="onAdd">

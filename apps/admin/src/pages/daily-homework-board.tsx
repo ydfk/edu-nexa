@@ -20,7 +20,6 @@ import {
 } from "@/components/domain/file-upload";
 import { AttachmentPreviewList } from "@/components/domain/attachment-preview";
 import { SchoolClassCascader } from "@/components/domain/school-class-cascader";
-import { PrintPreviewDialog } from "@/pages/daily-homework-print";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -56,6 +55,7 @@ import {
   deleteDailyHomework,
   fetchClasses,
   fetchDailyHomework,
+  fetchDailyHomeworkPrintPDF,
   fetchSchools,
   fetchServiceDays,
   saveDailyHomework,
@@ -477,8 +477,6 @@ export default function DailyHomeworkBoard() {
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editItem, setEditItem] = useState<DailyHomeworkItem | null>(null);
-  const [printOpen, setPrintOpen] = useState(false);
-
   // 加载基础数据（学校、班级、科目配置）
   useEffect(() => {
     async function loadBase() {
@@ -560,6 +558,20 @@ export default function DailyHomeworkBoard() {
     }
   }
 
+  async function handlePrint() {
+    if (items.length === 0) {
+      return;
+    }
+
+    try {
+      const result = await fetchDailyHomeworkPrintPDF({ serviceDate: selectedDate });
+      window.open(result.url, "_blank", "noopener,noreferrer");
+      toast.success("打印文件已生成，已在新窗口打开");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "生成打印文件失败");
+    }
+  }
+
   const isToday = selectedDate === format(new Date(), "yyyy-MM-dd");
   const weekDayNames = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
   const weekDay = weekDayNames[new Date(selectedDate + "T00:00:00").getDay()];
@@ -612,7 +624,7 @@ export default function DailyHomeworkBoard() {
           <Button
             variant="outline"
             disabled={items.length === 0}
-            onClick={() => setPrintOpen(true)}
+            onClick={() => void handlePrint()}
           >
             打印作业
             <Printer className="ml-1 size-4" />
@@ -674,16 +686,6 @@ export default function DailyHomeworkBoard() {
         editItem={editItem}
         subjects={subjects}
         schools={schools}
-        classes={classes}
-        serviceDate={selectedDate}
-      />
-
-      {/* 打印预览 Dialog */}
-      <PrintPreviewDialog
-        open={printOpen}
-        onClose={() => setPrintOpen(false)}
-        items={items}
-        subjects={subjects}
         classes={classes}
         serviceDate={selectedDate}
       />

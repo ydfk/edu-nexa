@@ -1,4 +1,9 @@
-const { getMealRecords, getHomeworkRecords } = require("../../services/records");
+const {
+  getDailyHomework,
+  getHomeworkRecords,
+  getMealRecords,
+  getStudents,
+} = require("../../services/records");
 const { getSession, isLoggedIn, isGuardian, canEdit } = require("../../store/session");
 const { getStatusName, getStatusTagType, requireAuth } = require("../../utils/permission");
 const { getToday, shiftDate, formatDateCN, formatDate } = require("../../utils/date");
@@ -11,22 +16,16 @@ Page({
     showCalendar: false,
     calendarDate: null,
     canEdit: false,
-    mealStatus: "",
-    statusOptions: [
-      { text: "全部", value: "" },
-      { text: "已完成", value: "completed" },
-      { text: "缺勤", value: "absent" },
-    ],
     mealGroups: [],
     homeworkGroups: [],
     mealStudentIndex: 0,
     homeworkStudentIndex: 0,
     currentGroups: [],
+    currentGroup: null,
     currentRecords: [],
     currentStudentIndex: 0,
-    currentStudentName: "",
-    currentStudentMeta: "",
     currentEmptyText: "暂无记录",
+    currentPlaceholder: null,
   },
 
   onShow() {
@@ -85,13 +84,6 @@ Page({
     this.loadRecords();
   },
 
-  onMealStatusTap(e) {
-    const value = e.currentTarget.dataset.value || "";
-    if (value === this.data.mealStatus) return;
-    this.setData({ mealStatus: value, mealStudentIndex: 0 });
-    this.loadRecords();
-  },
-
   onStudentTap(e) {
     const index = Number(e.currentTarget.dataset.index || 0);
     if (this.data.activeTab === 0) {
@@ -105,48 +97,43 @@ Page({
   async loadRecords() {
     if (!isLoggedIn()) return;
 
-    const params = { serviceDate: this.data.currentDate };
+    const currentDate = this.data.currentDate;
     const session = getSession();
+    const studentParams = { status: "active" };
     if (isGuardian()) {
-      params.guardianPhone = session.user?.phone;
+      studentParams.guardianPhone = session.user?.phone;
     }
 
-    try {
-      const mealParams = { ...params };
-      if (this.data.mealStatus) {
-        mealParams.status = this.data.mealStatus;
-      }
+    const recordParams = { serviceDate: currentDate };
 
-      const [meals, homework] = await Promise.all([
-        getMealRecords(mealParams).catch(() => ({ items: [] })),
-        getHomeworkRecords(params).catch(() => ({ items: [] })),
+    try {
+      const [students, meals, homework, assignments] = await Promise.all([
+        getStudents(studentParams).catch(() => []),
+        getMealRecords(recordParams).catch(() => ({ items: [] })),
+        getHomeworkRecords(recordParams).catch(() => ({ items: [] })),
+        getDailyHomework(recordParams).catch(() => ({ items: [] })),
       ]);
 
-      const mealList = (meals.items || meals || []).map((item) => ({
-        ...item,
-        statusText: getStatusName(item.status),
-        tagType: getStatusTagType(item.status),
-      }));
-      const homeworkList = (homework.items || homework || []).map((item) => ({
-        ...item,
-        statusText: getStatusName(item.status),
-        tagType: getStatusTagType(item.status),
-      }));
+      const studentList = students.items || students || [];
+      const studentMetaMap = buildStudentMetaMap(studentList);
+      const mealList = buildMealCards(meals.items || meals || []);
+      const homeworkList = buildHomeworkRecordList(homework.items || homework || []);
+      const assignmentList = assignments.items || assignments || [];
 
       this.setData({
-        mealGroups: buildStudentGroups(mealList),
-        homeworkGroups: buildStudentGroups(homeworkList),
+        mealGroups: buildMealGroups(studentList, mealList, studentMetaMap, currentDate),
+        homeworkGroups: buildHomeworkGroups(studentList, assignmentList, homeworkList, studentMetaMap, currentDate),
       });
       this.updateCurrentPanel();
-    } catch (e) {
-      console.warn("加载记录失败", e);
+    } catch (error) {
+      console.warn("加载记录失败", error);
       this.setData({
         mealGroups: [],
         homeworkGroups: [],
         currentGroups: [],
+        currentGroup: null,
         currentRecords: [],
-        currentStudentName: "",
-        currentStudentMeta: "",
+        currentPlaceholder: null,
       });
     }
   },
@@ -165,79 +152,235 @@ Page({
       this.setData({
         [indexKey]: 0,
         currentGroups: [],
+        currentGroup: null,
         currentRecords: [],
         currentStudentIndex: 0,
-        currentStudentName: "",
-        currentStudentMeta: "",
         currentEmptyText: activeTab === 0 ? "暂无用餐记录" : "暂无作业记录",
+        currentPlaceholder: null,
       });
       return;
     }
 
     const currentGroup = groups[selectedIndex];
+    const hasRecords = currentGroup.items.length > 0;
     this.setData({
       [indexKey]: selectedIndex,
       currentGroups: groups,
+      currentGroup,
       currentRecords: currentGroup.items,
       currentStudentIndex: selectedIndex,
-      currentStudentName: currentGroup.studentName,
-      currentStudentMeta: currentGroup.meta,
       currentEmptyText: activeTab === 0 ? "暂无用餐记录" : "暂无作业记录",
+      currentPlaceholder: hasRecords ? null : currentGroup.placeholder || null,
     });
   },
 
-  goMealEdit(e) {
-    if (!canEdit()) return;
-    const id = e.currentTarget.dataset.id;
-    wx.navigateTo({ url: `/pages/meal-record/edit?id=${id}` });
-  },
+  goRecordTap(e) {
+    const recordId = e.currentTarget.dataset.recordId || "";
+    const studentId = e.currentTarget.dataset.studentId || "";
+    const subject = e.currentTarget.dataset.subject || "";
+    const assignmentId = e.currentTarget.dataset.assignmentId || "";
 
-  goHomeworkEdit(e) {
-    if (!canEdit()) return;
-    const id = e.currentTarget.dataset.id;
-    wx.navigateTo({ url: `/pages/homework-record/edit?id=${id}` });
-  },
-
-  goRecordDetail(e) {
     if (this.data.activeTab === 0) {
-      this.goMealEdit(e);
+      if (recordId) {
+        wx.navigateTo({ url: this.data.canEdit ? `/pages/meal-record/edit?id=${recordId}` : `/pages/meal-record/edit?id=${recordId}&mode=view` });
+        return;
+      }
+      if (!this.data.canEdit || !studentId) {
+        return;
+      }
+      wx.navigateTo({ url: `/pages/meal-record/edit?date=${this.data.currentDate}&studentId=${studentId}` });
       return;
     }
-    this.goHomeworkEdit(e);
-  },
 
-  onAdd() {
-    if (this.data.activeTab === 0) {
-      wx.navigateTo({ url: `/pages/meal-record/edit?date=${this.data.currentDate}` });
+    if (recordId) {
+      wx.navigateTo({ url: this.data.canEdit ? `/pages/homework-record/edit?id=${recordId}` : `/pages/homework-record/edit?id=${recordId}&mode=view` });
       return;
     }
-    wx.navigateTo({ url: `/pages/homework-record/edit?date=${this.data.currentDate}` });
+    if (!this.data.canEdit || !studentId || !subject) {
+      return;
+    }
+
+    const encodedSubject = encodeURIComponent(subject);
+    const assignmentQuery = assignmentId ? `&assignmentId=${assignmentId}` : "";
+    wx.navigateTo({
+      url: `/pages/homework-record/edit?date=${this.data.currentDate}&studentId=${studentId}&subject=${encodedSubject}${assignmentQuery}`,
+    });
+  },
+
+  previewRecordImages(e) {
+    const current = e.currentTarget.dataset.current || "";
+    const urls = e.currentTarget.dataset.urls || [];
+    if (!current || !Array.isArray(urls) || urls.length === 0) {
+      return;
+    }
+    wx.previewImage({ current, urls });
   },
 });
 
-function buildStudentGroups(records) {
-  const map = {};
-
-  records.forEach((item) => {
-    const key = item.studentId || item.studentName;
-    if (!map[key]) {
-      map[key] = {
-        key,
-        studentName: item.studentName || "未命名学生",
-        meta: buildStudentMeta(item),
-        items: [],
-      };
-    }
-    map[key].items.push(item);
-  });
-
-  return Object.keys(map).map((key) => map[key]);
+function buildMealCards(records) {
+  return (records || []).map((item) => ({
+    assignmentId: "",
+    detailText: item.remark || "",
+    id: item.id,
+    imageUrls: item.imageUrls || [],
+    metaText: item.serviceDate || "",
+    recorded: true,
+    recordId: item.id,
+    statusText: getMealStatusText(item.status),
+    studentId: item.studentId || "",
+    subject: "",
+    summaryText: "",
+    tagType: getStatusTagType(item.status),
+    title: "用餐记录",
+  }));
 }
 
-function buildStudentMeta(item) {
+function buildHomeworkRecordList(records) {
+  return (records || []).map((item) => ({
+    ...item,
+    statusText: getStatusName(item.status),
+    tagType: getStatusTagType(item.status),
+  }));
+}
+
+function buildMealGroups(students, records, studentMetaMap, serviceDate) {
+  const recordMap = {};
+  records.forEach((item) => {
+    const key = item.studentId || item.studentName;
+    if (!recordMap[key]) {
+      recordMap[key] = [];
+    }
+    recordMap[key].push(item);
+  });
+
+  return (students || []).map((student) => ({
+    key: student.id || student.name,
+    placeholder: buildMealPlaceholder(serviceDate),
+    studentId: student.id || "",
+    studentName: student.name || "未命名学生",
+    meta: buildStudentMeta(student, studentMetaMap),
+    items: recordMap[student.id] || [],
+  }));
+}
+
+function buildHomeworkGroups(students, assignments, records, studentMetaMap, serviceDate) {
+  const recordMap = {};
+  (records || []).forEach((item) => {
+    recordMap[buildHomeworkRecordKey(item.studentId, item.subject)] = item;
+  });
+
+  return (students || []).map((student) => {
+    const studentAssignments = getAssignmentsForStudent(student, assignments);
+    return {
+      key: student.id || student.name,
+      placeholder: buildHomeworkPlaceholder(serviceDate),
+      studentId: student.id || "",
+      studentName: student.name || "未命名学生",
+      meta: buildStudentMeta(student, studentMetaMap),
+      items: studentAssignments.map((assignment) => buildHomeworkCard(student, assignment, recordMap)),
+    };
+  });
+}
+
+function buildHomeworkCard(student, assignment, recordMap) {
+  const subject = assignment.subject || "未分类";
+  const record = recordMap[buildHomeworkRecordKey(student.id, subject)] || null;
+  return {
+    assignmentId: assignment.id || "",
+    detailText: record && record.remark ? `备注：${record.remark}` : "",
+    id: record ? record.id : `${student.id}-${assignment.id || subject}`,
+    imageUrls: record ? record.imageUrls || [] : [],
+    metaText: buildHomeworkMetaText(assignment),
+    recorded: !!record,
+    recordId: record ? record.id : "",
+    statusText: record ? record.statusText : "未记录",
+    studentId: student.id || "",
+    subject,
+    summaryText: buildHomeworkSummary(assignment),
+    tagType: record ? record.tagType : "default",
+    title: subject,
+  };
+}
+
+function buildHomeworkMetaText(assignment) {
   const parts = [];
-  if (item.gradeName) parts.push(item.gradeName);
-  if (item.className) parts.push(item.className);
-  if (!parts.length && item.schoolName) parts.push(item.schoolName);
+  if (assignment.serviceDate) parts.push(assignment.serviceDate);
+  if (assignment.teacherName) parts.push(`教师：${assignment.teacherName}`);
+  return parts.join(" · ");
+}
+
+function buildHomeworkSummary(assignment) {
+  const items = assignment.items || [];
+  if (items.length > 0) {
+    return items.map((item) => item.content).filter(Boolean).join("；");
+  }
+  return assignment.content || "";
+}
+
+function getAssignmentsForStudent(student, assignments) {
+  if (!student) {
+    return [];
+  }
+
+  return (assignments || []).filter((assignment) => {
+    if (assignment.classId && student.classId) {
+      return assignment.classId === student.classId;
+    }
+    return assignment.schoolName === student.schoolName && assignment.className === student.className;
+  });
+}
+
+function buildHomeworkRecordKey(studentId, subject) {
+  return `${studentId}::${subject || ""}`;
+}
+
+function buildStudentMetaMap(students) {
+  const map = {};
+  (students || []).forEach((item) => {
+    if (!item || !item.id) return;
+    map[item.id] = {
+      grade: item.grade || "",
+      className: item.className || "",
+      schoolName: item.schoolName || "",
+    };
+  });
+  return map;
+}
+
+function buildStudentMeta(item, studentMetaMap) {
+  const studentMeta = (studentMetaMap && studentMetaMap[item.studentId || item.id]) || {};
+  const parts = [];
+  if (studentMeta.grade) parts.push(studentMeta.grade);
+  else if (item.gradeName || item.grade) parts.push(item.gradeName || item.grade);
+  if (studentMeta.className) parts.push(studentMeta.className);
+  else if (item.className) parts.push(item.className);
+  if (!parts.length) {
+    if (studentMeta.schoolName) parts.push(studentMeta.schoolName);
+    else if (item.schoolName) parts.push(item.schoolName);
+  }
   return parts.join(" ");
+}
+
+function buildMealPlaceholder(serviceDate) {
+  return {
+    metaText: serviceDate,
+    remark: "当天还没有记录这位学生的用餐情况。",
+    title: "未记录用餐",
+  };
+}
+
+function buildHomeworkPlaceholder(serviceDate) {
+  return {
+    metaText: serviceDate,
+    remark: "当天还没有布置到这位学生的作业内容。",
+    title: "暂无作业安排",
+  };
+}
+
+function getMealStatusText(status) {
+  const map = {
+    completed: "已用餐",
+    absent: "未用餐",
+  };
+  return map[status] || status;
 }
