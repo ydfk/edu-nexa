@@ -22,6 +22,12 @@
   color: var(--color-text);
 }
 
+.about-subtitle {
+  margin-top: var(--spacing-xs);
+  font-size: 26rpx;
+  color: var(--color-text-secondary);
+}
+
 .about-version {
   margin-top: var(--spacing-xs);
   font-size: 24rpx;

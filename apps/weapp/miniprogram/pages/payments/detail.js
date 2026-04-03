@@ -47,7 +47,7 @@ Page({
 
   async loadStudents() {
     try {
-      const params: Record<string, any> = {};
+      const params = {};
       if (isGuardian()) {
         const s = getSession();
         params.guardianPhone = s.user?.phone;
@@ -154,7 +154,7 @@ Page({
     }
     this.setData({ submitting: true });
     try {
-      const payload: Record<string, any> = {
+      const payload = {
         studentId: this.data.selectedStudent.id,
         paidAt: this.data.paidAt,
         paymentType: this.data.paymentType,
@@ -192,3 +192,4 @@ Page({
       .catch(() => {});
   },
 });
+

@@ -5,9 +5,9 @@ param(
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$weappRoot = Join-Path $repoRoot "apps\\weapp"
+$weappRoot = Join-Path $repoRoot "apps\weapp"
 $projectConfigPath = Join-Path $weappRoot "project.config.json"
-$workspaceSettingsPath = Join-Path $repoRoot ".vscode\\settings.json"
+$workspaceSettingsPath = Join-Path $repoRoot ".vscode\settings.json"
 
 function Resolve-WechatDevtoolsPath {
     param(
@@ -55,7 +55,7 @@ function Find-WechatDevtoolsInfo {
     }
 
     $searchPaths += @(
-        (Join-Path ${env:LOCALAPPDATA} "Programs\\wechatwebdevtools")
+        (Join-Path ${env:LOCALAPPDATA} "Programs\wechatwebdevtools")
     )
 
     foreach ($searchPath in $searchPaths) {
@@ -65,6 +65,7 @@ function Find-WechatDevtoolsInfo {
 
         $cliCandidates = @()
         $appCandidates = @()
+
         if ((Get-Item $searchPath).PSIsContainer) {
             $cliCandidates = @(
                 (Join-Path $searchPath "cli.bat")
@@ -116,23 +117,15 @@ if (-not [string]::IsNullOrWhiteSpace($wechatDevtoolsInfo.cli)) {
     Start-Process $wechatDevtoolsInfo.app | Out-Null
 }
 
-Start-Process explorer.exe $weappRoot | Out-Null
-
 Write-Host ""
 Write-Host "EduNexa weapp launcher is ready:" -ForegroundColor Cyan
 Write-Host "  Weapp root: $weappRoot"
 Write-Host "  Project name: $projectName"
-Write-Host ""
-Write-Host "Suggested flow:" -ForegroundColor Green
-Write-Host "  1. Import the weapp root in WeChat DevTools"
-Write-Host "  2. Disable domain check in DevTools when needed"
-Write-Host "  3. Start backend services manually when needed"
 
 if (-not [string]::IsNullOrWhiteSpace($resolvedWechatDevtoolsPath) -and [string]::IsNullOrWhiteSpace($wechatDevtoolsInfo.cli) -and [string]::IsNullOrWhiteSpace($wechatDevtoolsInfo.app)) {
     Write-Host ""
     Write-Host "Configured WeChat DevTools path is invalid:" -ForegroundColor DarkYellow
     Write-Host "  $resolvedWechatDevtoolsPath"
-    Write-Host "Check .vscode/settings.json -> edunexa.wechatDevtoolsPath."
 } elseif (-not [string]::IsNullOrWhiteSpace($wechatDevtoolsInfo.cli)) {
     Write-Host ""
     Write-Host "WeChat DevTools project opened by CLI:" -ForegroundColor Green
@@ -143,5 +136,5 @@ if (-not [string]::IsNullOrWhiteSpace($resolvedWechatDevtoolsPath) -and [string]
     Write-Host "  $($wechatDevtoolsInfo.app)"
 } else {
     Write-Host ""
-    Write-Host "WeChat DevTools path is not configured. Set .vscode/settings.json -> edunexa.wechatDevtoolsPath." -ForegroundColor DarkYellow
+    Write-Host "WeChat DevTools path is not configured." -ForegroundColor DarkYellow
 }

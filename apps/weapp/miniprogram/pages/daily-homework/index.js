@@ -59,7 +59,7 @@ Page({
 
   async loadHomework() {
     try {
-      const params: Record<string, any> = { serviceDate: this.data.currentDate };
+      const params = { serviceDate: this.data.currentDate };
       if (isGuardian()) {
         const session = getSession();
         params.guardianPhone = session.user?.phone;
@@ -81,3 +81,4 @@ Page({
     wx.navigateTo({ url: `/pages/daily-homework/detail?date=${this.data.currentDate}` });
   },
 });
+

@@ -1,41 +1,69 @@
-<view class="login-page">
-  <!-- 品牌区域 -->
-  <view class="login-brand">
-    <view class="login-logo">
-      <van-icon name="shop-o" size="80rpx" color="#07C160" />
-    </view>
-    <view class="login-app-name">学栖</view>
-    <view class="login-slogan">智慧教育，用心守护</view>
-  </view>
-
-  <!-- 角色选择 -->
-  <view class="login-role-section" wx:if="{{step === 'role'}}">
-    <view class="section-title mb-md">选择您的身份</view>
-    <view class="login-role-list">
-      <view
-        class="login-role-card {{selectedRole === 'teacher' ? 'login-role-card--active' : ''}}"
-        bindtap="selectRole"
-        data-role="teacher"
-      >
-        <van-icon name="friends-o" size="48rpx" />
-        <text class="login-role-name">教师</text>
-        <text class="login-role-desc">管理学生和教学事务</text>
+<view class="login-page safe-bottom">
+  <view class="login-hero">
+    <view class="login-hero__badge">游客可先浏览首页</view>
+    <view class="login-brand">
+      <view class="login-logo">
+        <van-icon name="home-o" size="88rpx" color="#07C160" />
       </view>
-      <view
-        class="login-role-card {{selectedRole === 'guardian' ? 'login-role-card--active' : ''}}"
-        bindtap="selectRole"
-        data-role="guardian"
-      >
-        <van-icon name="contact" size="48rpx" />
-        <text class="login-role-name">家长</text>
-        <text class="login-role-desc">关注孩子学习与生活</text>
+      <view class="login-brand__text">
+        <view class="login-app-name">壹一小屋</view>
+        <view class="login-app-subtitle">学栖·EduNexa</view>
+        <view class="login-slogan">家长与老师最关心的作业、用餐、缴费与反馈，在这里集中查看。</view>
       </view>
     </view>
+    <image class="login-hero__art" src="/assets/intro-campus.svg" mode="aspectFit" />
   </view>
 
-  <!-- 登录按钮区 -->
-  <view class="login-actions" wx:if="{{step === 'role'}}">
-    <view class="login-privacy flex flex-center gap-xs mb-md" bindtap="togglePrivacy">
+  <view class="login-panel">
+    <view class="login-panel__header">
+      <view class="section-title">欢迎登录</view>
+      <view class="login-panel__desc">支持手机号密码登录，也可以使用微信手机号快捷登录。</view>
+    </view>
+
+    <view class="form-group">
+      <view class="form-label">手机号</view>
+      <input
+        class="form-input login-input"
+        type="number"
+        maxlength="11"
+        value="{{phone}}"
+        placeholder="请输入登录手机号"
+        bindinput="onPhoneInput"
+      />
+    </view>
+
+    <view class="form-group">
+      <view class="form-label">密码</view>
+      <input
+        class="form-input login-input"
+        password="{{true}}"
+        value="{{password}}"
+        placeholder="请输入密码"
+        bindinput="onPasswordInput"
+      />
+    </view>
+
+    <button class="btn btn--primary btn--block btn--round login-submit" bindtap="onPasswordLogin" loading="{{submitting}}" disabled="{{submitting}}">
+      手机号密码登录
+    </button>
+
+    <view class="login-divider">
+      <view class="login-divider__line"></view>
+      <text class="login-divider__text">或</text>
+      <view class="login-divider__line"></view>
+    </view>
+
+    <button
+      class="btn btn--ghost btn--block btn--round"
+      open-type="getPhoneNumber"
+      bindgetphonenumber="onGetPhoneNumber"
+      disabled="{{submitting}}"
+      loading="{{submitting}}"
+    >
+      微信手机号快捷登录
+    </button>
+
+    <view class="login-privacy" bindtap="togglePrivacy">
       <van-checkbox value="{{agreedPrivacy}}" shape="round" icon-size="32rpx" bind:change="onPrivacyChange" />
       <text class="text-sm text-secondary">
         我已阅读并同意
@@ -43,23 +71,8 @@
       </text>
     </view>
 
-    <button
-      class="btn btn--primary btn--block btn--round"
-      open-type="getPhoneNumber"
-      bindgetphonenumber="onGetPhoneNumber"
-      disabled="{{!agreedPrivacy || !selectedRole}}"
-    >
-      微信手机号快捷登录
-    </button>
-
-    <view class="login-tip text-sm text-secondary mt-md">
-      首次使用将自动创建账号
+    <view class="login-tip text-sm text-secondary">
+      未登录时会以游客身份浏览首页；首次微信快捷登录将默认创建家长账号。
     </view>
-  </view>
-
-  <!-- 登录中 -->
-  <view class="login-loading flex flex-col flex-center" wx:if="{{step === 'loading'}}">
-    <van-icon name="loading" size="48rpx" color="#07C160" class="login-spin" />
-    <text class="mt-sm text-secondary">正在登录...</text>
   </view>
 </view>

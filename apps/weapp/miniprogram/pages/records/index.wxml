@@ -1,105 +1,99 @@
 <view class="page page--no-pad safe-bottom">
-  <!-- 日期导航 -->
-  <view class="date-nav mx-lg mt-sm">
-    <view class="date-nav__arrow" bindtap="prevDay">
-      <van-icon name="arrow-left" />
+  <view class="records-toolbar mx-lg mt-sm">
+    <view class="records-toolbar__date">
+      <view class="records-toolbar__arrow" bindtap="prevDay">
+        <van-icon name="arrow-left" />
+      </view>
+      <view class="records-toolbar__date-main" bindtap="openCalendar">
+        <view class="records-toolbar__date-text">{{dateDisplay}}</view>
+        <view class="records-toolbar__date-sub">{{activeTab === 0 ? "用餐记录" : "作业记录"}}</view>
+      </view>
+      <view class="records-toolbar__arrow" bindtap="nextDay">
+        <van-icon name="arrow" />
+      </view>
     </view>
-    <view class="date-nav__text" bindtap="openCalendar">{{dateDisplay}}</view>
-    <view class="date-nav__arrow" bindtap="nextDay">
-      <van-icon name="arrow" />
+
+    <view class="records-toolbar__tabs">
+      <view class="records-toolbar__tab {{activeTab === 0 ? 'records-toolbar__tab--active' : ''}}" bindtap="onTabTap" data-tab="0">
+        用餐
+      </view>
+      <view class="records-toolbar__tab {{activeTab === 1 ? 'records-toolbar__tab--active' : ''}}" bindtap="onTabTap" data-tab="1">
+        作业
+      </view>
     </view>
   </view>
 
-  <!-- Tab 切换 -->
-  <van-tabs active="{{activeTab}}" bind:change="onTabChange" color="#07C160" title-active-color="#07C160">
-    <van-tab title="用餐记录">
-      <!-- 筛选 -->
-      <view class="records-filter px-lg" wx:if="{{showFilter}}">
-        <van-dropdown-menu active-color="#07C160">
-          <van-dropdown-item value="{{mealStatus}}" options="{{statusOptions}}" bind:change="onMealStatusChange" />
-        </van-dropdown-menu>
+  <scroll-view class="records-filters" scroll-x="true" wx:if="{{canEdit && activeTab === 0}}">
+    <view class="records-filters__inner">
+      <view
+        wx:for="{{statusOptions}}"
+        wx:key="value"
+        class="records-filter-pill {{mealStatus === item.value ? 'records-filter-pill--active' : ''}}"
+        bindtap="onMealStatusTap"
+        data-value="{{item.value}}"
+      >
+        {{item.text}}
+      </view>
+    </view>
+  </scroll-view>
+
+  <view class="records-layout" wx:if="{{currentGroups.length > 0}}">
+    <scroll-view class="records-sidebar" scroll-y="true">
+      <view
+        wx:for="{{currentGroups}}"
+        wx:key="key"
+        class="records-student {{currentStudentIndex === index ? 'records-student--active' : ''}}"
+        bindtap="onStudentTap"
+        data-index="{{index}}"
+      >
+        <view class="records-student__name">{{item.studentName}}</view>
+        <view class="records-student__meta" wx:if="{{item.meta}}">{{item.meta}}</view>
+      </view>
+    </scroll-view>
+
+    <scroll-view class="records-content" scroll-y="true">
+      <view class="records-content__header">
+        <view class="records-content__name">{{currentStudentName}}</view>
+        <view class="records-content__meta" wx:if="{{currentStudentMeta}}">{{currentStudentMeta}}</view>
       </view>
 
-      <!-- 列表 -->
-      <view class="px-lg mt-sm">
-        <view class="list" wx:if="{{mealRecords.length > 0}}">
-          <view
-            class="record-card"
-            wx:for="{{mealRecords}}"
-            wx:key="id"
-            bindtap="goMealEdit"
-            data-id="{{item.id}}"
-          >
-            <view class="record-card__header">
-              <text class="record-card__name">{{item.studentName}}</text>
-              <view class="tag tag--{{item.tagType}}">{{item.statusText}}</view>
-            </view>
-            <view class="record-card__meta">
-              <text>{{item.schoolName}} {{item.className}}</text>
-            </view>
-            <view class="record-card__images" wx:if="{{item.imageUrls && item.imageUrls.length > 0}}">
-              <image
-                wx:for="{{item.imageUrls}}"
-                wx:for-item="img"
-                wx:key="*this"
-                src="{{img}}"
-                mode="aspectFill"
-                class="record-card__thumb"
-              />
-            </view>
-            <view class="record-card__remark text-sm text-secondary mt-xs" wx:if="{{item.remark}}">
-              {{item.remark}}
-            </view>
+      <view class="list">
+        <view
+          class="record-card"
+          wx:for="{{currentRecords}}"
+          wx:key="id"
+          bindtap="goRecordDetail"
+          data-id="{{item.id}}"
+        >
+          <view class="record-card__header">
+            <view class="record-card__title">{{activeTab === 0 ? "用餐记录" : (item.subject || "作业记录")}}</view>
+            <view class="tag tag--{{item.tagType}}">{{item.statusText}}</view>
+          </view>
+          <view class="record-card__meta">{{item.serviceDate}}</view>
+          <view class="record-card__remark" wx:if="{{item.remark}}">{{item.remark}}</view>
+          <view class="record-card__images" wx:if="{{item.imageUrls && item.imageUrls.length > 0}}">
+            <image
+              wx:for="{{item.imageUrls}}"
+              wx:for-item="img"
+              wx:key="*this"
+              src="{{img}}"
+              mode="aspectFill"
+              class="record-card__thumb"
+            />
           </view>
         </view>
-        <van-empty wx:else description="暂无用餐记录" image="search" />
       </view>
-    </van-tab>
+    </scroll-view>
+  </view>
 
-    <van-tab title="作业记录">
-      <view class="px-lg mt-sm">
-        <view class="list" wx:if="{{homeworkRecords.length > 0}}">
-          <view
-            class="record-card"
-            wx:for="{{homeworkRecords}}"
-            wx:key="id"
-            bindtap="goHomeworkEdit"
-            data-id="{{item.id}}"
-          >
-            <view class="record-card__header">
-              <text class="record-card__name">{{item.studentName}}</text>
-              <view class="tag tag--{{item.tagType}}">{{item.statusText}}</view>
-            </view>
-            <view class="record-card__meta">
-              <text>{{item.schoolName}} {{item.className}}</text>
-              <text wx:if="{{item.subject}}"> · {{item.subject}}</text>
-            </view>
-            <view class="record-card__images" wx:if="{{item.imageUrls && item.imageUrls.length > 0}}">
-              <image
-                wx:for="{{item.imageUrls}}"
-                wx:for-item="img"
-                wx:key="*this"
-                src="{{img}}"
-                mode="aspectFill"
-                class="record-card__thumb"
-              />
-            </view>
-            <view class="record-card__remark text-sm text-secondary mt-xs" wx:if="{{item.remark}}">
-              {{item.remark}}
-            </view>
-          </view>
-        </view>
-        <van-empty wx:else description="暂无作业记录" image="search" />
-      </view>
-    </van-tab>
-  </van-tabs>
+  <view class="records-empty" wx:else>
+    <van-empty description="{{currentEmptyText}}" image="search" />
+  </view>
 
-  <!-- FAB 新增按钮 -->
   <view class="fab" wx:if="{{canEdit}}" bindtap="onAdd">
     <text class="fab-icon">+</text>
   </view>
 
-  <!-- 日历弹窗 -->
   <van-calendar
     show="{{showCalendar}}"
     bind:close="closeCalendar"

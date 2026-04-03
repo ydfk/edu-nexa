@@ -1,5 +1,13 @@
 const { request } = require("./request");
 
+function login(payload) {
+  return request({
+    url: "/auth/login",
+    method: "POST",
+    data: payload,
+  });
+}
+
 function weappPhoneLogin(payload) {
   return request({
     url: "/auth/weapp/phone-login",
@@ -25,6 +33,7 @@ function changePassword(payload) {
 }
 
 module.exports = {
+  login,
   weappPhoneLogin,
   getProfile,
   updateProfile,

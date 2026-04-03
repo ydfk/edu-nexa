@@ -2,7 +2,7 @@
   <!-- 未登录提示 -->
   <view wx:if="{{!loggedIn}}" class="empty-state" style="padding-top: 200rpx;">
     <van-icon name="info-o" size="80rpx" color="#C8C9CC" />
-    <view class="empty-state__text">登录后查看完整功能</view>
+    <view class="empty-state__text">登录后查看完整功能与真实数据</view>
     <button class="btn btn--primary btn--small btn--round mt-md" bindtap="goLogin">去登录</button>
   </view>
 
@@ -12,7 +12,7 @@
       <view class="section-header">
         <text class="section-title">全部功能</text>
       </view>
-      <van-grid column-num="4" border="{{false}}" gutter="{{16}}">
+      <van-grid column-num="3" border="{{false}}" gutter="{{16}}">
         <van-grid-item
           wx:for="{{features}}"
           wx:key="id"

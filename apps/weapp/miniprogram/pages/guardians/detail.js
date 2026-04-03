@@ -79,7 +79,7 @@ Page({
     }
     this.setData({ submitting: true });
     try {
-      const payload: Record<string, any> = {
+      const payload = {
         name: this.data.name.trim(),
         phone: this.data.phone.trim(),
         relationship: this.data.relationship,
@@ -126,3 +126,4 @@ Page({
       .catch(() => {});
   },
 });
+

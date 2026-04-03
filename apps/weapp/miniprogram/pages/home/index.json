@@ -1,9 +1,8 @@
 {
   "usingComponents": {
     "van-icon": "@vant/weapp/icon/index",
-    "van-notice-bar": "@vant/weapp/notice-bar/index",
     "van-empty": "@vant/weapp/empty/index"
   },
-  "navigationBarTitleText": "学栖",
+  "navigationBarTitleText": "壹一小屋 学栖·EduNexa",
   "enablePullDownRefresh": true
 }

@@ -1,68 +1,22 @@
 <view class="page page--no-pad safe-bottom">
-  <!-- 顶部欢迎区 -->
-  <view class="home-header">
-    <view class="home-greeting">
-      <view class="text-lg font-bold">{{greeting}}，{{displayName}}</view>
-      <view class="tag tag--{{roleTagType}} mt-xs">{{roleName}}</view>
-    </view>
-    <view class="home-avatar" bindtap="goMine">
-      <van-icon name="contact" size="48rpx" color="#07C160" />
-    </view>
-  </view>
-
-  <!-- 通知栏 -->
-  <view class="px-lg" wx:if="{{notice}}">
-    <van-notice-bar text="{{notice}}" left-icon="volume-o" />
-  </view>
-
-  <!-- KPI 卡片区 -->
-  <view class="section mx-lg">
-    <view class="grid-2">
-      <view class="kpi-card kpi-card--primary">
-        <view class="kpi-label">{{kpiLabels[0]}}</view>
-        <view class="kpi-value">{{kpiValues[0]}}</view>
-      </view>
-      <view class="kpi-card kpi-card--info">
-        <view class="kpi-label">{{kpiLabels[1]}}</view>
-        <view class="kpi-value">{{kpiValues[1]}}</view>
-      </view>
-      <view class="kpi-card kpi-card--warning">
-        <view class="kpi-label">{{kpiLabels[2]}}</view>
-        <view class="kpi-value">{{kpiValues[2]}}</view>
-      </view>
-      <view class="kpi-card">
-        <view class="kpi-label">{{kpiLabels[3]}}</view>
-        <view class="kpi-value">{{kpiValues[3]}}</view>
-      </view>
-    </view>
-  </view>
-
-  <!-- 快捷入口 -->
-  <view class="section mx-lg">
-    <view class="section-header">
-      <text class="section-title">快捷操作</text>
-    </view>
-    <view class="home-shortcuts">
-      <view
-        class="home-shortcut"
-        wx:for="{{shortcuts}}"
-        wx:key="id"
-        bindtap="goShortcut"
-        data-url="{{item.url}}"
-      >
-        <view class="home-shortcut__icon" style="background: {{item.bg}}">
-          <van-icon name="{{item.icon}}" size="40rpx" color="{{item.color}}" />
+  <view class="home-hero">
+    <view class="home-hero__content">
+      <view class="home-hero__eyebrow">{{heroBadge}}</view>
+      <view class="home-hero__title">{{heroTitle}}</view>
+      <view class="home-hero__desc">{{heroDesc}}</view>
+      <view class="home-intro-list">
+        <view class="home-intro-card" wx:for="{{introPoints}}" wx:key="id">
+          <view class="home-intro-card__title">{{item.title}}</view>
+          <view class="home-intro-card__desc">{{item.desc}}</view>
         </view>
-        <text class="home-shortcut__label">{{item.label}}</text>
       </view>
     </view>
+    <image class="home-hero__art" src="{{heroImage}}" mode="aspectFit" />
   </view>
 
-  <!-- 最近动态 -->
   <view class="section mx-lg">
     <view class="section-header">
       <text class="section-title">最近动态</text>
-      <text class="section-more" bindtap="goRecords">查看全部</text>
     </view>
     <view class="list" wx:if="{{recentItems.length > 0}}">
       <view class="list-item" wx:for="{{recentItems}}" wx:key="id">

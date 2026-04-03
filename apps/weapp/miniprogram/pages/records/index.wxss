@@ -1,48 +1,211 @@
-.records-filter {
-  margin-top: var(--spacing-sm);
+.records-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  padding: 18rpx 20rpx;
+  border-radius: 28rpx;
+  background: #ffffff;
+  box-shadow: var(--shadow-card);
+}
+
+.records-toolbar__date {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.records-toolbar__arrow {
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 18rpx;
+  background: #f3f6f4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #285c45;
+}
+
+.records-toolbar__date-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.records-toolbar__date-text {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.records-toolbar__date-sub {
+  margin-top: 4rpx;
+  font-size: 22rpx;
+  color: var(--color-text-secondary);
+}
+
+.records-toolbar__tabs {
+  flex-shrink: 0;
+  display: flex;
+  gap: 8rpx;
+  padding: 8rpx;
+  border-radius: 22rpx;
+  background: #eef3ef;
+}
+
+.records-toolbar__tab {
+  min-width: 104rpx;
+  padding: 14rpx 20rpx;
+  border-radius: 18rpx;
+  text-align: center;
+  font-size: 24rpx;
+  color: #5f6d63;
+}
+
+.records-toolbar__tab--active {
+  background: #ffffff;
+  color: #0f766e;
+  font-weight: 600;
+  box-shadow: 0 8rpx 18rpx rgba(22, 101, 52, 0.08);
+}
+
+.records-filters {
+  white-space: nowrap;
+  margin: 16rpx 32rpx 0;
+}
+
+.records-filters__inner {
+  display: inline-flex;
+  gap: 12rpx;
+  padding-right: 8rpx;
+}
+
+.records-filter-pill {
+  padding: 14rpx 24rpx;
+  border-radius: 999rpx;
+  background: #edf2ee;
+  font-size: 22rpx;
+  color: #5f6d63;
+}
+
+.records-filter-pill--active {
+  background: #0f766e;
+  color: #ffffff;
+}
+
+.records-layout {
+  display: flex;
+  gap: 18rpx;
+  height: calc(100vh - 320rpx);
+  padding: 20rpx 32rpx 32rpx;
+  box-sizing: border-box;
+}
+
+.records-sidebar {
+  width: 198rpx;
+  border-radius: 28rpx;
+  background: #f4f7f5;
+  padding: 12rpx;
+  box-sizing: border-box;
+}
+
+.records-student {
+  padding: 18rpx 16rpx;
+  border-radius: 20rpx;
+}
+
+.records-student--active {
+  background: #ffffff;
+  box-shadow: 0 10rpx 22rpx rgba(15, 118, 110, 0.12);
+}
+
+.records-student__name {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: var(--color-text);
+  line-height: 1.4;
+}
+
+.records-student__meta {
+  margin-top: 6rpx;
+  font-size: 20rpx;
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+}
+
+.records-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.records-content__header {
+  margin-bottom: 16rpx;
+  padding: 20rpx 24rpx;
+  border-radius: 24rpx;
+  background: #ffffff;
+  box-shadow: var(--shadow-card);
+}
+
+.records-content__name {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.records-content__meta {
+  margin-top: 6rpx;
+  font-size: 22rpx;
+  color: var(--color-text-secondary);
 }
 
 .record-card {
-  padding: var(--spacing-md);
-  border-radius: var(--radius-lg);
-  background: var(--color-bg-card);
+  padding: 24rpx;
+  border-radius: 24rpx;
+  background: #ffffff;
   box-shadow: var(--shadow-card);
-  margin-bottom: var(--spacing-sm);
+  margin-bottom: 16rpx;
 }
 
 .record-card__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 16rpx;
 }
 
-.record-card__name {
-  font-size: 30rpx;
+.record-card__title {
+  font-size: 28rpx;
   font-weight: 600;
   color: var(--color-text);
 }
 
 .record-card__meta {
-  margin-top: 4rpx;
-  font-size: 24rpx;
+  margin-top: 8rpx;
+  font-size: 22rpx;
   color: var(--color-text-secondary);
+}
+
+.record-card__remark {
+  margin-top: 12rpx;
+  font-size: 24rpx;
+  line-height: 1.7;
+  color: var(--color-text);
 }
 
 .record-card__images {
   display: flex;
-  gap: var(--spacing-xs);
-  margin-top: var(--spacing-sm);
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin-top: 14rpx;
 }
 
 .record-card__thumb {
   width: 120rpx;
   height: 120rpx;
-  border-radius: var(--radius-sm);
+  border-radius: 16rpx;
   background: var(--color-bg-secondary);
 }
 
-.record-card__remark {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.records-empty {
+  padding-top: 160rpx;
 }

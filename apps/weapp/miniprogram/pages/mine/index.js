@@ -1,66 +1,62 @@
-// pages/mine/index.js
+const { getSession, isLoggedIn, clearSession, setActiveRole, getUserRoles, hasMultipleRoles } = require("../../store/session");
+const { getRoleName } = require("../../utils/permission");
+const Dialog = require("@vant/weapp/dialog/dialog");
+
 Page({
-
-  /**
-   * 页面的初始数据
-   */
   data: {
-
+    loggedIn: false,
+    displayName: "",
+    phone: "",
+    roleName: "",
+    hasMultiRoles: false,
+    roleList: [],
   },
 
-  /**
-   * 生命周期函数--监听页面加载
-   */
-  onLoad(options) {
-
-  },
-
-  /**
-   * 生命周期函数--监听页面初次渲染完成
-   */
-  onReady() {
-
-  },
-
-  /**
-   * 生命周期函数--监听页面显示
-   */
   onShow() {
-
+    const logged = isLoggedIn();
+    if (!logged) {
+      this.setData({ loggedIn: false });
+      return;
+    }
+    const session = getSession();
+    const roles = getUserRoles();
+    this.setData({
+      loggedIn: true,
+      displayName: session.user?.displayName || "用户",
+      phone: maskPhone(session.user?.phone || ""),
+      roleName: getRoleName(session.activeRole),
+      hasMultiRoles: hasMultipleRoles(),
+      roleList: roles.map((r) => ({
+        role: r,
+        name: getRoleName(r),
+        active: r === session.activeRole,
+      })),
+    });
   },
 
-  /**
-   * 生命周期函数--监听页面隐藏
-   */
-  onHide() {
-
+  goLogin() {
+    wx.navigateTo({ url: "/pages/login/index" });
   },
 
-  /**
-   * 生命周期函数--监听页面卸载
-   */
-  onUnload() {
-
+  switchRole(e) {
+    const role = e.currentTarget.dataset.role;
+    setActiveRole(role);
+    this.onShow();
+    wx.showToast({ title: `已切换为${getRoleName(role)}`, icon: "none" });
   },
 
-  /**
-   * 页面相关事件处理函数--监听用户下拉动作
-   */
-  onPullDownRefresh() {
-
+  onLogout() {
+    Dialog.confirm({ title: "确认退出", message: "退出后需要重新登录" })
+      .then(() => {
+        clearSession();
+        wx.switchTab({ url: "/pages/home/index" });
+        wx.showToast({ title: "已退出登录", icon: "success" });
+      })
+      .catch(() => {});
   },
+});
 
-  /**
-   * 页面上拉触底事件的处理函数
-   */
-  onReachBottom() {
-
-  },
-
-  /**
-   * 用户点击右上角分享
-   */
-  onShareAppMessage() {
-
-  }
-})
+function maskPhone(phone) {
+  if (!phone || phone.length < 7) return phone;
+  return phone.substring(0, 3) + "****" + phone.substring(7);
+}

@@ -124,7 +124,7 @@ Page({
     }
 
     try {
-      const payload: Record<string, any> = { name: editName.trim() };
+      const payload = { name: editName.trim() };
       if (editId) payload.id = editId;
 
       if (editType === "school") {
@@ -190,3 +190,4 @@ Page({
       .catch(() => {});
   },
 });
+

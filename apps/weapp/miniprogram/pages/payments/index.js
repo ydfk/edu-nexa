@@ -41,7 +41,7 @@ Page({
 
   async loadPayments() {
     try {
-      const params: Record<string, any> = {};
+      const params = {};
       if (this.data.keyword) params.keyword = this.data.keyword;
       if (this.data.statusFilter) params.status = this.data.statusFilter;
       if (isGuardian()) {
@@ -69,3 +69,4 @@ Page({
     wx.navigateTo({ url: "/pages/payments/detail" });
   },
 });
+

@@ -4,14 +4,15 @@
     <view class="about-logo">
       <van-icon name="home-o" size="80rpx" color="#07C160" />
     </view>
-    <view class="about-name">学栖</view>
+    <view class="about-name">壹一小屋</view>
+    <view class="about-subtitle">学栖·EduNexa</view>
     <view class="about-version">版本 1.0.0</view>
   </view>
 
   <view class="card mt-lg">
     <view class="section-title mb-md">应用简介</view>
     <view class="text-sm text-secondary" style="line-height: 1.8;">
-      学栖是一款专为教育机构打造的综合管理小程序，提供学生管理、用餐记录、作业管理、缴费管理等功能，帮助教师和家长高效协作，共同关注孩子的成长。
+      壹一小屋 学栖·EduNexa 是一款面向家长、教师与园所协作的教育服务小程序，聚焦孩子日常照护、学习反馈、到校记录与家校沟通，让最重要的信息能被更快看见。
     </view>
   </view>
 

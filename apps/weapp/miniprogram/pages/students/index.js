@@ -29,7 +29,7 @@ Page({
 
   async loadStudents() {
     try {
-      const params: Record<string, any> = {};
+      const params = {};
       if (this.data.keyword) params.keyword = this.data.keyword;
       if (isGuardian()) {
         const session = getSession();
@@ -56,3 +56,4 @@ Page({
     wx.navigateTo({ url: "/pages/students/detail" });
   },
 });
+

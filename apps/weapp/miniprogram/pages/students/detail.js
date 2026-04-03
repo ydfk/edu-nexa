@@ -198,7 +198,7 @@ Page({
     }
     this.setData({ submitting: true });
     try {
-      const payload: Record<string, any> = {
+      const payload = {
         name: this.data.name.trim(),
         schoolId: this.data.selectedSchool.id,
         gradeId: this.data.selectedGrade.id,
@@ -232,3 +232,4 @@ Page({
       .catch(() => {});
   },
 });
+

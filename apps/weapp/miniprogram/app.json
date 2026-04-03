@@ -23,13 +23,14 @@
     "pages/settings/about"
   ],
   "window": {
-    "navigationBarTitleText": "学栖",
+    "navigationBarTitleText": "壹一小屋 学栖·EduNexa",
     "navigationBarBackgroundColor": "#FFFFFF",
     "navigationBarTextStyle": "black",
     "backgroundColor": "#F7F8FA",
     "backgroundTextStyle": "dark"
   },
   "tabBar": {
+    "custom": false,
     "color": "#969799",
     "selectedColor": "#07C160",
     "backgroundColor": "#FFFFFF",
@@ -64,13 +65,5 @@
   "style": "v2",
   "sitemapLocation": "sitemap.json",
   "lazyCodeLoading": "requiredComponents",
-  "permission": {
-    "scope.camera": {
-      "desc": "用于拍照上传用餐和作业记录"
-    },
-    "scope.writePhotosAlbum": {
-      "desc": "用于保存图片到相册"
-    }
-  },
   "__usePrivacyCheck__": true
 }

@@ -38,7 +38,7 @@ Page({
 
   async loadStudents() {
     try {
-      const params: Record<string, any> = { status: "active" };
+      const params = { status: "active" };
       if (isGuardian()) {
         params.guardianPhone = getSession().user?.phone;
       }
@@ -148,7 +148,7 @@ Page({
         subject: this.data.subject,
         remark: this.data.remark,
         imageUrls: this.data.imageUrls,
-      } as Record<string, any>;
+      };
       if (this.data.isEdit) payload.id = this.data.recordId;
       await saveHomeworkRecord(payload);
       wx.showToast({ title: "保存成功", icon: "success" });
@@ -175,3 +175,4 @@ Page({
       .catch(() => {});
   },
 });
+

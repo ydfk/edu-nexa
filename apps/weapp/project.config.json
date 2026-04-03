@@ -1,18 +1,19 @@
 {
   "description": "EduNexa 微信小程序",
   "packOptions": {
-    "ignore": []
+    "ignore": [],
+    "include": []
   },
   "compileType": "miniprogram",
-  "libVersion": "3.6.0",
-  "appid": "touristappid",
+  "libVersion": "3.15.0",
+  "appid": "wx8f6b66e3c228d63f",
   "projectname": "edunexa-weapp",
   "miniprogramRoot": "miniprogram/",
   "setting": {
     "urlCheck": false,
     "es6": true,
     "enhance": true,
-    "typescript": true,
+    "typescript": false,
     "packNpmManually": true,
     "packNpmRelationList": [
       {
@@ -22,8 +23,25 @@
     ],
     "postcss": true,
     "minified": false,
-    "minifyWXML": true
+    "minifyWXML": true,
+    "compileWorklet": false,
+    "uglifyFileName": false,
+    "uploadWithSourceMap": true,
+    "minifyWXSS": true,
+    "localPlugins": false,
+    "disableUseStrict": false,
+    "useCompilerPlugins": [],
+    "condition": false,
+    "swc": false,
+    "disableSWC": true,
+    "babelSetting": {
+      "ignore": [],
+      "disablePlugins": [],
+      "outputPath": ""
+    }
   },
   "simulatorType": "wechat",
-  "condition": {}
+  "condition": {},
+  "simulatorPluginLibVersion": {},
+  "editorSetting": {}
 }

@@ -29,7 +29,7 @@ Page({
 
   async loadGuardians() {
     try {
-      const params: Record<string, any> = {};
+      const params = {};
       if (this.data.keyword) params.keyword = this.data.keyword;
       const res = await getGuardians(params);
       const list = (res.items || res || []).map((g) => ({
@@ -52,3 +52,4 @@ Page({
     wx.navigateTo({ url: "/pages/guardians/detail" });
   },
 });
+

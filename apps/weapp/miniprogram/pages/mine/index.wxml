@@ -5,8 +5,8 @@
       <van-icon name="user-o" size="64rpx" color="#C8C9CC" />
     </view>
     <view class="mine-info">
-      <view class="mine-name text-lg font-bold">未登录</view>
-      <view class="mine-desc text-sm text-secondary">登录后查看完整功能</view>
+      <view class="mine-name text-lg font-bold">游客</view>
+      <view class="mine-desc text-sm text-secondary">登录后查看完整功能与真实数据</view>
     </view>
     <button class="btn btn--primary btn--small btn--round" bindtap="goLogin">去登录</button>
   </view>
@@ -53,7 +53,7 @@
 
   <view class="mx-lg mt-md">
     <van-cell-group inset round>
-      <van-cell title="关于学栖" icon="info-o" is-link url="/pages/settings/about" />
+      <van-cell title="关于壹一小屋 学栖·EduNexa" icon="info-o" is-link url="/pages/settings/about" />
       <van-cell title="隐私协议" icon="shield-o" is-link url="/pages/settings/about" />
     </van-cell-group>
   </view>
@@ -65,7 +65,7 @@
 
   <!-- 版本号 -->
   <view class="mine-footer text-xs text-secondary">
-    学栖 v1.0.0
+    壹一小屋 学栖·EduNexa v1.0.0
   </view>
 
   <van-dialog id="van-dialog" />

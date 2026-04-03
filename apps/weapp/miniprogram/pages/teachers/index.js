@@ -29,7 +29,7 @@ Page({
 
   async loadUsers() {
     try {
-      const params: Record<string, any> = {};
+      const params = {};
       if (this.data.keyword) params.keyword = this.data.keyword;
       const res = await getUsers(params);
       const list = (res.items || res || []).map((u) => ({
@@ -53,3 +53,4 @@ Page({
     wx.navigateTo({ url: "/pages/teachers/detail" });
   },
 });
+

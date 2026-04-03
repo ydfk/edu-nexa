@@ -65,7 +65,7 @@ Page({
     }
     this.setData({ submitting: true });
     try {
-      const payload: Record<string, any> = {
+      const payload = {
         displayName: this.data.displayName.trim(),
         phone: this.data.phone.trim(),
         roles: [this.data.role],
@@ -110,3 +110,4 @@ Page({
       .catch(() => {});
   },
 });
+
