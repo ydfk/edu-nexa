@@ -21,9 +21,14 @@ import {
   DataTableToolbar,
 } from "@/components/data-table";
 import {
+  AttachmentPreviewList,
+} from "@/components/domain/attachment-preview";
+import {
   FileUpload,
+  createFileItemsFromUrls,
   type FileItem,
 } from "@/components/domain/file-upload";
+import { HomeworkStatusBadge } from "@/components/domain/homework-status-badge";
 import { LongText } from "@/components/long-text";
 import { PageContent } from "@/components/page-content";
 import { Badge } from "@/components/ui/badge";
@@ -147,11 +152,11 @@ const columns: ColumnDef<HomeworkRecordItem>[] = [
     header: ({ column }) => <DataTableColumnHeader column={column} title="完成情况" />,
     cell: ({ row }) => {
       const status = row.getValue<string>("status");
-      const info = homeworkStatusMap[status] ?? {
-        label: status,
-        variant: "outline" as const,
-      };
-      return <Badge variant={info.variant}>{info.label}</Badge>;
+      const info = homeworkStatusMap[status];
+      if (!info) {
+        return <Badge variant="outline">{status}</Badge>;
+      }
+      return <HomeworkStatusBadge status={status as "completed" | "partial" | "pending"} />;
     },
     filterFn: (row, id, value: string[]) => value.includes(row.getValue(id)),
   },
@@ -166,6 +171,14 @@ const columns: ColumnDef<HomeworkRecordItem>[] = [
     header: ({ column }) => <DataTableColumnHeader column={column} title="作业内容" />,
     cell: ({ row }) => (
       <LongText className="max-w-[220px]">{row.getValue("subjectSummary") || "-"}</LongText>
+    ),
+    enableSorting: false,
+  },
+  {
+    id: "attachments",
+    header: "附件",
+    cell: ({ row }) => (
+      <AttachmentPreviewList compact items={createFileItemsFromUrls(row.original.imageUrls)} />
     ),
     enableSorting: false,
   },
@@ -290,11 +303,7 @@ function HomeworkRecordFormDialog() {
       setForm({
         assignmentId: currentItem.assignmentId,
         id: currentItem.id,
-        imageUrls: currentItem.imageUrls.map((url) => ({
-          name: url.split("/").pop() || "图片",
-          type: "image",
-          url,
-        })),
+        imageUrls: createFileItemsFromUrls(currentItem.imageUrls),
         remark: currentItem.remark,
         serviceDate: currentItem.serviceDate,
         status: currentItem.status,
@@ -492,11 +501,10 @@ function HomeworkRecordFormDialog() {
             />
           </div>
           <div className="grid gap-2 md:col-span-2">
-            <Label>照片</Label>
+            <Label>附件（图片 / PDF）</Label>
             <FileUpload
               value={form.imageUrls}
               onChange={(value) => setForm((current) => ({ ...current, imageUrls: value }))}
-              accept="image/*"
               maxFiles={9}
             />
           </div>

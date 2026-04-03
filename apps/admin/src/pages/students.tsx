@@ -79,6 +79,7 @@ import {
   type SchoolItem,
   type StudentItem,
 } from "@/lib/server-data";
+import { useAdminSession } from "@/lib/auth/session";
 
 // ---------------------------------------------------------------------------
 // 常量与类型
@@ -125,6 +126,7 @@ const initialClassForm = {
 };
 const initialGuardianForm = {
   name: "",
+  password: "",
   phone: "",
   relationship: "",
   remark: "",
@@ -200,8 +202,8 @@ function SelectWithAction({
 // 列定义
 // ---------------------------------------------------------------------------
 
-function createColumns(): ColumnDef<StudentItem>[] {
-  return [
+function createColumns(canManageStudents: boolean): ColumnDef<StudentItem>[] {
+  const baseColumns: ColumnDef<StudentItem>[] = [
     {
       accessorKey: "name",
       header: ({ column }) => (
@@ -248,6 +250,14 @@ function createColumns(): ColumnDef<StudentItem>[] {
       },
       filterFn: (row, id, value: string[]) => value.includes(row.getValue(id)),
     },
+  ];
+
+  if (!canManageStudents) {
+    return baseColumns;
+  }
+
+  return [
+    ...baseColumns,
     {
       id: "actions",
       cell: function ActionsCell({ row }) {
@@ -355,11 +365,6 @@ function StudentFormDialog() {
     classes.filter((item) => item.gradeId === classForm.gradeId),
     classForm.name,
   );
-  const quickGuardianDefaultPassword = useMemo(
-    () => getDefaultLoginPassword(guardianForm.phone),
-    [guardianForm.phone],
-  );
-
   useEffect(() => {
     if (isEdit && currentItem) {
       setForm({
@@ -375,6 +380,20 @@ function StudentFormDialog() {
       setForm(initialStudentForm);
     }
   }, [open, currentItem, isEdit]);
+
+  useEffect(() => {
+    if (open !== "quick-guardian") {
+      return;
+    }
+
+    setGuardianForm((current) => {
+      const nextPassword = getDefaultLoginPassword(current.phone);
+      if (current.password === nextPassword || !current.password.trim()) {
+        return { ...current, password: nextPassword };
+      }
+      return current;
+    });
+  }, [guardianForm.phone, open]);
 
   async function handleSave() {
     const school = schools.find((item) => item.id === form.schoolId);
@@ -428,7 +447,9 @@ function StudentFormDialog() {
         schoolId: form.schoolId,
       });
     }
-    if (type === "quick-guardian") setGuardianForm(initialGuardianForm);
+    if (type === "quick-guardian") {
+      setGuardianForm({ ...initialGuardianForm, password: getDefaultLoginPassword("") });
+    }
     setOpen(type);
   }
 
@@ -489,11 +510,15 @@ function StudentFormDialog() {
       if (open === "quick-guardian") {
         if (!guardianForm.name.trim() || !guardianForm.phone.trim())
           throw new Error("家长姓名和手机号不能为空");
+        if (!guardianForm.password.trim()) {
+          throw new Error("默认密码不能为空");
+        }
         if (quickGuardianPhoneExists) {
           throw new Error("家长手机号已存在");
         }
         const item = await saveGuardianProfile({
           name: guardianForm.name.trim(),
+          password: guardianForm.password.trim(),
           phone: guardianForm.phone.trim(),
           relationship: guardianForm.relationship.trim(),
           remark: guardianForm.remark.trim(),
@@ -793,7 +818,12 @@ function StudentFormDialog() {
               </div>
               <div className="grid gap-2">
                 <Label>默认密码</Label>
-                <Input readOnly value={quickGuardianDefaultPassword} />
+                <Input
+                  value={guardianForm.password}
+                  onChange={(e) =>
+                    setGuardianForm((c) => ({ ...c, password: e.target.value }))
+                  }
+                />
                 <p className="text-sm text-muted-foreground">
                   {getDefaultLoginPasswordHint(guardianForm.phone)}
                 </p>
@@ -885,6 +915,7 @@ function Field({
 // ---------------------------------------------------------------------------
 
 export default function StudentsPage() {
+  const session = useAdminSession();
   const [open, setOpen] = useDialogState<DialogType>();
   const [currentItem, setCurrentItem] = useState<StudentItem | null>(null);
 
@@ -898,10 +929,14 @@ export default function StudentsPage() {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
+  const canManageStudents = !!session.user?.roles.some(
+    (role) => role === "admin" || role === "teacher",
+  );
+  const isGuardian = !!session.user?.roles.includes("guardian");
 
   useEffect(() => {
     void loadData();
-  }, []);
+  }, [session.user?.phone, isGuardian]);
 
   async function loadData() {
     setLoading(true);
@@ -913,7 +948,7 @@ export default function StudentsPage() {
         classItems,
         guardianItems,
       ] = await Promise.all([
-        fetchStudents(),
+        fetchStudents(isGuardian ? { guardianPhone: session.user?.phone || "" } : undefined),
         fetchSchools(),
         fetchGrades(),
         fetchClasses(),
@@ -936,7 +971,7 @@ export default function StudentsPage() {
     }
   }
 
-  const columns = useMemo(() => createColumns(), []);
+  const columns = useMemo(() => createColumns(canManageStudents), [canManageStudents]);
 
   const table = useReactTable({
     data: items,
@@ -997,11 +1032,15 @@ export default function StudentsPage() {
         <div className="mb-2 flex flex-wrap items-center justify-between gap-x-4 space-y-2">
           <div>
             <h2 className="text-2xl font-bold tracking-tight">学生</h2>
-            <p className="text-muted-foreground">管理学生信息与服务</p>
+            <p className="text-muted-foreground">
+              {canManageStudents ? "管理学生信息与服务" : "查看我的学生信息与服务"}
+            </p>
           </div>
-          <Button className="space-x-1" onClick={() => setOpen("create")}>
-            <span>新增学生</span> <UserPlus size={18} />
-          </Button>
+          {canManageStudents ? (
+            <Button className="space-x-1" onClick={() => setOpen("create")}>
+              <span>新增学生</span> <UserPlus size={18} />
+            </Button>
+          ) : null}
         </div>
 
         {/* 数据表格 */}
@@ -1083,7 +1122,7 @@ export default function StudentsPage() {
         </div>
 
         {/* 弹窗 */}
-        <StudentFormDialog />
+        {canManageStudents ? <StudentFormDialog /> : null}
       </PageContent>
     </StudentsContext.Provider>
   );

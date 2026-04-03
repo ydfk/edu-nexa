@@ -26,6 +26,7 @@ import UnauthorizedPage from "@/components/error/unauthorized";
 import SettingsProfilePage from "@/pages/settings/index";
 import SettingsSystemPage from "@/pages/settings/system";
 import { PageContent } from "@/components/page-content";
+import "yet-another-react-lightbox/styles.css";
 import "./index.css";
 
 const router = createBrowserRouter([

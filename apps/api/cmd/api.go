@@ -53,6 +53,7 @@ func api() {
 	auth.RegisterUnProtectedRoutes(app)
 	homeconfig.RegisterPublicRoutes(app.Group("/api"))
 	runtimeconfig.RegisterPublicRoutes(app.Group("/api"))
+	upload.RegisterPublicRoutes(app.Group("/api"))
 
 	protectedAPI := app.Group("/api")
 	protectedAPI.Use(jwtware.New(jwtware.Config{

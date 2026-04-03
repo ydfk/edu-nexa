@@ -14,9 +14,14 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import {
+  AttachmentPreviewList,
+} from "@/components/domain/attachment-preview";
+import {
   FileUpload,
+  createFileItemsFromUrls,
   type FileItem,
 } from "@/components/domain/file-upload";
+import { HomeworkStatusBadge } from "@/components/domain/homework-status-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -100,13 +105,7 @@ function HomeworkRecordEditDialog({
     if (record) {
       setStatus(record.status);
       setRemark(record.remark);
-      setImages(
-        record.imageUrls.map((url) => ({
-          name: url.split("/").pop() || "图片",
-          type: "image",
-          url,
-        })),
-      );
+      setImages(createFileItemsFromUrls(record.imageUrls));
       return;
     }
 
@@ -185,11 +184,10 @@ function HomeworkRecordEditDialog({
           </div>
 
           <div className="grid gap-2">
-            <Label>上传照片</Label>
+            <Label>上传附件（图片 / PDF）</Label>
             <FileUpload
               value={images}
               onChange={setImages}
-              accept="image/*"
               maxFiles={9}
             />
           </div>
@@ -237,11 +235,15 @@ function AssignmentRecordCard({
           <div className="flex items-center gap-2">
             <Badge variant="outline">{assignment.subject || "未分类"}</Badge>
             {record ? (
-              <Badge variant={homeworkStatusMap[record.status]?.variant ?? "secondary"}>
-                {homeworkStatusMap[record.status]?.label ?? record.status}
-              </Badge>
+              homeworkStatusMap[record.status] ? (
+                <HomeworkStatusBadge
+                  status={record.status as "completed" | "partial" | "pending"}
+                />
+              ) : (
+                <Badge variant="secondary">{record.status}</Badge>
+              )
             ) : (
-              <Badge variant="secondary">未记录</Badge>
+              <HomeworkStatusBadge status="unrecorded" />
             )}
           </div>
           <div className="mt-2 text-xs text-muted-foreground">
@@ -251,7 +253,7 @@ function AssignmentRecordCard({
         {record?.imageUrls.length ? (
           <div className="flex items-center gap-1 text-xs text-muted-foreground">
             <ImageIcon className="size-3.5" />
-            {record.imageUrls.length} 张照片
+            {record.imageUrls.length} 个附件
           </div>
         ) : null}
       </div>
@@ -262,6 +264,15 @@ function AssignmentRecordCard({
         ))}
       </ul>
 
+      {record?.imageUrls.length ? (
+        <AttachmentPreviewList
+          className="mt-2"
+          compact
+          items={createFileItemsFromUrls(record.imageUrls)}
+          maxVisible={3}
+        />
+      ) : null}
+
       {record?.remark ? (
         <p className="mt-2 text-xs text-muted-foreground">备注: {record.remark}</p>
       ) : null}
@@ -270,15 +281,30 @@ function AssignmentRecordCard({
         <div className="mt-3 flex flex-wrap gap-1.5">
           {!record ? (
             <>
-              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => onRecord("completed")}>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 border-emerald-200 bg-emerald-50 text-xs text-emerald-700 hover:bg-emerald-100"
+                onClick={() => onRecord("completed")}
+              >
                 <Check className="mr-1 size-3" />
                 已完成
               </Button>
-              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => onRecord("pending")}>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 border-rose-200 bg-rose-50 text-xs text-rose-700 hover:bg-rose-100"
+                onClick={() => onRecord("pending")}
+              >
                 <X className="mr-1 size-3" />
                 未完成
               </Button>
-              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => onRecord("partial")}>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 border-amber-200 bg-amber-50 text-xs text-amber-700 hover:bg-amber-100"
+                onClick={() => onRecord("partial")}
+              >
                 <Clock className="mr-1 size-3" />
                 部分完成
               </Button>
@@ -570,6 +596,7 @@ export default function HomeworkRecordBoard() {
           <span>共 <strong>{stats.totalAssignments}</strong> 条待记录作业</span>
           <span className="text-green-600">已完成 <strong>{stats.completed}</strong></span>
           <span className="text-amber-600">部分完成 <strong>{stats.partial}</strong></span>
+          <span className="text-rose-600">未完成 <strong>{records.filter((item) => item.status === "pending").length}</strong></span>
           <span className="text-muted-foreground">
             <Layers3 className="mr-0.5 inline size-3" />
             未记录 <strong>{stats.pending}</strong>

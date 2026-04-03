@@ -12,11 +12,11 @@ export const homeworkStatusOptions = [
 
 export const homeworkStatusMap: Record<
   string,
-  { label: string; variant: "default" | "secondary" | "outline" }
+  { label: string }
 > = {
-  pending: { label: "未完成", variant: "secondary" },
-  completed: { label: "已完成", variant: "default" },
-  partial: { label: "部分完成", variant: "outline" },
+  pending: { label: "未完成" },
+  completed: { label: "已完成" },
+  partial: { label: "部分完成" },
 };
 
 export function getAssignmentsForStudent(

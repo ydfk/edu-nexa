@@ -18,6 +18,7 @@ import (
 
 type guardianPayload struct {
 	Name         string `json:"name"`
+	Password     string `json:"password"`
 	Phone        string `json:"phone"`
 	Relationship string `json:"relationship"`
 	Remark       string `json:"remark"`
@@ -64,7 +65,14 @@ func Create(c *fiber.Ctx) error {
 		Status:       defaultGuardianStatus(req.Status),
 	}
 	if err := db.DB.Transaction(func(tx *gorm.DB) error {
-		user, err := upsertGuardianUser(tx, item.UserID, item.Name, item.Phone, defaultPasswordForPhone(item.Phone), item.Status)
+		user, err := upsertGuardianUser(
+			tx,
+			item.UserID,
+			item.Name,
+			item.Phone,
+			resolveGuardianPassword(item.Phone, req.Password),
+			item.Status,
+		)
 		if err != nil {
 			return err
 		}

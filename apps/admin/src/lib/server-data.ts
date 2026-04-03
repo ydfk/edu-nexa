@@ -299,6 +299,7 @@ export async function fetchGuardianProfiles(query?: ListQuery) {
 export async function saveGuardianProfile(input: {
   id?: string;
   name: string;
+  password?: string;
   phone: string;
   relationship: string;
   remark: string;
@@ -560,6 +561,60 @@ export async function uploadFile(file: File, purpose = "homework"): Promise<Uplo
   }
 
   return payload.data;
+}
+
+export function buildAttachmentPreviewURL(url: string) {
+  const trimmed = url.trim();
+  if (!trimmed) return trimmed;
+
+  try {
+    const fallbackOrigin =
+      typeof window === "undefined" ? "http://127.0.0.1" : window.location.origin;
+    const parsed = new URL(trimmed, fallbackOrigin);
+    if (parsed.pathname.startsWith("/api/uploads/preview")) {
+      return buildPreviewURL(`${parsed.pathname}${parsed.search}`);
+    }
+
+    if (parsed.pathname.startsWith("/uploads/")) {
+      const relativePath = parsed.pathname.slice("/uploads/".length);
+      return buildPreviewURL(`/api/uploads/preview/${relativePath}${parsed.search}`);
+    }
+
+    const sourceURL = parsed.toString();
+    return buildPreviewURL(`/api/uploads/preview?url=${encodeURIComponent(sourceURL)}`);
+  } catch {
+    return trimmed;
+  }
+}
+
+export function buildAttachmentPreviewDataURL(url: string) {
+  const trimmed = url.trim();
+  if (!trimmed) return trimmed;
+
+  try {
+    const fallbackOrigin =
+      typeof window === "undefined" ? "http://127.0.0.1" : window.location.origin;
+    const parsed = new URL(trimmed, fallbackOrigin);
+    const searchParams = new URLSearchParams(parsed.search);
+    searchParams.set("format", "base64");
+
+    if (parsed.pathname.startsWith("/api/uploads/preview")) {
+      return `${parsed.pathname}?${searchParams.toString()}`;
+    }
+
+    if (parsed.pathname.startsWith("/uploads/")) {
+      const relativePath = parsed.pathname.slice("/uploads/".length);
+      return `/api/uploads/preview/${relativePath}?${searchParams.toString()}`;
+    }
+
+    return `/api/uploads/preview?url=${encodeURIComponent(parsed.toString())}&${searchParams.toString()}`;
+  } catch {
+    return trimmed;
+  }
+}
+
+function buildPreviewURL(path: string) {
+  return `${apiBaseURL}${path}`;
 }
 
 async function request<T>(

@@ -18,6 +18,7 @@ import {
   serializeAttachments,
   type FileItem,
 } from "@/components/domain/file-upload";
+import { AttachmentPreviewList } from "@/components/domain/attachment-preview";
 import { SchoolClassCascader } from "@/components/domain/school-class-cascader";
 import { PrintPreviewDialog } from "@/pages/daily-homework-print";
 import { Badge } from "@/components/ui/badge";
@@ -451,29 +452,7 @@ function HomeworkCard({
       </ul>
 
       {attachments.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-2">
-          {attachments.map((file, i) =>
-            file.type === "image" ? (
-              <a key={i} href={file.url} target="_blank" rel="noreferrer">
-                <img
-                  src={file.url}
-                  alt={file.name}
-                  className="size-16 rounded border object-cover"
-                />
-              </a>
-            ) : (
-              <a
-                key={i}
-                href={file.url}
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center gap-1 rounded border px-2 py-1 text-xs text-blue-600 hover:bg-muted"
-              >
-                PDF: {file.name}
-              </a>
-            ),
-          )}
-        </div>
+        <AttachmentPreviewList className="mt-3" items={attachments} />
       )}
 
       {item.remark && (

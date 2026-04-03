@@ -12,9 +12,14 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import {
+  AttachmentPreviewList,
+} from "@/components/domain/attachment-preview";
+import {
   FileUpload,
+  createFileItemsFromUrls,
   type FileItem,
 } from "@/components/domain/file-upload";
+import { MealStatusBadge } from "@/components/domain/meal-status-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -59,13 +64,13 @@ import {
 
 const statusOptions = [
   { label: "已用餐", value: "completed", color: "text-green-600" },
-  { label: "未用餐", value: "absent", color: "text-destructive" },
+  { label: "未用餐", value: "absent", color: "text-orange-600" },
 ] as const;
 
-const statusMap: Record<string, { label: string; variant: "default" | "secondary" | "destructive" }> = {
-  pending: { label: "待处理", variant: "secondary" },
-  completed: { label: "已用餐", variant: "default" },
-  absent: { label: "未用餐", variant: "destructive" },
+const statusMap: Record<string, { label: string }> = {
+  pending: { label: "待处理" },
+  completed: { label: "已用餐" },
+  absent: { label: "未用餐" },
 };
 
 // ---------------------------------------------------------------------------
@@ -94,9 +99,7 @@ function RecordEditDialog({ open, onOpenChange, student, record, defaultStatus, 
       if (record) {
         setStatus(record.status);
         setRemark(record.remark);
-        setImages(record.imageUrls?.length
-          ? record.imageUrls.map((url) => ({ name: url.split("/").pop() || "图片", type: "image", url }))
-          : []);
+        setImages(createFileItemsFromUrls(record.imageUrls || []));
       } else {
         setStatus(defaultStatus || "completed");
         setRemark("");
@@ -156,11 +159,10 @@ function RecordEditDialog({ open, onOpenChange, student, record, defaultStatus, 
           </div>
 
           <div className="grid gap-2">
-            <Label>上传照片</Label>
+            <Label>上传附件（图片 / PDF）</Label>
             <FileUpload
               value={images}
               onChange={setImages}
-              accept="image/*"
               maxFiles={9}
             />
           </div>
@@ -220,9 +222,11 @@ function StudentMealCard({ student, record, onRecord, onDelete, canEdit }: Stude
             </CardDescription>
           </div>
           {record && (
-            <Badge variant={statusMap[record.status]?.variant ?? "secondary"}>
-              {statusMap[record.status]?.label ?? record.status}
-            </Badge>
+            statusMap[record.status] ? (
+              <MealStatusBadge status={record.status as "absent" | "completed" | "pending"} />
+            ) : (
+              <Badge variant="secondary">{record.status}</Badge>
+            )
           )}
         </div>
       </CardHeader>
@@ -244,8 +248,16 @@ function StudentMealCard({ student, record, onRecord, onDelete, canEdit }: Stude
         {record?.imageUrls && record.imageUrls.length > 0 && (
           <div className="flex gap-1">
             <ImageIcon className="size-3 text-muted-foreground" />
-            <span className="text-xs text-muted-foreground">{record.imageUrls.length} 张照片</span>
+            <span className="text-xs text-muted-foreground">{record.imageUrls.length} 个附件</span>
           </div>
+        )}
+
+        {record?.imageUrls && record.imageUrls.length > 0 && (
+          <AttachmentPreviewList
+            compact
+            items={createFileItemsFromUrls(record.imageUrls)}
+            maxVisible={3}
+          />
         )}
 
         {/* 操作按钮 */}
@@ -253,11 +265,21 @@ function StudentMealCard({ student, record, onRecord, onDelete, canEdit }: Stude
           <div className="flex flex-wrap gap-1.5 pt-1">
             {!record ? (
               <>
-                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => onRecord("completed")}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 border-emerald-200 bg-emerald-50 text-xs text-emerald-700 hover:bg-emerald-100"
+                  onClick={() => onRecord("completed")}
+                >
                   <Check className="mr-1 size-3" />
                   已用餐
                 </Button>
-                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => onRecord("absent")}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 border-orange-200 bg-orange-50 text-xs text-orange-700 hover:bg-orange-100"
+                  onClick={() => onRecord("absent")}
+                >
                   <X className="mr-1 size-3" />
                   未用餐
                 </Button>
@@ -477,7 +499,7 @@ export default function MealRecordBoard() {
         <div className="flex flex-wrap gap-4 text-sm">
           <span>共 <strong>{stats.total}</strong> 名学生</span>
           <span className="text-green-600">已用餐 <strong>{stats.completed}</strong></span>
-          <span className="text-destructive">未用餐 <strong>{stats.absent}</strong></span>
+          <span className="text-orange-600">未用餐 <strong>{stats.absent}</strong></span>
           <span className="text-muted-foreground">
             <Clock className="mr-0.5 inline size-3" />
             未记录 <strong>{stats.pending}</strong>

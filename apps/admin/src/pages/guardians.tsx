@@ -93,6 +93,7 @@ const statusMap: Record<string, { label: string; variant: "default" | "secondary
 const initialForm = {
   id: "",
   name: "",
+  password: "",
   phone: "",
   relationship: "",
   remark: "",
@@ -223,22 +224,36 @@ function GuardianFormDialog({
 
   const [form, setForm] = useState(initialForm);
   const [saving, setSaving] = useState(false);
-  const defaultPassword = useMemo(() => getDefaultLoginPassword(form.phone), [form.phone]);
 
   useEffect(() => {
     if (isEdit && currentItem) {
       setForm({
         id: currentItem.id,
         name: currentItem.name,
+        password: getDefaultLoginPassword(currentItem.phone),
         phone: currentItem.phone,
         relationship: currentItem.relationship,
         remark: currentItem.remark,
         status: currentItem.status,
       });
     } else if (open === "create") {
-      setForm(initialForm);
+      setForm({ ...initialForm, password: getDefaultLoginPassword("") });
     }
   }, [open, currentItem, isEdit]);
+
+  useEffect(() => {
+    if (isEdit || open !== "create") {
+      return;
+    }
+
+    setForm((current) => {
+      const nextPassword = getDefaultLoginPassword(current.phone);
+      if (current.password === nextPassword || !current.password.trim()) {
+        return { ...current, password: nextPassword };
+      }
+      return current;
+    });
+  }, [form.phone, isEdit, open]);
 
   const exactDuplicate = hasExactName(items, form.name, form.id);
   const similarItems = findSimilarNames(items, form.name, form.id);
@@ -251,6 +266,10 @@ function GuardianFormDialog({
       toast.error("家长姓名和手机号不能为空");
       return;
     }
+    if (!isEdit && !form.password.trim()) {
+      toast.error("默认密码不能为空");
+      return;
+    }
     if (phoneExists) {
       toast.error("家长手机号已存在");
       return;
@@ -261,6 +280,7 @@ function GuardianFormDialog({
       await saveGuardianProfile({
         id: form.id || undefined,
         name: form.name.trim(),
+        password: isEdit ? undefined : form.password.trim(),
         phone: form.phone.trim(),
         relationship: form.relationship.trim(),
         remark: form.remark.trim(),
@@ -307,7 +327,12 @@ function GuardianFormDialog({
           {!isEdit ? (
             <div className="grid gap-2">
               <Label>默认密码</Label>
-              <Input readOnly value={defaultPassword} />
+              <Input
+                value={form.password}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, password: event.target.value }))
+                }
+              />
               <p className="text-sm text-muted-foreground">
                 {getDefaultLoginPasswordHint(form.phone)}
               </p>
@@ -396,16 +421,28 @@ function ResetPasswordDialog({
     () => getDefaultLoginPassword(currentItem.phone),
     [currentItem.phone],
   );
+  const [password, setPassword] = useState(defaultPassword);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    setPassword(defaultPassword);
+  }, [defaultPassword, open]);
 
   async function handleReset() {
     if (!currentItem.userId) {
       toast.error("当前家长还没有登录账号");
       return;
     }
+    if (!password.trim()) {
+      toast.error("新密码不能为空");
+      return;
+    }
 
     setSaving(true);
     try {
-      await resetUserPassword(currentItem.userId, defaultPassword);
+      await resetUserPassword(currentItem.userId, password.trim());
       toast.success("密码已重置");
       onOpenChange(false);
     } catch (error) {
@@ -432,7 +469,7 @@ function ResetPasswordDialog({
           </div>
           <div className="grid gap-2">
             <Label>新密码</Label>
-            <Input readOnly value={defaultPassword} />
+            <Input value={password} onChange={(event) => setPassword(event.target.value)} />
             <p className="text-sm text-muted-foreground">
               {getDefaultLoginPasswordHint(currentItem.phone)}
             </p>

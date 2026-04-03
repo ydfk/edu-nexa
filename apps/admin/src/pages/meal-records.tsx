@@ -20,6 +20,13 @@ import {
   DataTablePagination,
   DataTableToolbar,
 } from "@/components/data-table";
+import { AttachmentPreviewList } from "@/components/domain/attachment-preview";
+import {
+  FileUpload,
+  createFileItemsFromUrls,
+  type FileItem,
+} from "@/components/domain/file-upload";
+import { MealStatusBadge } from "@/components/domain/meal-status-badge";
 import { PageContent } from "@/components/page-content";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -79,15 +86,16 @@ const statusOptions = [
 
 const statusMap: Record<
   string,
-  { label: string; variant: "default" | "secondary" | "destructive" }
+  { label: string }
 > = {
-  pending: { label: "待处理", variant: "secondary" },
-  completed: { label: "已用餐", variant: "default" },
-  absent: { label: "未用餐", variant: "destructive" },
+  pending: { label: "待处理" },
+  completed: { label: "已用餐" },
+  absent: { label: "未用餐" },
 };
 
 const initialForm = {
   id: "",
+  imageUrls: [] as FileItem[],
   remark: "",
   serviceDate: "",
   status: "completed",
@@ -168,13 +176,20 @@ const columns: ColumnDef<MealRecordItem>[] = [
     ),
     cell: ({ row }) => {
       const status = row.getValue<string>("status");
-      const info = statusMap[status] ?? {
-        label: status,
-        variant: "secondary" as const,
-      };
-      return <Badge variant={info.variant}>{info.label}</Badge>;
+      if (!statusMap[status]) {
+        return <Badge variant="secondary">{status}</Badge>;
+      }
+      return <MealStatusBadge status={status as "absent" | "completed" | "pending"} />;
     },
     filterFn: (row, id, value: string[]) => value.includes(row.getValue(id)),
+  },
+  {
+    id: "attachments",
+    header: "附件",
+    cell: ({ row }) => (
+      <AttachmentPreviewList compact items={createFileItemsFromUrls(row.original.imageUrls)} />
+    ),
+    enableSorting: false,
   },
   {
     accessorKey: "remark",
@@ -254,6 +269,7 @@ function MealRecordFormDialog() {
     if (isEdit && currentItem) {
       setForm({
         id: currentItem.id,
+        imageUrls: createFileItemsFromUrls(currentItem.imageUrls),
         remark: currentItem.remark,
         serviceDate: currentItem.serviceDate,
         status: currentItem.status,
@@ -275,7 +291,7 @@ function MealRecordFormDialog() {
     try {
       await saveMealRecord({
         id: form.id || undefined,
-        imageUrls: [],
+        imageUrls: form.imageUrls.map((item) => item.url),
         recordedBy: session.user?.displayName || "",
         recordedById: session.user?.id || "",
         remark: form.remark.trim(),
@@ -353,6 +369,14 @@ function MealRecordFormDialog() {
                 <SelectItem value="absent">未用餐</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+          <div className="grid gap-2 md:col-span-2">
+            <Label>附件（图片 / PDF）</Label>
+            <FileUpload
+              value={form.imageUrls}
+              onChange={(value) => setForm((current) => ({ ...current, imageUrls: value }))}
+              maxFiles={9}
+            />
           </div>
           <div className="grid gap-2 md:col-span-2">
             <Label htmlFor="meal-remark">备注</Label>

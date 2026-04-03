@@ -2,12 +2,7 @@ import { useCallback, useRef, useState } from "react";
 import { FileUp, FileText, X, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { AttachmentPreviewDialog } from "@/components/domain/attachment-preview-dialog";
 import { uploadFile, type UploadResult } from "@/lib/server-data";
 
 export type FileItem = {
@@ -16,15 +11,29 @@ export type FileItem = {
   url: string;
 };
 
-function detectFileType(url: string): "image" | "pdf" {
+export function detectFileType(url: string): "image" | "pdf" {
   const lower = url.toLowerCase();
   if (lower.endsWith(".pdf")) return "pdf";
   return "image";
 }
 
-function extractFileName(url: string): string {
+export function extractFileName(url: string): string {
   const parts = url.split("/");
   return parts[parts.length - 1] || url;
+}
+
+export function createFileItemFromUrl(url: string, fallbackName?: string): FileItem {
+  return {
+    name: fallbackName || extractFileName(url),
+    type: detectFileType(fallbackName || url),
+    url,
+  };
+}
+
+export function createFileItemsFromUrls(urls: string[]) {
+  return urls
+    .filter((url) => typeof url === "string" && url.trim())
+    .map((url) => createFileItemFromUrl(url));
 }
 
 export function parseAttachments(json: string): FileItem[] {
@@ -32,13 +41,7 @@ export function parseAttachments(json: string): FileItem[] {
   try {
     const urls = JSON.parse(json) as string[];
     if (!Array.isArray(urls)) return [];
-    return urls
-      .filter((u) => typeof u === "string" && u.trim())
-      .map((url) => ({
-        name: extractFileName(url),
-        type: detectFileType(url),
-        url,
-      }));
+    return createFileItemsFromUrls(urls);
   } catch {
     return [];
   }
@@ -47,44 +50,6 @@ export function parseAttachments(json: string): FileItem[] {
 export function serializeAttachments(items: FileItem[]): string {
   if (items.length === 0) return "";
   return JSON.stringify(items.map((i) => i.url));
-}
-
-// ---------------------------------------------------------------------------
-// 预览 Dialog
-// ---------------------------------------------------------------------------
-
-function PreviewDialog({
-  file,
-  open,
-  onClose,
-}: {
-  file: FileItem | null;
-  open: boolean;
-  onClose: () => void;
-}) {
-  if (!file) return null;
-  return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-h-[90vh] max-w-4xl overflow-auto">
-        <DialogHeader>
-          <DialogTitle>{file.name}</DialogTitle>
-        </DialogHeader>
-        {file.type === "image" ? (
-          <img
-            src={file.url}
-            alt={file.name}
-            className="mx-auto max-h-[70vh] rounded object-contain"
-          />
-        ) : (
-          <iframe
-            src={file.url}
-            title={file.name}
-            className="h-[70vh] w-full rounded border"
-          />
-        )}
-      </DialogContent>
-    </Dialog>
-  );
 }
 
 // ---------------------------------------------------------------------------
@@ -120,11 +85,7 @@ export function FileUpload({
       for (const file of Array.from(files)) {
         try {
           const result: UploadResult = await uploadFile(file);
-          newItems.push({
-            name: file.name,
-            type: file.type === "application/pdf" ? "pdf" : "image",
-            url: result.url,
-          });
+          newItems.push(createFileItemFromUrl(result.url, file.name));
         } catch (error) {
           toast.error(
             `上传 ${file.name} 失败: ${error instanceof Error ? error.message : "未知错误"}`,
@@ -212,8 +173,9 @@ export function FileUpload({
         onChange={(e) => handleFiles(e.target.files)}
       />
 
-      <PreviewDialog
+      <AttachmentPreviewDialog
         file={previewFile}
+        items={value}
         open={!!previewFile}
         onClose={() => setPreviewFile(null)}
       />

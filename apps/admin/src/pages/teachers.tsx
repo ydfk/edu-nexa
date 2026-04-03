@@ -95,6 +95,7 @@ const statusMap: Record<string, { label: string; variant: "default" | "secondary
 const initialForm = {
   displayName: "",
   isAdmin: false,
+  password: "",
   phone: "",
   status: "active",
 };
@@ -226,14 +227,29 @@ function TeacherFormDialog({
       setForm({
         displayName: currentRow.displayName || "",
         isAdmin: currentRow.roles.includes("admin"),
+        password: getDefaultLoginPassword(currentRow.phone),
         phone: currentRow.phone,
         status: currentRow.status || "active",
       });
       return;
     }
 
-    setForm(initialForm);
+    setForm({ ...initialForm, password: getDefaultLoginPassword("") });
   }, [currentRow, open]);
+
+  useEffect(() => {
+    if (!open || currentRow) {
+      return;
+    }
+
+    setForm((current) => {
+      const nextPassword = getDefaultLoginPassword(current.phone);
+      if (current.password === nextPassword || !current.password.trim()) {
+        return { ...current, password: nextPassword };
+      }
+      return current;
+    });
+  }, [currentRow, open, form.phone]);
 
   const nameItems = useMemo(
     () =>
@@ -251,6 +267,10 @@ function TeacherFormDialog({
       toast.error("姓名和手机号不能为空");
       return;
     }
+    if (!currentRow && !form.password.trim()) {
+      toast.error("默认密码不能为空");
+      return;
+    }
 
     const payload = {
       displayName: form.displayName.trim(),
@@ -266,7 +286,7 @@ function TeacherFormDialog({
       } else {
         await createUser({
           ...payload,
-          password: defaultPassword,
+          password: form.password.trim(),
         });
       }
       toast.success(currentRow ? "教师已更新" : "教师已创建");
@@ -322,17 +342,32 @@ function TeacherFormDialog({
               }
             />
           </div>
-          <div className="grid grid-cols-4 items-center gap-x-4 gap-y-1">
-            <Label className="text-end">默认密码</Label>
-            <div className="col-span-3 space-y-1">
-              <Input readOnly value={defaultPassword} />
-              <p className="text-sm text-muted-foreground">
-                {isEdit
-                  ? "编辑教师不会修改现有密码，重置密码时会按这个规则生成。"
-                  : getDefaultLoginPasswordHint(form.phone)}
-              </p>
+          {isEdit ? (
+            <div className="grid grid-cols-4 items-center gap-x-4 gap-y-1">
+              <Label className="text-end">默认密码</Label>
+              <div className="col-span-3 space-y-1">
+                <Input readOnly value={defaultPassword} />
+                <p className="text-sm text-muted-foreground">
+                  编辑教师不会修改现有密码，重置密码时可手动调整默认密码。
+                </p>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="grid grid-cols-4 items-center gap-x-4 gap-y-1">
+              <Label className="text-end">默认密码</Label>
+              <div className="col-span-3 space-y-1">
+                <Input
+                  value={form.password}
+                  onChange={(event) =>
+                    setForm((current) => ({ ...current, password: event.target.value }))
+                  }
+                />
+                <p className="text-sm text-muted-foreground">
+                  {getDefaultLoginPasswordHint(form.phone)}
+                </p>
+              </div>
+            </div>
+          )}
           <div className="grid grid-cols-4 items-center gap-x-4 gap-y-1">
             <Label className="text-end">管理员</Label>
             <div className="col-span-3 flex items-center gap-3">
@@ -397,11 +432,24 @@ function ResetPasswordDialog({
     () => getDefaultLoginPassword(currentRow.phone),
     [currentRow.phone],
   );
+  const [password, setPassword] = useState(defaultPassword);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    setPassword(defaultPassword);
+  }, [defaultPassword, open]);
 
   async function handleReset() {
+    if (!password.trim()) {
+      toast.error("新密码不能为空");
+      return;
+    }
+
     setSaving(true);
     try {
-      await resetUserPassword(currentRow.id, defaultPassword);
+      await resetUserPassword(currentRow.id, password.trim());
       toast.success("密码已重置");
       onOpenChange(false);
     } catch (error) {
@@ -428,7 +476,7 @@ function ResetPasswordDialog({
           <div className="grid grid-cols-4 items-center gap-x-4 gap-y-1">
             <Label className="text-end">新密码</Label>
             <div className="col-span-3 space-y-1">
-              <Input readOnly value={defaultPassword} />
+              <Input value={password} onChange={(event) => setPassword(event.target.value)} />
               <p className="text-sm text-muted-foreground">
                 {getDefaultLoginPasswordHint(currentRow.phone)}
               </p>

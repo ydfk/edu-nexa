@@ -17,6 +17,8 @@ import {
   DataTablePagination,
   DataTableToolbar,
 } from "@/components/data-table";
+import { AttachmentPreviewList } from "@/components/domain/attachment-preview";
+import { parseAttachments } from "@/components/domain/file-upload";
 import { LongText } from "@/components/long-text";
 import { SchoolClassCascader } from "@/components/domain/school-class-cascader";
 import { PageContent } from "@/components/page-content";
@@ -126,6 +128,14 @@ const columns: ColumnDef<DailyHomeworkItem>[] = [
       <LongText className="max-w-[300px]">
         {getHomeworkContentLines(row.original).join("\n") || "-"}
       </LongText>
+    ),
+    enableSorting: false,
+  },
+  {
+    id: "attachments",
+    header: "附件",
+    cell: ({ row }) => (
+      <AttachmentPreviewList compact items={parseAttachments(row.original.attachments)} />
     ),
     enableSorting: false,
   },
