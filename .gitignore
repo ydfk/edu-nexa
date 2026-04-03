@@ -16,3 +16,4 @@ apps/weapp/dist/
 ./logs/
 .playwright-mcp/
 *.png
+!apps/weapp/miniprogram/assets/*.png
