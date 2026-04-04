@@ -8,7 +8,9 @@
       <view class="mine-name text-lg font-bold">游客</view>
       <view class="mine-desc text-sm">登录后查看完整功能与真实数据</view>
     </view>
-    <button class="btn btn--outline btn--small btn--round" bindtap="goLogin">去登录</button>
+  </view>
+  <view class="mx-lg mine-login-wrap" wx:if="{{!loggedIn}}">
+    <button class="btn btn--outline btn--small btn--round mine-login-action" bindtap="goLogin">去登录</button>
   </view>
   <!-- 已登录状态 -->
   <view class="mine-header" wx:if="{{loggedIn}}">
@@ -17,20 +19,9 @@
     </view>
     <view class="mine-info">
       <view class="mine-name text-lg font-bold">{{displayName}}</view>
-      <view class="mine-meta flex gap-xs mt-xs">
-        <van-tag type="success" round>{{roleName}}</van-tag>
-        <text class="text-sm text-secondary">{{phone}}</text>
-      </view>
-    </view>
-  </view>
-  <!-- 角色切换 -->
-  <view class="section mx-lg" wx:if="{{hasMultiRoles}}">
-    <view class="section-header">
-      <text class="section-title">切换角色</text>
-    </view>
-    <view class="mine-roles">
-      <view class="mine-role-chip {{item.active ? 'mine-role-chip--active' : ''}}" wx:for="{{roleList}}" wx:key="role" bindtap="switchRole" data-role="{{item.role}}">
-        {{item.name}}
+      <view class="mine-meta">
+        <van-tag type="success" round custom-class="mine-meta__tag">{{roleName}}</van-tag>
+        <text class="mine-meta__phone">{{phone}}</text>
       </view>
     </view>
   </view>

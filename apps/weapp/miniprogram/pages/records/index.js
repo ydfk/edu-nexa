@@ -5,7 +5,7 @@ const {
   getStudents,
 } = require("../../services/records");
 const { getSession, isLoggedIn, isGuardian, canEdit } = require("../../store/session");
-const { getStatusName, getStatusTagType, requireAuth } = require("../../utils/permission");
+const { getStatusName, getStatusTagType } = require("../../utils/permission");
 const { getToday, shiftDate, formatDateCN, formatDate } = require("../../utils/date");
 
 Page({
@@ -29,13 +29,11 @@ Page({
   },
 
   onShow() {
-    if (!requireAuth()) return;
-
     const currentDate = this.data.currentDate || getToday();
     this.setData({
       currentDate,
       dateDisplay: formatDateCN(currentDate),
-      canEdit: canEdit(),
+      canEdit: isLoggedIn() ? canEdit() : false,
     });
     this.loadRecords();
   },
@@ -95,7 +93,19 @@ Page({
   },
 
   async loadRecords() {
-    if (!isLoggedIn()) return;
+    if (!isLoggedIn()) {
+      this.setData({
+        mealGroups: [],
+        homeworkGroups: [],
+        currentGroups: [],
+        currentGroup: null,
+        currentRecords: [],
+        currentStudentIndex: 0,
+        currentEmptyText: this.data.activeTab === 0 ? "登录后查看学生用餐记录" : "登录后查看学生作业记录",
+        currentPlaceholder: null,
+      });
+      return;
+    }
 
     const currentDate = this.data.currentDate;
     const session = getSession();
@@ -175,6 +185,14 @@ Page({
   },
 
   goRecordTap(e) {
+    if (!isLoggedIn()) {
+      wx.showToast({ title: "请先登录", icon: "none" });
+      setTimeout(() => {
+        wx.navigateTo({ url: "/pages/login/index" });
+      }, 200);
+      return;
+    }
+
     const recordId = e.currentTarget.dataset.recordId || "";
     const studentId = e.currentTarget.dataset.studentId || "";
     const subject = e.currentTarget.dataset.subject || "";

@@ -2,7 +2,7 @@ const { getStudents, saveStudent } = require("../../services/records");
 const { getSchools, getGrades, getClasses } = require("../../services/schools");
 const { getGuardians } = require("../../services/guardians");
 const { requireEditor } = require("../../utils/permission");
-const Dialog = require("@vant/weapp/dialog/dialog");
+const Dialog = require("@vant/weapp/dialog/dialog").default;
 
 Page({
   data: {

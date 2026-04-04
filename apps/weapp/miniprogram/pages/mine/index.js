@@ -1,6 +1,6 @@
-const { getSession, isLoggedIn, clearSession, setActiveRole, getUserRoles, hasMultipleRoles } = require("../../store/session");
+const { getSession, isLoggedIn, clearSession } = require("../../store/session");
 const { getRoleName } = require("../../utils/permission");
-const Dialog = require("@vant/weapp/dialog/dialog");
+const Dialog = require("@vant/weapp/dialog/dialog").default;
 
 Page({
   data: {
@@ -8,8 +8,6 @@ Page({
     displayName: "",
     phone: "",
     roleName: "",
-    hasMultiRoles: false,
-    roleList: [],
   },
 
   onShow() {
@@ -19,18 +17,11 @@ Page({
       return;
     }
     const session = getSession();
-    const roles = getUserRoles();
     this.setData({
       loggedIn: true,
       displayName: session.user?.displayName || "用户",
       phone: maskPhone(session.user?.phone || ""),
       roleName: getRoleName(session.activeRole),
-      hasMultiRoles: hasMultipleRoles(),
-      roleList: roles.map((r) => ({
-        role: r,
-        name: getRoleName(r),
-        active: r === session.activeRole,
-      })),
     });
   },
 
@@ -38,18 +29,22 @@ Page({
     wx.navigateTo({ url: "/pages/login/index" });
   },
 
-  switchRole(e) {
-    const role = e.currentTarget.dataset.role;
-    setActiveRole(role);
-    this.onShow();
-    wx.showToast({ title: `已切换为${getRoleName(role)}`, icon: "none" });
-  },
-
   onLogout() {
     Dialog.confirm({ title: "确认退出", message: "退出后需要重新登录" })
       .then(() => {
         clearSession();
-        wx.reLaunch({ url: "/pages/home/index" });
+        this.setData({
+          loggedIn: false,
+          displayName: "",
+          phone: "",
+          roleName: "",
+        });
+        wx.switchTab({
+          url: "/pages/home/index",
+          fail: () => {
+            wx.reLaunch({ url: "/pages/home/index" });
+          },
+        });
       })
       .catch(() => {});
   },

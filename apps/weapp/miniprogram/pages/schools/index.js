@@ -6,7 +6,7 @@ const {
 const { getStudents } = require("../../services/records");
 const { canEdit } = require("../../store/session");
 const { requireAuth } = require("../../utils/permission");
-const Dialog = require("@vant/weapp/dialog/dialog");
+const Dialog = require("@vant/weapp/dialog/dialog").default;
 
 Page({
   data: {

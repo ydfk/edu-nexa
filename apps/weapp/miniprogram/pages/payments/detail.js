@@ -4,7 +4,7 @@ const { getRuntimeSettings } = require("../../services/common");
 const { getSession, isGuardian } = require("../../store/session");
 const { requireEditor } = require("../../utils/permission");
 const { getToday, formatDate } = require("../../utils/date");
-const Dialog = require("@vant/weapp/dialog/dialog");
+const Dialog = require("@vant/weapp/dialog/dialog").default;
 
 Page({
   data: {

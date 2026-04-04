@@ -1,27 +1,25 @@
 <view class="page safe-bottom">
-  <!-- 未登录提示 -->
-  <view wx:if="{{!loggedIn}}" class="empty-state" style="padding-top: 200rpx;">
-    <van-icon name="info-o" size="80rpx" color="#C8C9CC" />
-    <view class="empty-state__text">登录后查看完整功能与真实数据</view>
-    <button class="btn btn--primary btn--small btn--round mt-md" bindtap="goLogin">去登录</button>
-  </view>
-  <!-- 功能入口 -->
-  <view wx:else>
-    <view class="section section--compact">
-      <van-grid column-num="3" border="{{false}}" gutter="{{16}}">
-        <van-grid-item wx:for="{{features}}" wx:key="id" icon="{{item.icon}}" text="{{item.title}}" icon-color="#06a050" bindtap="goFeature" data-url="{{item.url}}" />
-      </van-grid>
-    </view>
-    <view class="section" wx:if="{{quickActions.length > 0}}">
-      <view class="section-header">
-        <text class="section-title">快捷操作</text>
-      </view>
-      <view class="list">
-        <view class="list-item list-item--clickable" wx:for="{{quickActions}}" wx:key="id" bindtap="onQuickActionTap" data-url="{{item.url}}" data-action="{{item.action}}">
-          <view class="list-content">
-            <view class="list-title">{{item.title}}</view>
-            <view class="list-desc">{{item.desc}}</view>
+  <view class="section section--compact">
+    <view class="feature-grid">
+      <view class="feature-grid__item" wx:for="{{features}}" wx:key="id" bindtap="goFeature" data-url="{{item.url}}">
+        <view class="feature-grid__card">
+          <view class="feature-grid__icon">
+            <van-icon name="{{item.icon}}" size="42rpx" color="#06a050" />
           </view>
+          <view class="feature-grid__title">{{item.title}}</view>
+        </view>
+      </view>
+    </view>
+  </view>
+  <view class="section" wx:if="{{quickActions.length > 0}}">
+    <view class="section-header">
+      <text class="section-title">快捷操作</text>
+    </view>
+    <view class="list">
+      <view class="list-item list-item--clickable" wx:for="{{quickActions}}" wx:key="id" bindtap="onQuickActionTap" data-url="{{item.url}}" data-action="{{item.action}}">
+        <view class="list-content">
+          <view class="list-title">{{item.title}}</view>
+          <view class="list-desc">{{item.desc}}</view>
         </view>
       </view>
     </view>

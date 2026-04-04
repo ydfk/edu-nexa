@@ -1,6 +1,6 @@
 const { getUsers, saveUser, deleteUser, resetUserPassword } = require("../../services/teachers");
 const { requireAdmin } = require("../../utils/permission");
-const Dialog = require("@vant/weapp/dialog/dialog");
+const Dialog = require("@vant/weapp/dialog/dialog").default;
 
 Page({
   data: {

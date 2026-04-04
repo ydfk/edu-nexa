@@ -47,6 +47,32 @@
   color: #4a7060;
 }
 
+.mine-login-wrap {
+  margin-top: -8rpx;
+}
+
+.mine-login-action {
+  width: 100%;
+}
+
+.mine-meta {
+  margin-top: 10rpx;
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
+  flex-wrap: wrap;
+}
+
+.mine-meta__tag {
+  flex-shrink: 0;
+}
+
+.mine-meta__phone {
+  font-size: 24rpx;
+  line-height: 1.2;
+  color: var(--color-text-secondary);
+}
+
 .mine-roles {
   display: flex;
   gap: var(--spacing-sm);

@@ -13,20 +13,20 @@ function hydrateSession() {
     if (!payload || typeof payload !== "object") {
       return;
     }
-    sessionStore.activeRole = payload.activeRole || inferActiveRole(payload.user);
+    sessionStore.user = normalizeUser(payload.user);
+    sessionStore.activeRole = payload.activeRole || inferActiveRole(sessionStore.user);
     sessionStore.loginType = payload.loginType || "";
     sessionStore.token = payload.token || "";
-    sessionStore.user = payload.user || null;
   } catch (error) {
     console.warn("读取小程序会话失败", error);
   }
 }
 
 function setSession(payload) {
-  sessionStore.activeRole = payload.activeRole || inferActiveRole(payload.user);
+  sessionStore.user = normalizeUser(payload.user);
+  sessionStore.activeRole = payload.activeRole || inferActiveRole(sessionStore.user);
   sessionStore.loginType = payload.loginType || "";
   sessionStore.token = payload.token || "";
-  sessionStore.user = payload.user || null;
   try {
     wx.setStorageSync(storageKey, sessionStore);
   } catch (error) {
@@ -68,16 +68,20 @@ function isLoggedIn() {
   return !!sessionStore.token && !!sessionStore.user;
 }
 
+function hasRole(role) {
+  return getUserRoles().includes(role);
+}
+
 function isAdmin() {
-  return sessionStore.activeRole === "admin";
+  return hasRole("admin");
 }
 
 function isTeacher() {
-  return sessionStore.activeRole === "teacher";
+  return !isAdmin() && hasRole("teacher");
 }
 
 function isGuardian() {
-  return sessionStore.activeRole === "guardian";
+  return !isAdmin() && !isTeacher() && hasRole("guardian");
 }
 
 /** 管理员或教师可编辑 */
@@ -92,8 +96,8 @@ function canManage() {
 
 function getUserRoles() {
   const user = sessionStore.user;
-  if (!user || !Array.isArray(user.roles)) return [];
-  return user.roles;
+  if (!user) return [];
+  return normalizeRoles(user.roles);
 }
 
 function hasMultipleRoles() {
@@ -101,12 +105,38 @@ function hasMultipleRoles() {
 }
 
 function inferActiveRole(user) {
-  if (!user || !Array.isArray(user.roles) || user.roles.length === 0) {
+  const roles = normalizeRoles(user && user.roles);
+  if (roles.length === 0) {
     return "";
   }
-  if (user.roles.includes("guardian")) return "guardian";
-  if (user.roles.includes("teacher")) return "teacher";
-  return user.roles[0];
+  if (roles.includes("admin")) return "admin";
+  if (roles.includes("teacher")) return "teacher";
+  if (roles.includes("guardian")) return "guardian";
+  return roles[0];
+}
+
+function normalizeUser(user) {
+  if (!user || typeof user !== "object") {
+    return null;
+  }
+
+  return {
+    ...user,
+    roles: normalizeRoles(user.roles),
+  };
+}
+
+function normalizeRoles(rawRoles) {
+  if (Array.isArray(rawRoles)) {
+    return rawRoles.filter(Boolean);
+  }
+  if (typeof rawRoles === "string") {
+    return rawRoles
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+  return [];
 }
 
 module.exports = {
@@ -116,6 +146,7 @@ module.exports = {
   getSession,
   setActiveRole,
   isLoggedIn,
+  hasRole,
   isAdmin,
   isTeacher,
   isGuardian,
