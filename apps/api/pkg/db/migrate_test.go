@@ -2,6 +2,7 @@ package db
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/glebarez/sqlite"
@@ -11,17 +12,47 @@ import (
 	"gorm.io/gorm"
 )
 
+func openTestDB(t *testing.T) *gorm.DB {
+	t.Helper()
+
+	dsn := fmt.Sprintf("file:%s?mode=memory&cache=shared", t.Name())
+	testDB, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+
+	sqlDB, err := testDB.DB()
+	if err != nil {
+		t.Fatalf("get sql db: %v", err)
+	}
+	sqlDB.SetMaxOpenConns(1)
+	t.Cleanup(func() {
+		_ = sqlDB.Close()
+	})
+
+	return testDB
+}
+
+const (
+	testAssignmentID = "11111111-1111-1111-1111-111111111111"
+	testAttachmentID = "22222222-2222-2222-2222-222222222222"
+)
+
+func createAssignmentTableForTest(t *testing.T) {
+	t.Helper()
+
+	if err := DB.AutoMigrate(&homeworkassignmentModel.Assignment{}); err != nil {
+		t.Fatalf("create assignment table: %v", err)
+	}
+}
+
 func TestAutoMigrateSeparatesProfileTables(t *testing.T) {
 	prevDB := DB
 	t.Cleanup(func() {
 		DB = prevDB
 	})
 
-	testDB, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("open db: %v", err)
-	}
-	DB = testDB
+	DB = openTestDB(t)
 
 	if err := DB.Exec(`
 		CREATE TABLE profiles (
@@ -78,44 +109,18 @@ func TestAutoMigrateCreatesHomeworkAssignmentItemsFromLegacyContent(t *testing.T
 		DB = prevDB
 	})
 
-	testDB, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("open db: %v", err)
-	}
-	DB = testDB
+	DB = openTestDB(t)
 
-	if err := DB.Exec(`
-		CREATE TABLE assignments (
-			id TEXT PRIMARY KEY,
-			created_at DATETIME,
-			updated_at DATETIME,
-			deleted_at DATETIME,
-			campus_id TEXT,
-			service_date TEXT NOT NULL,
-			school_id TEXT,
-			school_name TEXT NOT NULL,
-			grade_name TEXT,
-			class_id TEXT,
-			class_name TEXT NOT NULL,
-			subject TEXT,
-			content TEXT NOT NULL,
-			attachments TEXT,
-			remark TEXT,
-			teacher_id TEXT,
-			teacher_name TEXT
-		)
-	`).Error; err != nil {
-		t.Fatalf("create assignments table: %v", err)
-	}
+	createAssignmentTableForTest(t)
 
 	if err := DB.Exec(`
 		INSERT INTO assignments (
-			id, created_at, updated_at, service_date, school_name, class_name, subject, content
+			id, created_at, updated_at, campus_id, service_date, school_name, class_name, subject, content, remark, teacher_name
 		) VALUES (
-			'assignment-1', '2026-04-02 10:00:00', '2026-04-02 10:00:00', '2026-04-02', '沣东九小', '一班', '数学', '口算十题
-订正错题'
+			?, '2026-04-02 10:00:00', '2026-04-02 10:00:00', '', '2026-04-02', '沣东九小', '一班', '数学', '口算十题
+订正错题', '', ''
 		)
-	`).Error; err != nil {
+	`, testAssignmentID).Error; err != nil {
 		t.Fatalf("seed assignments table: %v", err)
 	}
 
@@ -128,7 +133,7 @@ func TestAutoMigrateCreatesHomeworkAssignmentItemsFromLegacyContent(t *testing.T
 	}
 
 	var items []homeworkassignmentModel.Item
-	if err := DB.Order("sort asc").Find(&items, "assignment_id = ?", "assignment-1").Error; err != nil {
+	if err := DB.Order("sort asc").Find(&items, "assignment_id = ?", testAssignmentID).Error; err != nil {
 		t.Fatalf("query homework assignment items: %v", err)
 	}
 	if len(items) != 2 {
@@ -145,34 +150,13 @@ func TestAutoMigrateMovesHomeworkAssignmentAttachmentsToTable(t *testing.T) {
 		DB = prevDB
 	})
 
-	testDB, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("open db: %v", err)
-	}
-	DB = testDB
+	DB = openTestDB(t)
 
-	if err := DB.Exec(`
-		CREATE TABLE assignments (
-			id TEXT PRIMARY KEY,
-			created_at DATETIME,
-			updated_at DATETIME,
-			deleted_at DATETIME,
-			campus_id TEXT,
-			service_date TEXT NOT NULL,
-			school_id TEXT,
-			school_name TEXT NOT NULL,
-			grade_name TEXT,
-			class_id TEXT,
-			class_name TEXT NOT NULL,
-			subject TEXT,
-			content TEXT NOT NULL,
-			attachments TEXT,
-			remark TEXT,
-			teacher_id TEXT,
-			teacher_name TEXT
-		)
-	`).Error; err != nil {
-		t.Fatalf("create assignments table: %v", err)
+	createAssignmentTableForTest(t)
+	if !DB.Migrator().HasColumn("assignments", "attachments") {
+		if err := DB.Exec("ALTER TABLE assignments ADD COLUMN attachments TEXT").Error; err != nil {
+			t.Fatalf("add legacy attachments column: %v", err)
+		}
 	}
 
 	legacyAttachments, err := json.Marshal([]map[string]string{
@@ -189,11 +173,11 @@ func TestAutoMigrateMovesHomeworkAssignmentAttachmentsToTable(t *testing.T) {
 
 	if err := DB.Exec(`
 		INSERT INTO assignments (
-			id, created_at, updated_at, service_date, school_name, class_name, subject, content, attachments
+			id, created_at, updated_at, campus_id, service_date, school_name, class_name, subject, content, attachments, remark, teacher_name
 		) VALUES (
-			'assignment-1', '2026-04-02 10:00:00', '2026-04-02 10:00:00', '2026-04-02', '沣东九小', '一班', '数学', '口算十题', ?
+			?, '2026-04-02 10:00:00', '2026-04-02 10:00:00', '', '2026-04-02', '沣东九小', '一班', '数学', '口算十题', ?, '', ''
 		)
-	`, string(legacyAttachments)).Error; err != nil {
+	`, testAssignmentID, string(legacyAttachments)).Error; err != nil {
 		t.Fatalf("seed assignments table: %v", err)
 	}
 
@@ -209,7 +193,7 @@ func TestAutoMigrateMovesHomeworkAssignmentAttachmentsToTable(t *testing.T) {
 	}
 
 	var attachments []homeworkassignmentModel.Attachment
-	if err := DB.Order("sort asc").Find(&attachments, "assignment_id = ?", "assignment-1").Error; err != nil {
+	if err := DB.Order("sort asc").Find(&attachments, "assignment_id = ?", testAssignmentID).Error; err != nil {
 		t.Fatalf("query homework assignment attachments: %v", err)
 	}
 	if len(attachments) != 2 {
@@ -238,34 +222,13 @@ func TestAutoMigrateKeepsLegacyAttachmentColumnWhenUnsupportedDataExists(t *test
 		DB = prevDB
 	})
 
-	testDB, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("open db: %v", err)
-	}
-	DB = testDB
+	DB = openTestDB(t)
 
-	if err := DB.Exec(`
-		CREATE TABLE assignments (
-			id TEXT PRIMARY KEY,
-			created_at DATETIME,
-			updated_at DATETIME,
-			deleted_at DATETIME,
-			campus_id TEXT,
-			service_date TEXT NOT NULL,
-			school_id TEXT,
-			school_name TEXT NOT NULL,
-			grade_name TEXT,
-			class_id TEXT,
-			class_name TEXT NOT NULL,
-			subject TEXT,
-			content TEXT NOT NULL,
-			attachments TEXT,
-			remark TEXT,
-			teacher_id TEXT,
-			teacher_name TEXT
-		)
-	`).Error; err != nil {
-		t.Fatalf("create assignments table: %v", err)
+	createAssignmentTableForTest(t)
+	if !DB.Migrator().HasColumn("assignments", "attachments") {
+		if err := DB.Exec("ALTER TABLE assignments ADD COLUMN attachments TEXT").Error; err != nil {
+			t.Fatalf("add legacy attachments column: %v", err)
+		}
 	}
 
 	legacyAttachments, err := json.Marshal([]map[string]string{
@@ -282,11 +245,11 @@ func TestAutoMigrateKeepsLegacyAttachmentColumnWhenUnsupportedDataExists(t *test
 
 	if err := DB.Exec(`
 		INSERT INTO assignments (
-			id, created_at, updated_at, service_date, school_name, class_name, subject, content, attachments
+			id, created_at, updated_at, campus_id, service_date, school_name, class_name, subject, content, attachments, remark, teacher_name
 		) VALUES (
-			'assignment-1', '2026-04-02 10:00:00', '2026-04-02 10:00:00', '2026-04-02', '沣东九小', '一班', '数学', '口算十题', ?
+			?, '2026-04-02 10:00:00', '2026-04-02 10:00:00', '', '2026-04-02', '沣东九小', '一班', '数学', '口算十题', ?, '', ''
 		)
-	`, string(legacyAttachments)).Error; err != nil {
+	`, testAssignmentID, string(legacyAttachments)).Error; err != nil {
 		t.Fatalf("seed assignments table: %v", err)
 	}
 
@@ -299,7 +262,7 @@ func TestAutoMigrateKeepsLegacyAttachmentColumnWhenUnsupportedDataExists(t *test
 	}
 
 	var attachments []homeworkassignmentModel.Attachment
-	if err := DB.Order("sort asc").Find(&attachments, "assignment_id = ?", "assignment-1").Error; err != nil {
+	if err := DB.Order("sort asc").Find(&attachments, "assignment_id = ?", testAssignmentID).Error; err != nil {
 		t.Fatalf("query homework assignment attachments: %v", err)
 	}
 	if len(attachments) != 1 {
@@ -322,35 +285,20 @@ func TestAutoMigrateBackfillsHomeworkAttachmentMetadata(t *testing.T) {
 		DB = prevDB
 	})
 
-	testDB, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("open db: %v", err)
-	}
-	DB = testDB
+	DB = openTestDB(t)
 
-	if err := DB.Exec(`
-		CREATE TABLE homework_assignment_attachments (
-			id TEXT PRIMARY KEY,
-			created_at DATETIME,
-			updated_at DATETIME,
-			deleted_at DATETIME,
-			assignment_id TEXT NOT NULL,
-			sort INTEGER NOT NULL DEFAULT 0,
-			bucket TEXT NOT NULL,
-			object_key TEXT NOT NULL
-		)
-	`).Error; err != nil {
-		t.Fatalf("create legacy attachments table: %v", err)
+	if err := DB.AutoMigrate(&homeworkassignmentModel.Attachment{}); err != nil {
+		t.Fatalf("create attachments table: %v", err)
 	}
 
 	if err := DB.Exec(`
 		INSERT INTO homework_assignment_attachments (
-			id, created_at, updated_at, assignment_id, sort, bucket, object_key
+			id, created_at, updated_at, assignment_id, sort, bucket, name, extension, object_key, size
 		) VALUES (
-			'attachment-1', '2026-04-02 10:00:00', '2026-04-02 10:00:00', 'assignment-1', 1, 'yiyixiaowu', 'edunexa/homework/2026/04/demo-3.png'
+			?, '2026-04-02 10:00:00', '2026-04-02 10:00:00', ?, 1, 'yiyixiaowu', '', '', 'edunexa/homework/2026/04/demo-3.png', -1
 		)
-	`).Error; err != nil {
-		t.Fatalf("seed legacy attachments table: %v", err)
+	`, testAttachmentID, testAssignmentID).Error; err != nil {
+		t.Fatalf("seed attachments table: %v", err)
 	}
 
 	if err := autoMigrate(); err != nil {
@@ -358,7 +306,7 @@ func TestAutoMigrateBackfillsHomeworkAttachmentMetadata(t *testing.T) {
 	}
 
 	var attachment homeworkassignmentModel.Attachment
-	if err := DB.First(&attachment, "id = ?", "attachment-1").Error; err != nil {
+	if err := DB.First(&attachment, "id = ?", testAttachmentID).Error; err != nil {
 		t.Fatalf("query attachment: %v", err)
 	}
 	if attachment.Name != "demo-3.png" {

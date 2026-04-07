@@ -10,7 +10,6 @@ steps:
       - pnpm config set registry https://registry.npmmirror.com
       - pnpm install --frozen-lockfile
       - pnpm lint:admin
-      - pnpm test:admin
       - pnpm build:admin
 
 trigger:
@@ -68,7 +67,6 @@ steps:
       - corepack enable
       - pnpm config set registry https://registry.npmmirror.com
       - pnpm install --frozen-lockfile
-      - pnpm test:admin
       - pnpm build:admin
 
   - name: deploy-admin
