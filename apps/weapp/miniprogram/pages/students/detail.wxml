@@ -6,6 +6,15 @@
       <input class="form-input" value="{{name}}" bindinput="onInput" data-field="name" placeholder="请输入学生姓名" />
     </view>
 
+    <!-- 性别 -->
+    <view class="form-group">
+      <view class="form-label form-label--required">性别</view>
+      <van-radio-group value="{{gender}}" bind:change="onGenderChange" direction="horizontal">
+        <van-radio name="male" icon-size="36rpx">男</van-radio>
+        <van-radio name="female" icon-size="36rpx">女</van-radio>
+      </van-radio-group>
+    </view>
+
     <!-- 学校 -->
     <view class="form-group">
       <view class="form-label form-label--required">学校</view>

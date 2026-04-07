@@ -38,6 +38,7 @@ Page({
       const res = await getStudents(params);
       const list = (res.items || res || []).map((s) => ({
         ...s,
+        genderText: getGenderName(s.gender),
         statusText: getStatusName(s.status),
         tagType: getStatusTagType(s.status),
       }));
@@ -56,4 +57,14 @@ Page({
     wx.navigateTo({ url: "/pages/students/detail" });
   },
 });
+
+function getGenderName(gender) {
+  if (gender === "male") {
+    return "男";
+  }
+  if (gender === "female") {
+    return "女";
+  }
+  return "";
+}
 

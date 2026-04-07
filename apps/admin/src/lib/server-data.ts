@@ -59,6 +59,7 @@ export type GuardianProfileItem = {
 export type StudentItem = {
   classId: string;
   className: string;
+  gender?: string;
   grade: string;
   gradeId: string;
   guardianId: string;
@@ -348,6 +349,7 @@ export async function fetchStudents(query?: ListQuery) {
 export async function saveStudent(input: {
   classId: string;
   className: string;
+  gender: string;
   grade: string;
   gradeId: string;
   guardianId: string;
@@ -495,7 +497,14 @@ export async function fetchDailyHomework(query?: ListQuery) {
 }
 
 export async function fetchDailyHomeworkPrintPDF(query?: ListQuery) {
-  return request<{ path: string; serviceDate: string; url: string }>(
+  return request<{
+    bucket?: string;
+    objectKey?: string;
+    path: string;
+    provider?: string;
+    serviceDate: string;
+    url: string;
+  }>(
     "/api/daily-homework/print-pdf",
     { query },
   );

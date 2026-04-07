@@ -8,6 +8,7 @@ Page({
   data: {
     isEdit: false,
     studentId: "",
+    gender: "",
     name: "",
     status: "active",
     submitting: false,
@@ -48,6 +49,7 @@ Page({
       const student = Array.isArray(list) ? list.find((s) => String(s.id) === String(id)) : list;
       if (!student) return;
       this.setData({
+        gender: student.gender || "",
         name: student.name || "",
         status: student.status || "active",
         selectedSchool: { id: student.schoolId, name: student.schoolName },
@@ -123,6 +125,10 @@ Page({
     this.setData({ status: e.detail });
   },
 
+  onGenderChange(e) {
+    this.setData({ gender: e.detail });
+  },
+
   openSchoolPicker() { this.setData({ showSchoolPicker: true }); },
   closeSchoolPicker() { this.setData({ showSchoolPicker: false }); },
   onSchoolConfirm(e) {
@@ -196,14 +202,28 @@ Page({
       wx.showToast({ title: "请输入学生姓名", icon: "none" });
       return;
     }
+    if (!this.data.gender) {
+      wx.showToast({ title: "请选择性别", icon: "none" });
+      return;
+    }
     this.setData({ submitting: true });
     try {
+      const school = this.data.schools.find((item) => item.id === this.data.selectedSchool.id);
+      const grade = this.data.grades.find((item) => item.id === this.data.selectedGrade.id);
+      const cls = this.data.classes.find((item) => item.id === this.data.selectedClass.id);
+      const guardian = this.data.guardians.find((item) => item.id === this.data.selectedGuardian.id);
       const payload = {
-        name: this.data.name.trim(),
         schoolId: this.data.selectedSchool.id,
+        schoolName: (school && school.name) || this.data.selectedSchool.name || "",
         gradeId: this.data.selectedGrade.id,
+        grade: (grade && grade.name) || this.data.selectedGrade.name || "",
         classId: this.data.selectedClass.id,
+        className: (cls && cls.name) || this.data.selectedClass.name || "",
         guardianId: this.data.selectedGuardian.id,
+        guardianName: (guardian && guardian.name) || this.data.selectedGuardian.name || "",
+        guardianPhone: (guardian && guardian.phone) || "",
+        name: this.data.name.trim(),
+        gender: this.data.gender,
         status: this.data.status,
       };
       if (this.data.isEdit) payload.id = this.data.studentId;

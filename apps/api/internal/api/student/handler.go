@@ -24,6 +24,7 @@ type studentPayload struct {
 	CampusID      string `json:"campusId"`
 	ClassID       string `json:"classId"`
 	ClassName     string `json:"className"`
+	Gender        string `json:"gender"`
 	Grade         string `json:"grade"`
 	GradeID       string `json:"gradeId"`
 	GuardianID    string `json:"guardianId"`
@@ -111,6 +112,7 @@ func List(c *fiber.Ctx) error {
 			"campusId":       item.CampusID,
 			"classId":        item.ClassID,
 			"className":      item.ClassName,
+			"gender":         item.Gender,
 			"grade":          item.Grade,
 			"gradeId":        item.GradeID,
 			"guardianId":     item.GuardianID,
@@ -153,6 +155,7 @@ func Create(c *fiber.Ctx) error {
 		CampusID:      strings.TrimSpace(req.CampusID),
 		ClassID:       strings.TrimSpace(req.ClassID),
 		ClassName:     strings.TrimSpace(req.ClassName),
+		Gender:        normalizeStudentGender(req.Gender),
 		Grade:         strings.TrimSpace(req.Grade),
 		GradeID:       strings.TrimSpace(req.GradeID),
 		GuardianID:    strings.TrimSpace(req.GuardianID),
@@ -199,6 +202,7 @@ func Update(c *fiber.Ctx) error {
 	student.ClassID = strings.TrimSpace(req.ClassID)
 	student.ClassName = strings.TrimSpace(req.ClassName)
 	student.CampusID = strings.TrimSpace(req.CampusID)
+	student.Gender = normalizeStudentGender(req.Gender)
 	student.Grade = strings.TrimSpace(req.Grade)
 	student.GradeID = strings.TrimSpace(req.GradeID)
 	student.GuardianID = strings.TrimSpace(req.GuardianID)
@@ -244,6 +248,9 @@ func validateStudentPayload(req studentPayload) error {
 	if strings.TrimSpace(req.Name) == "" {
 		return errors.New("学生姓名不能为空")
 	}
+	if normalizeStudentGender(req.Gender) == "" {
+		return errors.New("性别不能为空")
+	}
 	if strings.TrimSpace(req.SchoolID) == "" || strings.TrimSpace(req.SchoolName) == "" {
 		return errors.New("学校不能为空")
 	}
@@ -260,6 +267,15 @@ func validateStudentPayload(req studentPayload) error {
 	}
 
 	return nil
+}
+
+func normalizeStudentGender(gender string) string {
+	switch strings.TrimSpace(gender) {
+	case "male", "female":
+		return strings.TrimSpace(gender)
+	default:
+		return ""
+	}
 }
 
 func ensureStudentNameUnique(name string, guardianID string, guardianPhone string, excludeID string) error {

@@ -20,7 +20,7 @@
       >
         <view class="list-content manage-list-item__content">
           <view class="manage-list-item__title-row">
-            <text class="list-title">{{item.name}}</text>
+            <text class="list-title">{{item.name}}{{item.genderText ? ' · ' + item.genderText : ''}}</text>
             <view class="tag tag--{{item.tagType}}">{{item.statusText}}</view>
           </view>
           <view class="list-desc">{{item.schoolName}} {{item.gradeName || item.grade}} {{item.className}}</view>

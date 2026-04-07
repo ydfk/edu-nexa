@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import {
   type ColumnDef,
@@ -98,6 +98,16 @@ const statusOptions = [
   { label: "暂停", value: "paused", icon: CirclePause },
 ] as const;
 
+const genderOptions = [
+  { label: "男", value: "male" },
+  { label: "女", value: "female" },
+] as const;
+
+const genderLabelMap: Record<string, string> = {
+  female: "女",
+  male: "男",
+};
+
 const statusMap: Record<
   string,
   { label: string; variant: "default" | "secondary" }
@@ -108,6 +118,7 @@ const statusMap: Record<
 
 const initialStudentForm = {
   classId: "",
+  gender: "",
   gradeId: "",
   guardianId: "",
   id: "",
@@ -212,6 +223,12 @@ function createColumns(canManageStudents: boolean): ColumnDef<StudentItem>[] {
       cell: ({ row }) => (
         <div className="font-medium">{row.getValue("name")}</div>
       ),
+    },
+    {
+      accessorKey: "gender",
+      header: "性别",
+      cell: ({ row }) => genderLabelMap[row.original.gender || ""] || "-",
+      enableSorting: false,
     },
     {
       id: "schoolGradeClass",
@@ -323,6 +340,7 @@ function StudentFormDialog() {
 
   const [form, setForm] = useState(initialStudentForm);
   const [saving, setSaving] = useState(false);
+  const previousDialogRef = useRef<DialogType | null>(null);
 
   // 记住当前是新增还是编辑，快捷新增关闭后恢复
   const [previousOpen, setPreviousOpen] = useState<"create" | "edit" | null>(
@@ -369,6 +387,7 @@ function StudentFormDialog() {
     if (isEdit && currentItem) {
       setForm({
         classId: currentItem.classId || "",
+        gender: currentItem.gender || "",
         gradeId: currentItem.gradeId || "",
         guardianId: currentItem.guardianId || "",
         id: currentItem.id,
@@ -376,9 +395,17 @@ function StudentFormDialog() {
         schoolId: currentItem.schoolId || "",
         status: currentItem.status,
       });
-    } else if (open === "create") {
+    } else if (
+      open === "create" &&
+      previousDialogRef.current !== "quick-school" &&
+      previousDialogRef.current !== "quick-grade" &&
+      previousDialogRef.current !== "quick-class" &&
+      previousDialogRef.current !== "quick-guardian"
+    ) {
       setForm(initialStudentForm);
     }
+
+    previousDialogRef.current = open;
   }, [open, currentItem, isEdit]);
 
   useEffect(() => {
@@ -401,8 +428,8 @@ function StudentFormDialog() {
     const guardian = guardians.find((item) => item.id === form.guardianId);
     const classItem = classes.find((item) => item.id === form.classId);
 
-    if (!form.name.trim() || !school || !grade || !classItem || !guardian) {
-      toast.error("学生、学校、年级、班级、家长不能为空");
+    if (!form.name.trim() || !form.gender || !school || !grade || !classItem || !guardian) {
+      toast.error("学生姓名、性别、学校、年级、班级、家长不能为空");
       return;
     }
 
@@ -411,6 +438,7 @@ function StudentFormDialog() {
       await saveStudent({
         classId: classItem.id,
         className: classItem.name,
+        gender: form.gender,
         grade: grade.name,
         gradeId: grade.id,
         guardianId: guardian.id,
@@ -583,6 +611,23 @@ function StudentFormDialog() {
                 <SelectContent>
                   <SelectItem value="active">启用</SelectItem>
                   <SelectItem value="paused">暂停</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="性别" required>
+              <Select
+                value={form.gender}
+                onValueChange={(v) => setForm((c) => ({ ...c, gender: v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="选择性别" />
+                </SelectTrigger>
+                <SelectContent>
+                  {genderOptions.map((item) => (
+                    <SelectItem key={item.value} value={item.value}>
+                      {item.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </Field>

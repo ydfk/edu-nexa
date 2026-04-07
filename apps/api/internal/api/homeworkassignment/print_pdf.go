@@ -80,15 +80,18 @@ func PrintPDF(c *fiber.Ctx) error {
 		return response.Error(c, "日期不能为空", fiber.StatusBadRequest)
 	}
 
-	fileURL, relativePath, err := generateDailyHomeworkPDF(serviceDate)
+	result, err := generateDailyHomeworkPDF(serviceDate)
 	if err != nil {
 		return response.Error(c, err.Error(), fiber.StatusBadRequest)
 	}
 
 	return response.Success(c, fiber.Map{
+		"bucket":      result.Bucket,
+		"objectKey":   result.ObjectKey,
+		"path":        result.ObjectKey,
+		"provider":    result.Provider,
 		"serviceDate": serviceDate,
-		"url":         fileURL,
-		"path":        relativePath,
+		"url":         result.URL,
 	})
 }
 
@@ -102,23 +105,23 @@ func canPrintDailyHomework(rawRoles string) bool {
 	return false
 }
 
-func generateDailyHomeworkPDF(serviceDate string) (string, string, error) {
+func generateDailyHomeworkPDF(serviceDate string) (*uploadService.Result, error) {
 	assignments, err := loadDailyHomeworkAssignments(serviceDate)
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
 	if len(assignments) == 0 {
-		return "", "", errors.New("当天暂无可打印的每日作业")
+		return nil, errors.New("当天暂无可打印的每日作业")
 	}
 
 	subjectOrder := loadDailyHomeworkSubjectOrder()
 	groups, err := buildDailyHomeworkPrintGroups(assignments, subjectOrder)
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
 	slips := buildDailyHomeworkPrintSlips(groups, formatDailyHomeworkDate(serviceDate))
 	if len(slips) == 0 {
-		return "", "", errors.New("当天暂无可打印的学生作业")
+		return nil, errors.New("当天暂无可打印的学生作业")
 	}
 
 	document := dailyHomeworkPrintDocument{
@@ -128,20 +131,20 @@ func generateDailyHomeworkPDF(serviceDate string) (string, string, error) {
 
 	htmlContent, err := renderDailyHomeworkPrintHTML(document)
 	if err != nil {
-		return "", "", errors.New("生成打印页面失败")
+		return nil, errors.New("生成打印页面失败")
 	}
 
 	pdfBytes, err := renderDailyHomeworkHTMLToPDF(htmlContent)
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
 
 	result, err := uploadService.UploadGeneratedFile(pdfBytes, "application/pdf", "prints/daily-homework", ".pdf")
 	if err != nil {
-		return "", "", errors.New("上传打印文件失败")
+		return nil, errors.New("上传打印文件失败")
 	}
 
-	return result.URL, result.ObjectKey, nil
+	return result, nil
 }
 
 func loadDailyHomeworkAssignments(serviceDate string) ([]model.Assignment, error) {

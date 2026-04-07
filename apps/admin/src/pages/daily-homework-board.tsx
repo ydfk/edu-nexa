@@ -5,6 +5,7 @@ import {
   CalendarDays,
   ChevronLeft,
   ChevronRight,
+  Loader2,
   Pencil,
   Plus,
   Printer,
@@ -58,6 +59,7 @@ import {
   fetchDailyHomeworkPrintPDF,
   fetchSchools,
   fetchServiceDays,
+  resolveAttachmentAccessURL,
   saveDailyHomework,
   type ClassItem,
   type DailyHomeworkItem,
@@ -474,6 +476,7 @@ export default function DailyHomeworkBoard() {
   const [schools, setSchools] = useState<SchoolItem[]>([]);
   const [classes, setClasses] = useState<ClassItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [printing, setPrinting] = useState(false);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editItem, setEditItem] = useState<DailyHomeworkItem | null>(null);
@@ -559,16 +562,26 @@ export default function DailyHomeworkBoard() {
   }
 
   async function handlePrint() {
-    if (items.length === 0) {
+    if (items.length === 0 || printing) {
       return;
     }
 
+    setPrinting(true);
     try {
       const result = await fetchDailyHomeworkPrintPDF({ serviceDate: selectedDate });
-      window.open(result.url, "_blank", "noopener,noreferrer");
+      const accessURL = await resolveAttachmentAccessURL({
+        bucket: result.bucket,
+        objectKey: result.objectKey,
+        url: result.url,
+      }, {
+        disposition: "inline",
+      });
+      window.open(accessURL || result.url, "_blank", "noopener,noreferrer");
       toast.success("打印文件已生成，已在新窗口打开");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "生成打印文件失败");
+    } finally {
+      setPrinting(false);
     }
   }
 
@@ -623,11 +636,15 @@ export default function DailyHomeworkBoard() {
         <div className="ml-auto flex gap-2">
           <Button
             variant="outline"
-            disabled={items.length === 0}
+            disabled={items.length === 0 || printing}
             onClick={() => void handlePrint()}
           >
-            打印作业
-            <Printer className="ml-1 size-4" />
+            {printing ? "生成中..." : "打印作业"}
+            {printing ? (
+              <Loader2 className="ml-1 size-4 animate-spin" />
+            ) : (
+              <Printer className="ml-1 size-4" />
+            )}
           </Button>
           <Button onClick={handleCreate}>
             新增作业

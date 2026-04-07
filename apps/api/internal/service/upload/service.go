@@ -46,6 +46,7 @@ var allowedFileExtensions = map[string]bool{
 }
 
 type Result struct {
+	Bucket    string `json:"bucket"`
 	ObjectKey string `json:"objectKey"`
 	Provider  string `json:"provider"`
 	URL       string `json:"url"`
@@ -157,6 +158,7 @@ func uploadToLocal(content []byte, objectKey string) (*Result, error) {
 	}
 
 	return &Result{
+		Bucket:    "",
 		ObjectKey: objectKey,
 		Provider:  "local",
 		URL:       buildPublicURL(localConfig.BaseURL, path.Join(publicPath, objectKey)),
@@ -174,6 +176,7 @@ func uploadToAliyunOSS(content []byte, contentType string, objectKey string) (*R
 	}
 
 	return &Result{
+		Bucket:    strings.TrimSpace(ossConfig.Bucket),
 		ObjectKey: objectKey,
 		Provider:  "aliyun_oss",
 		URL:       buildAliyunOSSURL(ossConfig, objectKey),
@@ -242,6 +245,7 @@ func uploadToUpYun(content []byte, contentType string, objectKey string) (*Resul
 	}
 
 	return &Result{
+		Bucket:    strings.TrimSpace(upyunConfig.Bucket),
 		ObjectKey: objectKey,
 		Provider:  "upyun",
 		URL:       buildPublicURL(upyunConfig.BaseURL, "/"+objectKey),
