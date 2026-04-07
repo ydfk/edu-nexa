@@ -96,7 +96,7 @@ steps:
         from_secret: deploy_user
       key:
         from_secret: deploy_key
-      command_timeout: 20
+      command_timeout: 20m
       source: .drone-dist/admin-dist.tar.gz
       target: /tmp/edunexa-admin
 
@@ -164,7 +164,7 @@ steps:
         from_secret: deploy_user
       key:
         from_secret: deploy_key
-      command_timeout: 20
+      command_timeout: 20m
       source: .drone-dist/api-source.tar.gz
       target: /tmp/edunexa-api
 
