@@ -8,7 +8,8 @@
     "dev:weapp": "powershell -ExecutionPolicy Bypass -File ./scripts/dev-weapp.ps1",
     "build:admin": "pnpm --dir apps/admin build",
     "lint:admin": "pnpm --dir apps/admin lint",
-    "test:admin": "pnpm --dir apps/admin test:run"
+    "test:admin": "pnpm --dir apps/admin test:run",
+    "check:weapp": "node ./scripts/verify-weapp.mjs"
   },
   "pnpm": {
     "ignoredBuiltDependencies": []

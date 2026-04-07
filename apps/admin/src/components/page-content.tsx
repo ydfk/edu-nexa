@@ -20,6 +20,7 @@ export function PageContent({ children, fixed, fluid }: PageContentProps) {
       <Header fixed>
         <Search />
         <div className="ml-auto flex items-center gap-3">
+          <span className="text-xs text-muted-foreground">v{__APP_VERSION__}</span>
           <ThemeSwitch />
           <ProfileDropdown />
         </div>

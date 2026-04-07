@@ -14,6 +14,7 @@ apps/api/log/
 .history/
 ./logs/
 .playwright-mcp/
+.deploy/
 *.png
 !apps/weapp/miniprogram/assets/*.png
 .idea/

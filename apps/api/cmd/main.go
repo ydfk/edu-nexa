@@ -1,13 +1,14 @@
 // @title EduNexa API
 // @version 1.0
 // @description EduNexa 托管服务 API
-// @host localhost:25610
+// @host localhost:33001
 // @BasePath /api
 package main
 
 import (
 	_ "github.com/ydfk/edu-nexa/apps/api/docs"
 	"github.com/ydfk/edu-nexa/apps/api/internal/service/adminseed"
+	"github.com/ydfk/edu-nexa/apps/api/pkg/buildinfo"
 	"github.com/ydfk/edu-nexa/apps/api/pkg/config"
 	"github.com/ydfk/edu-nexa/apps/api/pkg/db"
 	"github.com/ydfk/edu-nexa/apps/api/pkg/logger"
@@ -28,6 +29,8 @@ func main() {
 	if err := adminseed.EnsureDefaultAdmin(); err != nil {
 		logger.Fatal("初始化默认管理员失败: %v", err)
 	}
+
+	logger.Info("当前服务版本: %s", buildinfo.Version())
 
 	api()
 }

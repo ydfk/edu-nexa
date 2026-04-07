@@ -14,7 +14,11 @@ import path from "path";
 export default defineConfig(({ mode }) => {
   // 加载当前模式下的环境变量
   const env = loadEnv(mode, process.cwd());
+  const appVersion = process.env.APP_VERSION || process.env.npm_package_version || "dev";
   return {
+    define: {
+      __APP_VERSION__: JSON.stringify(appVersion),
+    },
     plugins: [react()],
     resolve: {
       alias: {

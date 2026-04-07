@@ -1,0 +1,145 @@
+kind: pipeline
+type: docker
+name: admin-ci
+
+steps:
+  - name: verify-admin
+    image: node:22.14.0-bullseye
+    commands:
+      - corepack enable
+      - pnpm install --frozen-lockfile
+      - pnpm lint:admin
+      - pnpm test:admin
+      - pnpm build:admin
+
+trigger:
+  event:
+    - push
+    - pull_request
+
+---
+kind: pipeline
+type: docker
+name: weapp-ci
+
+steps:
+  - name: verify-weapp
+    image: node:22.14.0-bullseye
+    commands:
+      - corepack enable
+      - pnpm install --frozen-lockfile
+      - pnpm check:weapp
+
+trigger:
+  event:
+    - push
+    - pull_request
+
+---
+kind: pipeline
+type: docker
+name: api-ci
+
+steps:
+  - name: verify-api
+    image: golang:1.24
+    commands:
+      - cd apps/api
+      - go test ./...
+
+trigger:
+  event:
+    - push
+    - pull_request
+
+---
+kind: pipeline
+type: docker
+name: admin-release
+
+steps:
+  - name: verify-admin-release
+    image: node:22.14.0-bullseye
+    commands:
+      - corepack enable
+      - pnpm install --frozen-lockfile
+      - pnpm test:admin
+      - pnpm build:admin
+
+  - name: deploy-admin
+    image: appleboy/drone-ssh
+    environment:
+      SERVER_REPO_DIR:
+        from_secret: server_repo_dir
+      ADMIN_WEB_ROOT:
+        from_secret: admin_web_root
+    settings:
+      host:
+        from_secret: deploy_host
+      port:
+        from_secret: deploy_port
+      username:
+        from_secret: deploy_user
+      key:
+        from_secret: deploy_key
+      command_timeout: 20m
+      envs:
+        - DRONE_COMMIT_SHA
+        - DRONE_BUILD_NUMBER
+        - DRONE_TAG
+        - SERVER_REPO_DIR
+        - ADMIN_WEB_ROOT
+      script:
+        - export DEPLOY_SHA="$DRONE_COMMIT_SHA"
+        - bash "$SERVER_REPO_DIR/scripts/deploy-admin.sh"
+
+trigger:
+  event:
+    - promote
+  target:
+    - production
+
+---
+kind: pipeline
+type: docker
+name: api-release
+
+steps:
+  - name: verify-api-release
+    image: golang:1.24
+    commands:
+      - cd apps/api
+      - go test ./...
+
+  - name: deploy-api
+    image: appleboy/drone-ssh
+    environment:
+      SERVER_REPO_DIR:
+        from_secret: server_repo_dir
+      API_COMPOSE_FILE:
+        from_secret: api_compose_file
+    settings:
+      host:
+        from_secret: deploy_host
+      port:
+        from_secret: deploy_port
+      username:
+        from_secret: deploy_user
+      key:
+        from_secret: deploy_key
+      command_timeout: 20m
+      envs:
+        - DRONE_COMMIT_SHA
+        - DRONE_BUILD_NUMBER
+        - DRONE_TAG
+        - SERVER_REPO_DIR
+        - API_COMPOSE_FILE
+      script:
+        - export DEPLOY_SHA="$DRONE_COMMIT_SHA"
+        - bash "$SERVER_REPO_DIR/scripts/deploy-api.sh"
+
+trigger:
+  event:
+    - promote
+  target:
+    - production

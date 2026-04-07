@@ -7,6 +7,8 @@ interface ImportMetaEnv {
   VITE_PROXY_HOST: string;
 }
 
+declare const __APP_VERSION__: string;
+
 // 扩展 @tanstack/react-table ColumnMeta 以支持自定义 className
 import "@tanstack/react-table";
 declare module "@tanstack/react-table" {

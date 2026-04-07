@@ -1,5 +1,5 @@
 basePath: /api
-host: localhost:25610
+host: localhost:33001
 info:
   contact: {}
   description: EduNexa 托管服务 API

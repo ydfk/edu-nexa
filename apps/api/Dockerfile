@@ -23,6 +23,8 @@ RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main ./cmd
 # 第二阶段：运行阶段
 FROM alpine:latest
 
+ARG APP_VERSION=dev
+
 # 安装基本工具和CA证书
 RUN apk --no-cache add ca-certificates tzdata
 
@@ -35,6 +37,9 @@ RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
 # 设置工作目录
 WORKDIR /app
+
+ENV APP_VERSION=$APP_VERSION
+LABEL org.opencontainers.image.version=$APP_VERSION
 
 # 从构建阶段复制二进制文件
 COPY --from=builder /app/main .
@@ -50,8 +55,8 @@ RUN mkdir -p /app/data /app/log && \
 # 切换到非root用户
 USER appuser
 
-# 暴露API端口
-EXPOSE 25610
+# 暴露 API 端口
+EXPOSE 33001
 
 # 运行应用
 CMD ["./main"]
