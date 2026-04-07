@@ -18,6 +18,11 @@
 - `admin-release`：人工 promote 后发布管理后台静态资源
 - `api-release`：人工 promote 后通过服务器固定 compose 文件发布后端
 
+其中 Node 和 Go 相关步骤已经默认切到国内可用源：
+
+- `pnpm` 使用 `https://registry.npmmirror.com`
+- `go` 使用 `https://goproxy.cn,direct`
+
 ## 发布版本号
 
 admin 和 api 现在共用同一套发布版本号规则：

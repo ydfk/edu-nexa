@@ -7,6 +7,7 @@ steps:
     image: node:22.14.0-bullseye
     commands:
       - corepack enable
+      - pnpm config set registry https://registry.npmmirror.com
       - pnpm install --frozen-lockfile
       - pnpm lint:admin
       - pnpm test:admin
@@ -27,6 +28,7 @@ steps:
     image: node:22.14.0-bullseye
     commands:
       - corepack enable
+      - pnpm config set registry https://registry.npmmirror.com
       - pnpm install --frozen-lockfile
       - pnpm check:weapp
 
@@ -44,6 +46,8 @@ steps:
   - name: verify-api
     image: golang:1.24
     commands:
+      - go env -w GOPROXY=https://goproxy.cn,direct
+      - go env -w GOSUMDB=sum.golang.google.cn
       - cd apps/api
       - go test ./...
 
@@ -62,6 +66,7 @@ steps:
     image: node:22.14.0-bullseye
     commands:
       - corepack enable
+      - pnpm config set registry https://registry.npmmirror.com
       - pnpm install --frozen-lockfile
       - pnpm test:admin
       - pnpm build:admin
@@ -108,6 +113,8 @@ steps:
   - name: verify-api-release
     image: golang:1.24
     commands:
+      - go env -w GOPROXY=https://goproxy.cn,direct
+      - go env -w GOSUMDB=sum.golang.google.cn
       - cd apps/api
       - go test ./...
 
