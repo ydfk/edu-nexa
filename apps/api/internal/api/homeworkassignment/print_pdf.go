@@ -9,7 +9,6 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -21,10 +20,9 @@ import (
 	studentModel "github.com/ydfk/edu-nexa/apps/api/internal/model/student"
 	"github.com/ydfk/edu-nexa/apps/api/internal/service"
 	runtimeconfigService "github.com/ydfk/edu-nexa/apps/api/internal/service/runtimeconfig"
-	"github.com/ydfk/edu-nexa/apps/api/pkg/config"
+	uploadService "github.com/ydfk/edu-nexa/apps/api/internal/service/upload"
 	"github.com/ydfk/edu-nexa/apps/api/pkg/db"
 	"github.com/ydfk/edu-nexa/apps/api/pkg/logger"
-	"github.com/ydfk/edu-nexa/apps/api/pkg/util"
 	"gorm.io/gorm"
 )
 
@@ -133,16 +131,17 @@ func generateDailyHomeworkPDF(serviceDate string) (string, string, error) {
 		return "", "", errors.New("生成打印页面失败")
 	}
 
-	relativePath := filepath.Join("prints", "daily-homework", serviceDate+".pdf")
-	absolutePath := filepath.Join(config.Current.Storage.Local.Dir, relativePath)
-	if err := util.EnsureDir(absolutePath); err != nil {
-		return "", "", errors.New("创建打印目录失败")
-	}
-	if err := renderDailyHomeworkHTMLToPDF(htmlContent, absolutePath); err != nil {
+	pdfBytes, err := renderDailyHomeworkHTMLToPDF(htmlContent)
+	if err != nil {
 		return "", "", err
 	}
 
-	return buildDailyHomeworkPublicURL(relativePath), filepath.ToSlash(relativePath), nil
+	result, err := uploadService.UploadGeneratedFile(pdfBytes, "application/pdf", "prints/daily-homework", ".pdf")
+	if err != nil {
+		return "", "", errors.New("上传打印文件失败")
+	}
+
+	return result.URL, result.ObjectKey, nil
 }
 
 func loadDailyHomeworkAssignments(serviceDate string) ([]model.Assignment, error) {
@@ -452,29 +451,29 @@ func renderDailyHomeworkPrintHTML(document dailyHomeworkPrintDocument) (string, 
 	return builder.String(), nil
 }
 
-func renderDailyHomeworkHTMLToPDF(htmlContent string, outputPath string) error {
+func renderDailyHomeworkHTMLToPDF(htmlContent string) ([]byte, error) {
 	browserPath, err := resolveDailyHomeworkBrowserPath()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	htmlFile, err := os.CreateTemp("", "edunexa-daily-homework-*.html")
 	if err != nil {
-		return errors.New("创建打印页面失败")
+		return nil, errors.New("创建打印页面失败")
 	}
 	defer os.Remove(htmlFile.Name())
 
 	if _, err := htmlFile.WriteString(htmlContent); err != nil {
 		htmlFile.Close()
-		return errors.New("写入打印页面失败")
+		return nil, errors.New("写入打印页面失败")
 	}
 	if err := htmlFile.Close(); err != nil {
-		return errors.New("保存打印页面失败")
+		return nil, errors.New("保存打印页面失败")
 	}
 
 	tempPDF, err := os.CreateTemp("", "edunexa-daily-homework-*.pdf")
 	if err != nil {
-		return errors.New("创建打印文件失败")
+		return nil, errors.New("创建打印文件失败")
 	}
 	tempPDFPath := tempPDF.Name()
 	tempPDF.Close()
@@ -483,7 +482,7 @@ func renderDailyHomeworkHTMLToPDF(htmlContent string, outputPath string) error {
 
 	profileDir, err := os.MkdirTemp("", "edunexa-daily-homework-browser-*")
 	if err != nil {
-		return errors.New("创建打印环境失败")
+		return nil, errors.New("创建打印环境失败")
 	}
 	defer os.RemoveAll(profileDir)
 
@@ -507,18 +506,15 @@ func renderDailyHomeworkHTMLToPDF(htmlContent string, outputPath string) error {
 		if runErr == nil {
 			pdfBytes, readErr := os.ReadFile(tempPDFPath)
 			if readErr != nil || len(pdfBytes) == 0 {
-				return errors.New("打印文件生成失败")
+				return nil, errors.New("打印文件生成失败")
 			}
-			if writeErr := os.WriteFile(outputPath, pdfBytes, 0644); writeErr != nil {
-				return errors.New("保存打印文件失败")
-			}
-			return nil
+			return pdfBytes, nil
 		}
 
 		logger.Error("生成每日作业 PDF 失败: %v, output=%s", runErr, strings.TrimSpace(string(output)))
 	}
 
-	return errors.New("生成打印文件失败，请确认本机已安装 Edge 或 Chrome")
+	return nil, errors.New("生成打印文件失败，请确认本机已安装 Edge 或 Chrome")
 }
 
 func resolveDailyHomeworkBrowserPath() (string, error) {
@@ -549,13 +545,6 @@ func buildDailyHomeworkFileURL(filePath string) string {
 		Path:   filepath.ToSlash(filePath),
 	}
 	return u.String()
-}
-
-func buildDailyHomeworkPublicURL(relativePath string) string {
-	publicPath := strings.TrimRight(config.Current.Storage.Local.PublicPath, "/")
-	baseURL := strings.TrimRight(config.Current.Storage.Local.BaseURL, "/")
-	cleanRelativePath := path.Join(strings.Split(filepath.ToSlash(relativePath), "/")...)
-	return baseURL + publicPath + "/" + cleanRelativePath
 }
 
 func loadDailyHomeworkSubjectOrder() []string {

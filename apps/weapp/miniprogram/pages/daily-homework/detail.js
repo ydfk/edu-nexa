@@ -1,4 +1,9 @@
-const { getDailyHomework, saveDailyHomework, uploadImage } = require("../../services/records");
+const {
+  getAttachmentAccessURL,
+  getDailyHomework,
+  saveDailyHomework,
+  uploadAttachment,
+} = require("../../services/records");
 const { getSchools, getGrades, getClasses } = require("../../services/schools");
 const { getRuntimeSettings } = require("../../services/common");
 const { requireEditor } = require("../../utils/permission");
@@ -68,13 +73,14 @@ Page({
       const hw = Array.isArray(list) ? list.find((h) => String(h.id) === String(id)) : list;
       if (!hw) return;
       const attachmentUrls = parseAttachments(hw.attachments);
+      const fileList = await buildAttachmentFileList(attachmentUrls);
       this.setData({
         serviceDate: hw.serviceDate || getToday(),
         subject: hw.subject || "",
         content: hw.content || "",
         remark: hw.remark || "",
         imageUrls: attachmentUrls,
-        fileList: attachmentUrls.map((url, i) => ({ url, name: `img${i}` })),
+        fileList,
         selectedSchool: { id: hw.schoolId, name: hw.schoolName },
         selectedGrade: { id: hw.gradeId, name: hw.gradeName || hw.grade },
         selectedClass: { id: hw.classId, name: buildClassLabel(hw.gradeName || hw.grade, hw.className) },
@@ -203,9 +209,20 @@ Page({
     for (const f of files) {
       try {
         wx.showLoading({ title: "上传中..." });
-        const res = await uploadImage({ filePath: f.url || f.path, purpose: "daily-homework" });
-        const urls = [...this.data.imageUrls, res.url || res];
-        const fl = [...this.data.fileList, { url: res.url || res, name: `img${urls.length}` }];
+        const res = await uploadAttachment({
+          contentType: f.type,
+          fileName: f.name,
+          filePath: f.url || f.path,
+          fileSize: f.size,
+          purpose: "daily-homework",
+        });
+        const rawURL = res.url || res;
+        const previewURL = await resolveAttachmentPreviewURL(rawURL, f.name);
+        const urls = [...this.data.imageUrls, rawURL];
+        const fl = [
+          ...this.data.fileList,
+          buildAttachmentFileItem(rawURL, previewURL, f.name),
+        ];
         this.setData({ imageUrls: urls, fileList: fl });
       } catch (err) {
         wx.showToast({ title: "上传失败", icon: "none" });
@@ -299,5 +316,55 @@ function parseAttachments(raw) {
 
 function serializeAttachments(items) {
   return JSON.stringify((items || []).filter(Boolean));
+}
+
+async function buildAttachmentFileList(urls) {
+  const fileItems = [];
+
+  for (const url of urls || []) {
+    const previewURL = await resolveAttachmentPreviewURL(url, getAttachmentName(url));
+    fileItems.push(buildAttachmentFileItem(url, previewURL, getAttachmentName(url)));
+  }
+
+  return fileItems;
+}
+
+function buildAttachmentFileItem(rawURL, previewURL, fileName) {
+  const type = getAttachmentType(rawURL);
+  return {
+    isImage: type === "image",
+    name: fileName || getAttachmentName(rawURL),
+    url: previewURL || "",
+  };
+}
+
+function getAttachmentType(url) {
+  const lower = String(url || "").split("#")[0].split("?")[0].toLowerCase();
+  if (lower.endsWith(".pdf")) {
+    return "pdf";
+  }
+  return "image";
+}
+
+function getAttachmentName(url) {
+  const parts = String(url || "").split("#")[0].split("?")[0].split("/");
+  return parts[parts.length - 1] || "附件";
+}
+
+async function resolveAttachmentPreviewURL(rawURL, fileName) {
+  if (!rawURL) {
+    return "";
+  }
+
+  try {
+    const result = await getAttachmentAccessURL({
+      disposition: "inline",
+      fileName: fileName || getAttachmentName(rawURL),
+      url: rawURL,
+    });
+    return result.url || rawURL;
+  } catch (error) {
+    return rawURL;
+  }
 }
 

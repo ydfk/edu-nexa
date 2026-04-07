@@ -45,6 +45,7 @@
     "@radix-ui/react-toggle": "^1.1.10",
     "@radix-ui/react-toggle-group": "^1.1.11",
     "@radix-ui/react-tooltip": "^1.2.8",
+    "ali-oss": "^6.23.0",
     "alova": "^3.5.0",
     "cmdk": "^1.1.1",
     "date-fns": "^4.1.0",

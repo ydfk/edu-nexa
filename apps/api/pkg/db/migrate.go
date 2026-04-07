@@ -175,8 +175,8 @@ func migrateLegacyConfigs() error {
 	if runtimeCount == 0 {
 		if err := DB.Exec(
 			fmt.Sprintf(
-				"INSERT INTO %s (id, created_at, updated_at, scene, system_name_prefix, image_security_enable, image_security_strict, text_security_enable, text_security_strict, upload_provider, homework_subjects, payment_types, deleted_at) "+
-					"SELECT id, created_at, updated_at, scene, COALESCE(system_name_prefix, ''), image_security_enable, image_security_strict, text_security_enable, text_security_strict, upload_provider, COALESCE(homework_subjects, ''), '', deleted_at "+
+				"INSERT INTO %s (id, created_at, updated_at, scene, system_name_prefix, image_security_enable, image_security_strict, text_security_enable, text_security_strict, homework_subjects, payment_types, deleted_at) "+
+					"SELECT id, created_at, updated_at, scene, COALESCE(system_name_prefix, ''), image_security_enable, image_security_strict, text_security_enable, text_security_strict, COALESCE(homework_subjects, ''), '', deleted_at "+
 					"FROM configs WHERE scene = 'app-runtime'",
 				runtimeTable,
 			),

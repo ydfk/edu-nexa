@@ -21,7 +21,6 @@ import (
 	"github.com/aliyun/aliyun-oss-go-sdk/oss"
 	"github.com/google/uuid"
 	"github.com/ydfk/edu-nexa/apps/api/internal/service/contentsafety"
-	runtimeconfigService "github.com/ydfk/edu-nexa/apps/api/internal/service/runtimeconfig"
 	"github.com/ydfk/edu-nexa/apps/api/pkg/config"
 )
 
@@ -31,6 +30,7 @@ const maxFileSize = 20 * 1024 * 1024
 var allowedImageExtensions = map[string]bool{
 	".gif":  true,
 	".heic": true,
+	".jpe":  true,
 	".jpeg": true,
 	".jpg":  true,
 	".png":  true,
@@ -40,6 +40,7 @@ var allowedImageExtensions = map[string]bool{
 var allowedFileExtensions = map[string]bool{
 	".gif":  true,
 	".heic": true,
+	".jpe":  true,
 	".jpeg": true,
 	".jpg":  true,
 	".png":  true,
@@ -51,6 +52,29 @@ type Result struct {
 	ObjectKey string `json:"objectKey"`
 	Provider  string `json:"provider"`
 	URL       string `json:"url"`
+}
+
+func UploadGeneratedFile(content []byte, contentType string, purpose string, extension string) (*Result, error) {
+	if len(content) == 0 {
+		return nil, fmt.Errorf("上传文件不能为空")
+	}
+
+	normalizedExtension := strings.ToLower(strings.TrimSpace(extension))
+	if normalizedExtension == "" || !strings.HasPrefix(normalizedExtension, ".") {
+		return nil, fmt.Errorf("文件后缀不正确")
+	}
+
+	targetProvider := resolveProvider("")
+	objectKey := buildObjectKey(targetProvider, purpose, normalizedExtension)
+
+	switch targetProvider {
+	case "aliyun_oss":
+		return uploadToAliyunOSS(content, contentType, objectKey)
+	case "upyun":
+		return uploadToUpYun(content, contentType, objectKey)
+	default:
+		return uploadToLocal(content, objectKey)
+	}
 }
 
 func UploadImage(fileHeader *multipart.FileHeader, provider string, purpose string) (*Result, error) {
@@ -129,12 +153,6 @@ func detectImageMeta(fileHeader *multipart.FileHeader) (string, string, error) {
 
 func resolveProvider(provider string) string {
 	value := strings.TrimSpace(strings.ToLower(provider))
-	if value == "" {
-		settings, err := runtimeconfigService.GetSnapshot()
-		if err == nil && settings != nil {
-			value = strings.TrimSpace(strings.ToLower(settings.UploadProvider))
-		}
-	}
 	if value == "" {
 		value = strings.TrimSpace(strings.ToLower(config.Current.Storage.DefaultProvider))
 	}
@@ -223,24 +241,9 @@ func uploadToLocal(content []byte, objectKey string) (*Result, error) {
 }
 
 func uploadToAliyunOSS(content []byte, contentType string, objectKey string) (*Result, error) {
-	ossConfig := config.Current.Storage.AliyunOSS
-	if ossConfig.Endpoint == "" || ossConfig.Bucket == "" || ossConfig.AccessKeyID == "" || ossConfig.AccessKeySecret == "" {
-		return nil, fmt.Errorf("阿里云 OSS 配置不完整")
-	}
-
-	options := []oss.ClientOption{}
-	if ossConfig.Region != "" {
-		options = append(options, oss.Region(ossConfig.Region), oss.AuthVersion(oss.AuthV4))
-	}
-
-	client, err := oss.New(ossConfig.Endpoint, ossConfig.AccessKeyID, ossConfig.AccessKeySecret, options...)
+	bucket, ossConfig, err := getAliyunOSSBucket()
 	if err != nil {
-		return nil, fmt.Errorf("初始化阿里云 OSS 失败")
-	}
-
-	bucket, err := client.Bucket(ossConfig.Bucket)
-	if err != nil {
-		return nil, fmt.Errorf("连接阿里云 OSS Bucket 失败")
+		return nil, err
 	}
 
 	if err := bucket.PutObject(objectKey, bytes.NewReader(content), oss.ContentType(contentType)); err != nil {

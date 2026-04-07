@@ -10,7 +10,6 @@ type Config struct {
 	ImageSecurityStrict bool   `gorm:"default:false" json:"imageSecurityStrict"`
 	TextSecurityEnable  bool   `gorm:"default:false" json:"textSecurityEnable"`
 	TextSecurityStrict  bool   `gorm:"default:false" json:"textSecurityStrict"`
-	UploadProvider      string `gorm:"size:32;default:local" json:"uploadProvider"`
 	HomeworkSubjects    string `gorm:"size:512" json:"homeworkSubjects"`
 	PaymentTypes        string `gorm:"size:512" json:"paymentTypes"`
 }

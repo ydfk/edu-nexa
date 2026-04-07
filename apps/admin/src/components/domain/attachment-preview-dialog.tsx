@@ -10,11 +10,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  buildAttachmentPreviewDataURL,
-  buildAttachmentPreviewURL,
-} from "@/lib/server-data";
 import type { FileItem } from "@/components/domain/file-upload";
+import { useAttachmentAccessURLMap } from "@/hooks/use-attachment-access-url-map";
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   "pdfjs-dist/build/pdf.worker.min.mjs",
@@ -56,6 +53,9 @@ export function AttachmentPreviewDialog({
 
     return images;
   }, [file, items]);
+  const imageAccessURLMap = useAttachmentAccessURLMap(
+    imageItems.map((item) => ({ name: item.name, url: item.url })),
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -85,22 +85,22 @@ export function AttachmentPreviewDialog({
           };
         });
       };
-      image.src = buildAttachmentPreviewURL(item.url);
+      image.src = resolveAttachmentDisplayURL(item.url, imageAccessURLMap[item.url]);
     });
 
     return () => {
       cancelled = true;
     };
-  }, [imageItems, imageMetaMap]);
+  }, [imageAccessURLMap, imageItems, imageMetaMap]);
 
   const imageSlides = useMemo(
     () =>
       imageItems.map((item) => ({
         alt: item.name,
-        src: buildAttachmentPreviewURL(item.url),
+        src: resolveAttachmentDisplayURL(item.url, imageAccessURLMap[item.url]),
         ...imageMetaMap[item.url],
       })),
-    [imageItems, imageMetaMap],
+    [imageAccessURLMap, imageItems, imageMetaMap],
   );
   const currentImageIndex = useMemo(() => {
     if (!currentFile || currentFile.type !== "image") return 0;
@@ -113,6 +113,16 @@ export function AttachmentPreviewDialog({
   }
 
   if (currentFile.type === "image") {
+    if (!imageSlides[currentImageIndex]?.src) {
+      return (
+        <Dialog open={open} onOpenChange={onClose}>
+          <DialogContent className="flex h-[60vh] w-[90vw] max-w-3xl items-center justify-center">
+            <PdfLoadingState />
+          </DialogContent>
+        </Dialog>
+      );
+    }
+
     return (
       <Lightbox
         open={open}
@@ -150,8 +160,11 @@ function PdfPreviewDialog({
   const [pdfData, setPdfData] = useState<Uint8Array | null>(null);
   const [pdfError, setPdfError] = useState(false);
   const [zoom, setZoom] = useState(1);
-  const previewURL = buildAttachmentPreviewURL(file.url);
-  const previewDataURL = buildAttachmentPreviewDataURL(file.url);
+  const pdfAccessURLMap = useAttachmentAccessURLMap(
+    [{ name: file.name, url: file.url }],
+    { disposition: "inline" },
+  );
+  const previewURL = resolveAttachmentDisplayURL(file.url, pdfAccessURLMap[file.url]);
 
   useEffect(() => {
     if (!open) {
@@ -175,52 +188,14 @@ function PdfPreviewDialog({
     if (!open) {
       return;
     }
+    if (!previewURL) {
+      return;
+    }
 
     const controller = new AbortController();
-    const base64CandidateURLs = Array.from(
-      new Set([previewDataURL, buildAttachmentPreviewDataURL(previewURL)].filter(Boolean)),
-    );
-    const candidateURLs = Array.from(new Set([previewURL, file.url].filter(Boolean)));
+    const candidateURLs = Array.from(new Set([previewURL].filter(Boolean)));
 
     async function loadPdfData() {
-      for (const candidateURL of base64CandidateURLs) {
-        try {
-          const response = await fetch(candidateURL, {
-            signal: controller.signal,
-          });
-          if (!response.ok) {
-            continue;
-          }
-
-          const payload = (await response.json()) as {
-            data?: { contentBase64?: string };
-            flag?: boolean;
-          };
-          const contentBase64 = payload?.data?.contentBase64?.trim();
-          if (!payload?.flag || !contentBase64) {
-            continue;
-          }
-
-          const binary = atob(contentBase64);
-          const bytes = new Uint8Array(binary.length);
-          for (let index = 0; index < binary.length; index += 1) {
-            bytes[index] = binary.charCodeAt(index);
-          }
-
-          if (controller.signal.aborted || bytes.byteLength === 0) {
-            return;
-          }
-
-          setPdfData(bytes);
-          setPdfError(false);
-          return;
-        } catch {
-          if (controller.signal.aborted) {
-            return;
-          }
-        }
-      }
-
       for (const candidateURL of candidateURLs) {
         try {
           const response = await fetch(candidateURL, {
@@ -257,7 +232,7 @@ function PdfPreviewDialog({
 
     void loadPdfData();
     return () => controller.abort();
-  }, [file.url, open, previewDataURL, previewURL]);
+  }, [open, previewURL]);
 
   useEffect(() => {
     if (!open) {
@@ -398,6 +373,18 @@ function PdfPreviewDialog({
       </DialogContent>
     </Dialog>
   );
+}
+
+function resolveAttachmentDisplayURL(rawURL: string, accessURL?: string) {
+  if (accessURL) {
+    return accessURL;
+  }
+
+  if (/^https?:\/\//i.test(rawURL)) {
+    return "";
+  }
+
+  return rawURL;
 }
 
 function PdfLoadingState({ compact = false }: { compact?: boolean }) {

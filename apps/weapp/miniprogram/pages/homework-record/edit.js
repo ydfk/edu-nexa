@@ -1,4 +1,10 @@
-const { getStudents, saveHomeworkRecord, getHomeworkRecords, uploadImage } = require("../../services/records");
+const {
+  getAttachmentAccessURL,
+  getStudents,
+  getHomeworkRecords,
+  saveHomeworkRecord,
+  uploadAttachment,
+} = require("../../services/records");
 const { getRuntimeSettings } = require("../../services/common");
 const { getSession, isGuardian } = require("../../store/session");
 const { requireAuth, requireEditor } = require("../../utils/permission");
@@ -105,6 +111,7 @@ Page({
       const records = res.items || res || [];
       const record = Array.isArray(records) ? records.find((r) => String(r.id) === String(id)) : records;
       if (!record) return;
+      const fileList = await buildImageFileList(record.imageUrls || []);
       this.setData({
         assignmentId: record.assignmentId || "",
         status: record.status || "completed",
@@ -114,7 +121,7 @@ Page({
         serviceDate: record.serviceDate || getToday(),
         selectedStudent: { id: record.studentId, name: buildRecordStudentLabel(record) },
         imageUrls: record.imageUrls || [],
-        fileList: (record.imageUrls || []).map((url, i) => ({ url, name: `img${i}` })),
+        fileList,
       });
     } catch (e) {
       console.warn("加载记录失败", e);
@@ -161,9 +168,16 @@ Page({
     for (const f of files) {
       try {
         wx.showLoading({ title: "上传中..." });
-        const res = await uploadImage({ filePath: f.url || f.path });
-        const urls = [...this.data.imageUrls, res.url || res];
-        const fl = [...this.data.fileList, { url: res.url || res, name: `img${urls.length}` }];
+        const res = await uploadAttachment({
+          contentType: f.type,
+          fileName: f.name,
+          filePath: f.url || f.path,
+          fileSize: f.size,
+        });
+        const rawURL = res.url || res;
+        const previewURL = await resolveImagePreviewURL(rawURL);
+        const urls = [...this.data.imageUrls, rawURL];
+        const fl = [...this.data.fileList, { isImage: true, name: f.name || `img${urls.length}`, url: previewURL }];
         this.setData({ imageUrls: urls, fileList: fl });
       } catch (err) {
         wx.showToast({ title: "上传失败", icon: "none" });
@@ -249,5 +263,42 @@ function getHomeworkStatusText(status) {
     pending: "待处理",
   };
   return map[status] || status;
+}
+
+async function buildImageFileList(urls) {
+  const fileItems = [];
+
+  for (const url of urls || []) {
+    const previewURL = await resolveImagePreviewURL(url);
+    fileItems.push({
+      isImage: true,
+      name: getImageName(url),
+      url: previewURL,
+    });
+  }
+
+  return fileItems;
+}
+
+async function resolveImagePreviewURL(rawURL) {
+  if (!rawURL) {
+    return "";
+  }
+
+  try {
+    const result = await getAttachmentAccessURL({
+      disposition: "inline",
+      fileName: getImageName(rawURL),
+      url: rawURL,
+    });
+    return result.url || rawURL;
+  } catch (error) {
+    return rawURL;
+  }
+}
+
+function getImageName(url) {
+  const parts = String(url || "").split("#")[0].split("?")[0].split("/");
+  return parts[parts.length - 1] || "图片";
 }
 

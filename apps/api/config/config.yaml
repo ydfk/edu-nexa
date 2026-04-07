@@ -20,6 +20,10 @@ storage:
     endpoint: ""
     path_prefix: "edunexa"
     region: ""
+    sts_duration_seconds: 3600
+    sts_endpoint: ""
+    sts_role_arn: ""
+    sts_session_name: "edunexa-upload"
   upyun:
     api_host: "https://v0.api.upyun.com"
     base_url: ""

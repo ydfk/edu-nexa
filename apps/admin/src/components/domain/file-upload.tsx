@@ -3,6 +3,7 @@ import { FileUp, FileText, X, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { AttachmentPreviewDialog } from "@/components/domain/attachment-preview-dialog";
+import { useAttachmentAccessURLMap } from "@/hooks/use-attachment-access-url-map";
 import { uploadFile, type UploadResult } from "@/lib/server-data";
 
 export type FileItem = {
@@ -11,15 +12,26 @@ export type FileItem = {
   url: string;
 };
 
+type AttachmentValue =
+  | string
+  | {
+      name?: string;
+      url?: string;
+    };
+
 export function detectFileType(url: string): "image" | "pdf" {
-  const lower = url.toLowerCase();
+  const lower = stripURLSearch(url).toLowerCase();
   if (lower.endsWith(".pdf")) return "pdf";
   return "image";
 }
 
 export function extractFileName(url: string): string {
-  const parts = url.split("/");
+  const parts = stripURLSearch(url).split("/");
   return parts[parts.length - 1] || url;
+}
+
+function stripURLSearch(url: string) {
+  return url.split("#")[0].split("?")[0];
 }
 
 export function createFileItemFromUrl(url: string, fallbackName?: string): FileItem {
@@ -30,18 +42,18 @@ export function createFileItemFromUrl(url: string, fallbackName?: string): FileI
   };
 }
 
-export function createFileItemsFromUrls(urls: string[]) {
-  return urls
-    .filter((url) => typeof url === "string" && url.trim())
-    .map((url) => createFileItemFromUrl(url));
+export function createFileItemsFromUrls(values: AttachmentValue[]) {
+  return values
+    .map((value) => normalizeAttachmentValue(value))
+    .filter((item): item is FileItem => !!item);
 }
 
 export function parseAttachments(json: string): FileItem[] {
   if (!json) return [];
   try {
-    const urls = JSON.parse(json) as string[];
-    if (!Array.isArray(urls)) return [];
-    return createFileItemsFromUrls(urls);
+    const values = JSON.parse(json) as AttachmentValue[];
+    if (!Array.isArray(values)) return [];
+    return createFileItemsFromUrls(values);
   } catch {
     return [];
   }
@@ -49,7 +61,7 @@ export function parseAttachments(json: string): FileItem[] {
 
 export function serializeAttachments(items: FileItem[]): string {
   if (items.length === 0) return "";
-  return JSON.stringify(items.map((i) => i.url));
+  return JSON.stringify(items.map((item) => ({ name: item.name, url: item.url })));
 }
 
 // ---------------------------------------------------------------------------
@@ -70,6 +82,11 @@ export function FileUpload({
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [previewFile, setPreviewFile] = useState<FileItem | null>(null);
+  const accessURLMap = useAttachmentAccessURLMap(
+    value
+      .filter((item) => item.type === "image")
+      .map((item) => ({ name: item.name, url: item.url })),
+  );
 
   const handleFiles = useCallback(
     async (files: FileList | null) => {
@@ -112,43 +129,51 @@ export function FileUpload({
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap gap-2">
-        {value.map((item, index) => (
-          <div
-            key={`${item.url}-${index}`}
-            className="group relative flex items-center gap-2 rounded-md border bg-muted/30 px-3 py-2"
-          >
-            {item.type === "image" ? (
-              <img
-                src={item.url}
-                alt={item.name}
-                className="size-10 rounded object-cover"
-              />
-            ) : (
-              <FileText className="size-10 text-red-500" />
-            )}
-            <span className="max-w-[120px] truncate text-sm">{item.name}</span>
-            <div className="flex gap-1">
-              <Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                className="size-6"
-                onClick={() => setPreviewFile(item)}
-              >
-                <Eye className="size-3.5" />
-              </Button>
-              <Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                className="size-6 text-destructive"
-                onClick={() => handleRemove(index)}
-              >
-                <X className="size-3.5" />
-              </Button>
+        {value.map((item, index) => {
+          const previewImageURL = resolveAttachmentDisplayURL(item.url, accessURLMap[item.url]);
+
+          return (
+            <div
+              key={`${item.url}-${index}`}
+              className="group relative flex items-center gap-2 rounded-md border bg-muted/30 px-3 py-2"
+            >
+              {item.type === "image" ? (
+                previewImageURL ? (
+                  <img
+                    src={previewImageURL}
+                    alt={item.name}
+                    className="size-10 rounded object-cover"
+                  />
+                ) : (
+                  <div className="size-10 rounded bg-muted" />
+                )
+              ) : (
+                <FileText className="size-10 text-red-500" />
+              )}
+              <span className="max-w-[120px] truncate text-sm">{item.name}</span>
+              <div className="flex gap-1">
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className="size-6"
+                  onClick={() => setPreviewFile(item)}
+                >
+                  <Eye className="size-3.5" />
+                </Button>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className="size-6 text-destructive"
+                  onClick={() => handleRemove(index)}
+                >
+                  <X className="size-3.5" />
+                </Button>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {value.length < maxFiles && (
@@ -181,4 +206,38 @@ export function FileUpload({
       />
     </div>
   );
+}
+
+function resolveAttachmentDisplayURL(rawURL: string, accessURL?: string) {
+  if (accessURL) {
+    return accessURL;
+  }
+
+  if (/^https?:\/\//i.test(rawURL)) {
+    return "";
+  }
+
+  return rawURL;
+}
+
+function normalizeAttachmentValue(value: AttachmentValue) {
+  if (typeof value === "string") {
+    const trimmedURL = value.trim();
+    if (!trimmedURL) {
+      return null;
+    }
+    return createFileItemFromUrl(trimmedURL);
+  }
+
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const trimmedURL = String(value.url || "").trim();
+  if (!trimmedURL) {
+    return null;
+  }
+
+  const trimmedName = String(value.name || "").trim();
+  return createFileItemFromUrl(trimmedURL, trimmedName || undefined);
 }

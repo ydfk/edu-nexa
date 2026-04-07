@@ -1,6 +1,9 @@
 package config
 
 import (
+	"errors"
+	"os"
+
 	"github.com/spf13/viper"
 )
 
@@ -48,6 +51,10 @@ type AliyunOSSConfig struct {
 	Endpoint        string `mapstructure:"endpoint"`
 	PathPrefix      string `mapstructure:"path_prefix"`
 	Region          string `mapstructure:"region"`
+	STSDuration     int    `mapstructure:"sts_duration_seconds"`
+	STSEndpoint     string `mapstructure:"sts_endpoint"`
+	STSRoleArn      string `mapstructure:"sts_role_arn"`
+	STSSessionName  string `mapstructure:"sts_session_name"`
 }
 
 type UpYunConfig struct {
@@ -74,8 +81,13 @@ var Current Config
 var IsProduction bool
 
 func Init() error {
+	viper.Reset()
 	viper.SetConfigFile("config/config.yaml")
 	if err := viper.ReadInConfig(); err != nil {
+		return err
+	}
+
+	if err := mergeLocalConfig(); err != nil {
 		return err
 	}
 
@@ -86,4 +98,18 @@ func Init() error {
 	IsProduction = Current.App.Env == "production"
 
 	return nil
+}
+
+func mergeLocalConfig() error {
+	const localConfigPath = "config/config.local.yaml"
+
+	if _, err := os.Stat(localConfigPath); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		return err
+	}
+
+	viper.SetConfigFile(localConfigPath)
+	return viper.MergeInConfig()
 }

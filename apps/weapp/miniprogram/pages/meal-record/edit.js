@@ -1,4 +1,10 @@
-const { getStudents, saveMealRecord, getMealRecords, uploadImage } = require("../../services/records");
+const {
+  getAttachmentAccessURL,
+  getMealRecords,
+  getStudents,
+  saveMealRecord,
+  uploadAttachment,
+} = require("../../services/records");
 const { getSession, isGuardian } = require("../../store/session");
 const { requireAuth, requireEditor } = require("../../utils/permission");
 const { getToday, formatDate } = require("../../utils/date");
@@ -82,6 +88,7 @@ Page({
       if (!record) return;
 
       const student = this.data.students.find((s) => String(s.id) === String(record.studentId)) || {};
+      const fileList = await buildImageFileList(record.imageUrls || []);
       this.setData({
         status: record.status || "completed",
         statusText: getMealStatusText(record.status || "completed"),
@@ -89,7 +96,7 @@ Page({
         serviceDate: record.serviceDate || getToday(),
         selectedStudent: { id: record.studentId, name: buildRecordStudentLabel(record, student) },
         imageUrls: record.imageUrls || [],
-        fileList: (record.imageUrls || []).map((url, i) => ({ url, name: `img${i}` })),
+        fileList,
       });
     } catch (e) {
       console.warn("加载记录失败", e);
@@ -133,9 +140,16 @@ Page({
     for (const f of files) {
       try {
         wx.showLoading({ title: "上传中..." });
-        const res = await uploadImage({ filePath: f.url || f.path });
-        const urls = [...this.data.imageUrls, res.url || res];
-        const fl = [...this.data.fileList, { url: res.url || res, name: `img${urls.length}` }];
+        const res = await uploadAttachment({
+          contentType: f.type,
+          fileName: f.name,
+          filePath: f.url || f.path,
+          fileSize: f.size,
+        });
+        const rawURL = res.url || res;
+        const previewURL = await resolveImagePreviewURL(rawURL);
+        const urls = [...this.data.imageUrls, rawURL];
+        const fl = [...this.data.fileList, { isImage: true, name: f.name || `img${urls.length}`, url: previewURL }];
         this.setData({ imageUrls: urls, fileList: fl });
       } catch (err) {
         wx.showToast({ title: "上传失败", icon: "none" });
@@ -219,5 +233,42 @@ function getMealStatusText(status) {
     absent: "未用餐",
   };
   return map[status] || status;
+}
+
+async function buildImageFileList(urls) {
+  const fileItems = [];
+
+  for (const url of urls || []) {
+    const previewURL = await resolveImagePreviewURL(url);
+    fileItems.push({
+      isImage: true,
+      name: getImageName(url),
+      url: previewURL,
+    });
+  }
+
+  return fileItems;
+}
+
+async function resolveImagePreviewURL(rawURL) {
+  if (!rawURL) {
+    return "";
+  }
+
+  try {
+    const result = await getAttachmentAccessURL({
+      disposition: "inline",
+      fileName: getImageName(rawURL),
+      url: rawURL,
+    });
+    return result.url || rawURL;
+  } catch (error) {
+    return rawURL;
+  }
+}
+
+function getImageName(url) {
+  const parts = String(url || "").split("#")[0].split("?")[0].split("/");
+  return parts[parts.length - 1] || "图片";
 }
 

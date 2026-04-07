@@ -64,8 +64,8 @@
         bind:after-read="afterRead"
         bind:delete="onDeleteImage"
         max-count="9"
-        accept="image"
-        upload-text="上传图片"
+        accept="file"
+        upload-text="上传附件"
       />
     </view>
 

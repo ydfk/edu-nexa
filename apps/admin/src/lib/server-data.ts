@@ -1,4 +1,8 @@
 import { expireAdminSession, getAdminSessionSnapshot } from "@/lib/auth/session";
+import {
+  type AliyunOSSBrowserUploadConfig,
+  uploadFileByAliyunOSS,
+} from "@/lib/aliyun-oss";
 
 type ApiEnvelope<T> = {
   code: number;
@@ -8,6 +12,7 @@ type ApiEnvelope<T> = {
 };
 
 const apiBaseURL = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
+const attachmentAccessURLTTL = 8 * 60 * 1000;
 
 export type UserItem = {
   displayName: string;
@@ -542,86 +547,85 @@ export type UploadResult = {
   url: string;
 };
 
+type AttachmentAccessURLResult = {
+  objectKey: string;
+  provider: string;
+  url: string;
+};
+
+const attachmentAccessURLCache = new Map<
+  string,
+  { expiresAt: number; promise: Promise<string> }
+>();
+
 export async function uploadFile(file: File, purpose = "homework"): Promise<UploadResult> {
-  const session = getAdminSessionSnapshot();
-  const formData = new FormData();
-  formData.append("file", file);
-  formData.append("purpose", purpose);
+  try {
+    const uploadConfig = await request<AliyunOSSBrowserUploadConfig>("/api/uploads/aliyun-sts", {
+      query: {
+        contentType: file.type,
+        fileName: file.name,
+        fileSize: file.size,
+        purpose,
+      },
+    });
 
-  const response = await fetch(`${apiBaseURL}/api/uploads/files`, {
-    body: formData,
-    headers: {
-      Authorization: session.token ? `Bearer ${session.token}` : "",
-    },
-    method: "POST",
+    await uploadFileByAliyunOSS(file, uploadConfig);
+
+    return {
+      objectKey: uploadConfig.objectKey,
+      provider: uploadConfig.provider,
+      url: uploadConfig.publicURL,
+    };
+  } catch (error) {
+    if (!shouldFallbackToSignedUpload(error)) {
+      throw error;
+    }
+  }
+
+  return uploadFileBySignedURL(file, purpose);
+}
+
+export async function resolveAttachmentAccessURL(
+  url: string,
+  options?: {
+    disposition?: "attachment" | "inline";
+    fileName?: string;
+  },
+) {
+  const trimmed = url.trim();
+  if (!trimmed) {
+    return trimmed;
+  }
+
+  const cacheKey = JSON.stringify({
+    disposition: options?.disposition || "",
+    fileName: options?.disposition === "attachment" ? options?.fileName || "" : "",
+    url: trimmed,
   });
-
-  let payload: ApiEnvelope<UploadResult> | null = null;
-  try {
-    payload = (await response.json()) as ApiEnvelope<UploadResult>;
-  } catch {
-    throw new Error("上传响应解析失败");
+  const cached = attachmentAccessURLCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.promise;
   }
+  attachmentAccessURLCache.delete(cacheKey);
 
-  if (!response.ok || !payload.flag) {
-    throw new Error(payload?.msg || "上传失败");
-  }
+  const promise = request<AttachmentAccessURLResult>("/api/uploads/access-url", {
+    query: {
+      disposition: options?.disposition,
+      fileName: options?.disposition === "attachment" ? options?.fileName : undefined,
+      url: trimmed,
+    },
+  })
+    .then((payload) => payload.url || trimmed)
+    .catch((error) => {
+      attachmentAccessURLCache.delete(cacheKey);
+      throw error;
+    });
 
-  return payload.data;
-}
-
-export function buildAttachmentPreviewURL(url: string) {
-  const trimmed = url.trim();
-  if (!trimmed) return trimmed;
-
-  try {
-    const fallbackOrigin =
-      typeof window === "undefined" ? "http://127.0.0.1" : window.location.origin;
-    const parsed = new URL(trimmed, fallbackOrigin);
-    if (parsed.pathname.startsWith("/api/uploads/preview")) {
-      return buildPreviewURL(`${parsed.pathname}${parsed.search}`);
-    }
-
-    if (parsed.pathname.startsWith("/uploads/")) {
-      const relativePath = parsed.pathname.slice("/uploads/".length);
-      return buildPreviewURL(`/api/uploads/preview/${relativePath}${parsed.search}`);
-    }
-
-    const sourceURL = parsed.toString();
-    return buildPreviewURL(`/api/uploads/preview?url=${encodeURIComponent(sourceURL)}`);
-  } catch {
-    return trimmed;
-  }
-}
-
-export function buildAttachmentPreviewDataURL(url: string) {
-  const trimmed = url.trim();
-  if (!trimmed) return trimmed;
-
-  try {
-    const fallbackOrigin =
-      typeof window === "undefined" ? "http://127.0.0.1" : window.location.origin;
-    const parsed = new URL(trimmed, fallbackOrigin);
-    const searchParams = new URLSearchParams(parsed.search);
-    searchParams.set("format", "base64");
-
-    if (parsed.pathname.startsWith("/api/uploads/preview")) {
-      return `${parsed.pathname}?${searchParams.toString()}`;
-    }
-
-    if (parsed.pathname.startsWith("/uploads/")) {
-      const relativePath = parsed.pathname.slice("/uploads/".length);
-      return `/api/uploads/preview/${relativePath}?${searchParams.toString()}`;
-    }
-
-    return `/api/uploads/preview?url=${encodeURIComponent(parsed.toString())}&${searchParams.toString()}`;
-  } catch {
-    return trimmed;
-  }
-}
-
-function buildPreviewURL(path: string) {
-  return `${apiBaseURL}${path}`;
+  attachmentAccessURLCache.set(cacheKey, {
+    expiresAt: Date.now() + attachmentAccessURLTTL,
+    promise,
+  });
+  return promise;
 }
 
 async function request<T>(
@@ -659,6 +663,52 @@ async function request<T>(
   }
 
   return payload.data;
+}
+
+async function uploadFileBySignedURL(file: File, purpose: string): Promise<UploadResult> {
+  const uploadConfig = await request<{
+    headers: Record<string, string>;
+    method: "PUT";
+    objectKey: string;
+    provider: string;
+    publicURL: string;
+    uploadURL: string;
+  }>("/api/uploads/direct-upload-url", {
+    query: {
+      contentType: file.type,
+      fileName: file.name,
+      fileSize: file.size,
+      purpose,
+    },
+  });
+
+  const response = await fetch(uploadConfig.uploadURL, {
+    body: file,
+    headers: uploadConfig.headers,
+    method: uploadConfig.method,
+  });
+
+  if (!response.ok) {
+    throw new Error("上传到 OSS 失败");
+  }
+
+  return {
+    objectKey: uploadConfig.objectKey,
+    provider: uploadConfig.provider,
+    url: uploadConfig.publicURL,
+  };
+}
+
+function shouldFallbackToSignedUpload(error: unknown) {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  return [
+    "当前上传存储未配置为阿里云 OSS",
+    "阿里云 OSS STS 角色 ARN 未配置",
+    "阿里云 OSS 配置不完整",
+  ].some((message) => error.message.includes(message));
 }
 
 function buildURL(path: string, query?: ListQuery) {

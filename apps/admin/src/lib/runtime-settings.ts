@@ -9,7 +9,6 @@ export type RuntimeSettings = {
   systemNamePrefix: string;
   textSecurityEnable: boolean;
   textSecurityStrict: boolean;
-  uploadProvider: "local" | "aliyun_oss" | "upyun";
 };
 
 const defaultHomeworkSubjects = '["语文","数学","英语","其他"]';
@@ -24,7 +23,6 @@ const defaultSettings: RuntimeSettings = {
   systemNamePrefix: "",
   textSecurityEnable: false,
   textSecurityStrict: false,
-  uploadProvider: "local",
 };
 
 let mockRuntimeSettings = cloneRuntimeSettings(defaultSettings);
@@ -87,13 +85,6 @@ export async function saveRuntimeSettings(settings: RuntimeSettings) {
 function normalizeRuntimeSettings(
   value: Partial<RuntimeSettings> | undefined
 ): RuntimeSettings {
-  const uploadProvider =
-    value?.uploadProvider === "aliyun_oss" ||
-    value?.uploadProvider === "upyun" ||
-    value?.uploadProvider === "local"
-      ? value.uploadProvider
-      : "local";
-
   return {
     homeworkSubjects: value?.homeworkSubjects || defaultHomeworkSubjects,
     paymentTypes: value?.paymentTypes || defaultPaymentTypes,
@@ -103,7 +94,6 @@ function normalizeRuntimeSettings(
     systemNamePrefix: (value?.systemNamePrefix || "").trim(),
     textSecurityEnable: !!value?.textSecurityEnable,
     textSecurityStrict: !!value?.textSecurityStrict,
-    uploadProvider,
   };
 }
 

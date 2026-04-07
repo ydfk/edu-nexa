@@ -14,7 +14,6 @@ type payload struct {
 	ImageSecurityStrict bool   `json:"imageSecurityStrict"`
 	TextSecurityEnable  bool   `json:"textSecurityEnable"`
 	TextSecurityStrict  bool   `json:"textSecurityStrict"`
-	UploadProvider      string `json:"uploadProvider"`
 }
 
 func Get(c *fiber.Ctx) error {
@@ -40,7 +39,6 @@ func Update(c *fiber.Ctx) error {
 		ImageSecurityStrict: req.ImageSecurityStrict,
 		TextSecurityEnable:  req.TextSecurityEnable,
 		TextSecurityStrict:  req.TextSecurityStrict,
-		UploadProvider:      req.UploadProvider,
 	})
 	if err != nil {
 		return response.Error(c, "保存运行配置失败")
