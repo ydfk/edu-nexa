@@ -94,7 +94,7 @@ export function serializeAttachments(items: FileItem[]) {
     }));
 }
 
-export function getFileItemKey(item: Pick<FileItem, "bucket" | "objectKey" | "url">) {
+export function getFileItemKey(item: Pick<FileItem, "bucket" | "objectKey"> & { url?: string }) {
   if (item.bucket && item.objectKey) {
     return `oss:${item.bucket}:${item.objectKey}`;
   }

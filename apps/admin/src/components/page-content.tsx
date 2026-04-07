@@ -4,6 +4,8 @@ import { ProfileDropdown } from "@/components/profile-dropdown";
 import { Header } from "@/components/layout/header";
 import { Main } from "@/components/layout/main";
 
+const appVersion = typeof __APP_VERSION__ === "string" ? __APP_VERSION__ : "dev";
+
 type PageContentProps = {
   children: React.ReactNode;
   fixed?: boolean;
@@ -20,7 +22,7 @@ export function PageContent({ children, fixed, fluid }: PageContentProps) {
       <Header fixed>
         <Search />
         <div className="ml-auto flex items-center gap-3">
-          <span className="text-xs text-muted-foreground">v{__APP_VERSION__}</span>
+          <span className="text-xs text-muted-foreground">v{appVersion}</span>
           <ThemeSwitch />
           <ProfileDropdown />
         </div>

@@ -1,5 +1,9 @@
 import type { ReactNode } from "react";
 import { render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
+import { ThemeProvider } from "@/components/theme-provider";
+import { SearchProvider } from "@/context/search-provider";
+import { SidebarProvider } from "@/components/ui/sidebar";
 import DashboardPage from "./dashboard";
 import {
   fetchHomeworkRecords,
@@ -57,14 +61,23 @@ function setSession(roles: string[], phone = "13800000001") {
 }
 
 beforeEach(() => {
-  vi.useFakeTimers();
-  vi.setSystemTime(new Date("2026-04-02T08:00:00Z"));
   vi.clearAllMocks();
+  window.localStorage.clear();
 });
 
-afterEach(() => {
-  vi.useRealTimers();
-});
+function renderDashboard() {
+  render(
+    <MemoryRouter initialEntries={["/"]}>
+      <ThemeProvider>
+        <SidebarProvider>
+          <SearchProvider>
+            <DashboardPage />
+          </SearchProvider>
+        </SidebarProvider>
+      </ThemeProvider>
+    </MemoryRouter>,
+  );
+}
 
 test("shows admin overview with monthly payments and school summary", async () => {
   setSession(["admin"]);
@@ -144,9 +157,10 @@ test("shows admin overview with monthly payments and school summary", async () =
     },
   ]);
 
-  render(<DashboardPage />);
+  renderDashboard();
 
-  await waitFor(() => expect(screen.getByText("本月缴费金额")).toBeInTheDocument());
+  await waitFor(() => expect(mockedFetchStudents).toHaveBeenCalled());
+  expect(screen.getByText("本月缴费金额")).toBeInTheDocument();
   expect(screen.getByText("近7天趋势")).toBeInTheDocument();
   expect(screen.getByText("学校概览")).toBeInTheDocument();
   expect(screen.getByText("最近用餐")).toBeInTheDocument();
@@ -176,9 +190,10 @@ test("keeps guardian dashboard focused on linked students", async () => {
   mockedFetchHomeworkRecords.mockResolvedValue([]);
   mockedFetchPaymentRecords.mockResolvedValue([]);
 
-  render(<DashboardPage />);
+  renderDashboard();
 
-  await waitFor(() => expect(screen.getByText("关联学生")).toBeInTheDocument());
+  await waitFor(() => expect(mockedFetchStudents).toHaveBeenCalled());
+  expect(screen.getByText("关联学生")).toBeInTheDocument();
   expect(screen.queryByText("本月缴费金额")).not.toBeInTheDocument();
   expect(screen.queryByText("学校概览")).not.toBeInTheDocument();
 });

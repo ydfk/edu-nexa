@@ -1,27 +1,39 @@
 declare module "ali-oss" {
-  export type AliyunOSSMultipartUploadOptions = {
-    headers?: Record<string, string>;
+  type OSSHeaders = Record<string, string>;
+
+  type OSSPutOptions = {
+    headers?: OSSHeaders;
     mime?: string;
-    progress?: (percentage: number, checkpoint?: unknown, response?: unknown) => void | Promise<void>;
   };
 
-  export type AliyunOSSOptions = {
+  type OSSSignatureRequest = {
+    headers?: OSSHeaders;
+    queries?: Record<string, string>;
+  };
+
+  type OSSOptions = {
     accessKeyId: string;
     accessKeySecret: string;
     authorizationV4?: boolean;
-    bucket: string;
+    bucket?: string;
+    cname?: boolean;
+    endpoint?: string;
     region: string;
     secure?: boolean;
-    stsToken: string;
+    stsToken?: string;
   };
 
   export default class OSS {
-    constructor(options: AliyunOSSOptions);
+    constructor(options: OSSOptions);
 
-    multipartUpload(
-      name: string,
-      file: Blob | File,
-      options?: AliyunOSSMultipartUploadOptions,
-    ): Promise<unknown>;
+    put(name: string, file: Blob | File, options?: OSSPutOptions): Promise<unknown>;
+
+    signatureUrlV4(
+      method: string,
+      expires: number,
+      request?: OSSSignatureRequest,
+      objectName?: string,
+      additionalHeaders?: OSSHeaders,
+    ): Promise<string>;
   }
 }

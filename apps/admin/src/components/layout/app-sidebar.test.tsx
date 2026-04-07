@@ -13,6 +13,7 @@ test("shows product navigation entries without statistics board", () => {
         id: "1",
         phone: "13800000001",
         roles: ["admin"],
+        status: "active",
       },
     })
   );
@@ -30,6 +31,8 @@ test("shows product navigation entries without statistics board", () => {
   expect(screen.getByText("教师管理")).toBeInTheDocument();
   expect(screen.getByText("学校管理")).toBeInTheDocument();
   expect(screen.getByText("家长管理")).toBeInTheDocument();
+  expect(screen.getByText("学生管理")).toBeInTheDocument();
+  expect(screen.getByText("缴费管理")).toBeInTheDocument();
   expect(screen.getByText("用餐记录")).toBeInTheDocument();
   expect(screen.getByText("每日作业")).toBeInTheDocument();
 });
