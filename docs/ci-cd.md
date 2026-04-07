@@ -39,17 +39,7 @@ admin 和 api 现在共用同一套发布版本号规则：
 
 ## 一次性服务器准备
 
-### 1. 准备部署目录
-
-建议在服务器上保留一个干净的仓库副本，例如：
-
-```bash
-mkdir -p /app/edu-nexa
-cd /app/edu-nexa
-git clone <your-repo-url> repo
-```
-
-### 2. 准备管理后台发布目录
+### 1. 准备管理后台发布目录
 
 例如：
 
@@ -59,11 +49,12 @@ mkdir -p /var/www/edunexa-admin
 
 并由 Nginx 指向这个目录。
 
-### 3. 准备后端运行目录
+### 2. 准备后端源码与运行目录
 
 例如：
 
 ```bash
+mkdir -p /app/edu-nexa/api/source
 mkdir -p /app/edu-nexa/shared/api-config
 mkdir -p /app/edu-nexa/shared/api-data
 mkdir -p /app/edu-nexa/shared/api-log
@@ -71,7 +62,7 @@ mkdir -p /app/edu-nexa/shared/api-log
 
 把生产环境的 `config.yaml` 放到 `api-config` 目录下。
 
-### 4. 准备服务器固定 compose 文件
+### 3. 准备服务器固定 compose 文件
 
 API 发布脚本会从 Drone secret 读取 compose 路径。按你现在的服务器约定，可以直接配置为：
 
@@ -87,7 +78,7 @@ version: "3.8"
 services:
   app:
     build:
-      context: /app/edu-nexa/repo/apps/api
+      context: /app/edu-nexa/api/source
       dockerfile: Dockerfile
       args:
         APP_VERSION: ${APP_VERSION:-dev}
@@ -117,23 +108,23 @@ services:
 - `deploy_port`
 - `deploy_user`
 - `deploy_key`
-- `server_repo_dir`
 - `admin_web_root`
 - `api_compose_file`
+- `api_source_dir`
 
 一个常见示例：
 
 ```text
-server_repo_dir=/app/edu-nexa/repo
 admin_web_root=/var/www/edunexa-admin
 api_compose_file=/app/edu-nexa/api/compose.yml
+api_source_dir=/app/edu-nexa/api/source
 ```
 
 这些目录或路径的职责分别是：
 
-- `server_repo_dir`：服务器上的仓库目录，管理后台和 API 共用这一份代码
 - `admin_web_root`：管理后台构建产物的发布目录，通常由 Nginx 直接托管
 - `api_compose_file`：服务器上固定维护的 API compose 文件路径
+- `api_source_dir`：Drone 上传 API 源码包并解压的目录，compose 从这里构建镜像
 
 ## 发布命令
 

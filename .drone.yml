@@ -67,13 +67,30 @@ steps:
       - corepack enable
       - pnpm config set registry https://registry.npmmirror.com
       - pnpm install --frozen-lockfile
-      - pnpm build:admin
+      - export SHORT_SHA="$(printf '%.7s' "$DRONE_COMMIT_SHA")"
+      - if [ -n "${DRONE_TAG:-}" ]; then export APP_VERSION="$DRONE_TAG"; elif [ -n "${DRONE_BUILD_NUMBER:-}" ]; then export APP_VERSION="build-${DRONE_BUILD_NUMBER}-${SHORT_SHA}"; else export APP_VERSION="$SHORT_SHA"; fi
+      - APP_VERSION="$APP_VERSION" pnpm build:admin
+      - mkdir -p .drone-dist
+      - tar -C apps/admin/dist -czf .drone-dist/admin-dist.tar.gz .
+
+  - name: upload-admin
+    image: appleboy/drone-scp
+    settings:
+      host:
+        from_secret: deploy_host
+      port:
+        from_secret: deploy_port
+      username:
+        from_secret: deploy_user
+      key:
+        from_secret: deploy_key
+      command_timeout: 20
+      source: .drone-dist/admin-dist.tar.gz
+      target: /tmp/edunexa-admin
 
   - name: deploy-admin
     image: appleboy/drone-ssh
     environment:
-      SERVER_REPO_DIR:
-        from_secret: server_repo_dir
       ADMIN_WEB_ROOT:
         from_secret: admin_web_root
     settings:
@@ -90,11 +107,12 @@ steps:
         - DRONE_COMMIT_SHA
         - DRONE_BUILD_NUMBER
         - DRONE_TAG
-        - SERVER_REPO_DIR
         - ADMIN_WEB_ROOT
       script:
-        - export DEPLOY_SHA="$DRONE_COMMIT_SHA"
-        - bash "$SERVER_REPO_DIR/scripts/deploy-admin.sh"
+        - mkdir -p "$ADMIN_WEB_ROOT"
+        - find "$ADMIN_WEB_ROOT" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+        - tar -xzf /tmp/edunexa-admin/admin-dist.tar.gz -C "$ADMIN_WEB_ROOT"
+        - rm -f /tmp/edunexa-admin/admin-dist.tar.gz
 
 trigger:
   event:
@@ -116,14 +134,32 @@ steps:
       - go env -w GOSUMDB=sum.golang.google.cn
       - cd apps/api
       - go build -o ./tmp/api-dev.exe ./cmd
+      - cd ../..
+      - mkdir -p .drone-dist
+      - tar -C apps/api -czf .drone-dist/api-source.tar.gz .
+
+  - name: upload-api
+    image: appleboy/drone-scp
+    settings:
+      host:
+        from_secret: deploy_host
+      port:
+        from_secret: deploy_port
+      username:
+        from_secret: deploy_user
+      key:
+        from_secret: deploy_key
+      command_timeout: 20
+      source: .drone-dist/api-source.tar.gz
+      target: /tmp/edunexa-api
 
   - name: deploy-api
     image: appleboy/drone-ssh
     environment:
-      SERVER_REPO_DIR:
-        from_secret: server_repo_dir
       API_COMPOSE_FILE:
         from_secret: api_compose_file
+      API_SOURCE_DIR:
+        from_secret: api_source_dir
     settings:
       host:
         from_secret: deploy_host
@@ -138,11 +174,16 @@ steps:
         - DRONE_COMMIT_SHA
         - DRONE_BUILD_NUMBER
         - DRONE_TAG
-        - SERVER_REPO_DIR
         - API_COMPOSE_FILE
+        - API_SOURCE_DIR
       script:
-        - export DEPLOY_SHA="$DRONE_COMMIT_SHA"
-        - bash "$SERVER_REPO_DIR/scripts/deploy-api.sh"
+        - export SHORT_SHA="$(printf '%.7s' "$DRONE_COMMIT_SHA")"
+        - if [ -n "${DRONE_TAG:-}" ]; then export APP_VERSION="$DRONE_TAG"; elif [ -n "${DRONE_BUILD_NUMBER:-}" ]; then export APP_VERSION="build-${DRONE_BUILD_NUMBER}-${SHORT_SHA}"; else export APP_VERSION="$SHORT_SHA"; fi
+        - mkdir -p "$API_SOURCE_DIR"
+        - find "$API_SOURCE_DIR" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+        - tar -xzf /tmp/edunexa-api/api-source.tar.gz -C "$API_SOURCE_DIR"
+        - rm -f /tmp/edunexa-api/api-source.tar.gz
+        - APP_VERSION="$APP_VERSION" docker compose -f "$API_COMPOSE_FILE" up -d --build
 
 trigger:
   event:
