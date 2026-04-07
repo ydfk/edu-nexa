@@ -3,7 +3,7 @@
 ## 推荐发布策略
 
 - `push` / `pull_request`：只做校验，不做发布
-- `promote production`：人工确认后触发正式发布
+- `promote` 到不同 target：人工确认后按需发布 admin、api 或两者一起发布
 - 微信小程序：继续手动上传，CI 只保留代码检查
 
 这样的好处是日常提交足够快，正式环境也不会因为每次 commit 自动变更。
@@ -137,11 +137,19 @@ api_compose_file=/app/edu-nexa/api/compose.yml
 
 ## 发布命令
 
-先让某次通过校验的构建成为候选版本，再人工 promote 到正式环境：
+先让某次通过校验的构建成为候选版本，再人工 promote 到指定目标环境：
 
 ```bash
-drone build promote <repo> <build_number> production
+drone build promote <repo> <build_number> admin-production
+drone build promote <repo> <build_number> api-production
+drone build promote <repo> <build_number> full-production
 ```
+
+三种 target 的含义分别是：
+
+- `admin-production`：只发布管理后台
+- `api-production`：只发布 API
+- `full-production`：同时发布管理后台和 API
 
 Drone 官方把 promotion 作为独立事件处理，适合把“校验通过”和“正式发布”分开：[Drone Promotions](https://docs.drone.io/promote/)。
 

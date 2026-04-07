@@ -100,7 +100,8 @@ trigger:
   event:
     - promote
   target:
-    - production
+    - admin-production
+    - full-production
 
 ---
 kind: pipeline
@@ -147,4 +148,5 @@ trigger:
   event:
     - promote
   target:
-    - production
+    - api-production
+    - full-production
