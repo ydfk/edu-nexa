@@ -16,3 +16,4 @@ apps/api/log/
 .playwright-mcp/
 *.png
 !apps/weapp/miniprogram/assets/*.png
+.idea/

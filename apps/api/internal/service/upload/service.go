@@ -7,8 +7,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io"
-	"mime"
 	"mime/multipart"
 	"net/http"
 	neturl "net/url"
@@ -20,7 +18,6 @@ import (
 
 	"github.com/aliyun/aliyun-oss-go-sdk/oss"
 	"github.com/google/uuid"
-	"github.com/ydfk/edu-nexa/apps/api/internal/service/contentsafety"
 	"github.com/ydfk/edu-nexa/apps/api/pkg/config"
 )
 
@@ -75,80 +72,6 @@ func UploadGeneratedFile(content []byte, contentType string, purpose string, ext
 	default:
 		return uploadToLocal(content, objectKey)
 	}
-}
-
-func UploadImage(fileHeader *multipart.FileHeader, provider string, purpose string) (*Result, error) {
-	if fileHeader == nil {
-		return nil, fmt.Errorf("上传文件不能为空")
-	}
-	if fileHeader.Size > maxImageSize {
-		return nil, fmt.Errorf("图片大小不能超过 10MB")
-	}
-
-	contentType, extension, err := detectImageMeta(fileHeader)
-	if err != nil {
-		return nil, err
-	}
-
-	reader, err := fileHeader.Open()
-	if err != nil {
-		return nil, fmt.Errorf("读取上传文件失败")
-	}
-	defer reader.Close()
-
-	content, err := io.ReadAll(reader)
-	if err != nil {
-		return nil, fmt.Errorf("读取上传文件失败")
-	}
-	if len(content) == 0 {
-		return nil, fmt.Errorf("上传文件不能为空")
-	}
-
-	targetProvider := resolveProvider(provider)
-	objectKey := buildObjectKey(targetProvider, purpose, extension)
-
-	var result *Result
-	switch targetProvider {
-	case "aliyun_oss":
-		result, err = uploadToAliyunOSS(content, contentType, objectKey)
-	case "upyun":
-		result, err = uploadToUpYun(content, contentType, objectKey)
-	default:
-		result, err = uploadToLocal(content, objectKey)
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	if err := contentsafety.CheckImageURL(result.URL); err != nil {
-		return nil, err
-	}
-
-	return result, nil
-}
-
-func detectImageMeta(fileHeader *multipart.FileHeader) (string, string, error) {
-	extension := strings.ToLower(filepath.Ext(fileHeader.Filename))
-	if extension == "" {
-		contentType := fileHeader.Header.Get("Content-Type")
-		extensions, _ := mime.ExtensionsByType(contentType)
-		if len(extensions) > 0 {
-			extension = strings.ToLower(extensions[0])
-		}
-	}
-	if !allowedImageExtensions[extension] {
-		return "", "", fmt.Errorf("仅支持 jpg、png、webp、gif、heic 图片")
-	}
-
-	contentType := fileHeader.Header.Get("Content-Type")
-	if !strings.HasPrefix(contentType, "image/") {
-		contentType = mime.TypeByExtension(extension)
-	}
-	if !strings.HasPrefix(contentType, "image/") {
-		return "", "", fmt.Errorf("仅支持图片上传")
-	}
-
-	return contentType, extension, nil
 }
 
 func resolveProvider(provider string) string {
@@ -352,84 +275,4 @@ func buildAliyunOSSURL(ossConfig config.AliyunOSSConfig, objectKey string) strin
 	}
 
 	return parsed.Scheme + "://" + ossConfig.Bucket + "." + parsed.Host + "/" + objectKey
-}
-
-// UploadFile 支持图片和 PDF 文件上传
-func UploadFile(fileHeader *multipart.FileHeader, provider string, purpose string) (*Result, error) {
-	if fileHeader == nil {
-		return nil, fmt.Errorf("上传文件不能为空")
-	}
-	if fileHeader.Size > maxFileSize {
-		return nil, fmt.Errorf("文件大小不能超过 20MB")
-	}
-
-	contentType, extension, err := detectFileMeta(fileHeader)
-	if err != nil {
-		return nil, err
-	}
-
-	reader, err := fileHeader.Open()
-	if err != nil {
-		return nil, fmt.Errorf("读取上传文件失败")
-	}
-	defer reader.Close()
-
-	content, err := io.ReadAll(reader)
-	if err != nil {
-		return nil, fmt.Errorf("读取上传文件失败")
-	}
-	if len(content) == 0 {
-		return nil, fmt.Errorf("上传文件不能为空")
-	}
-
-	targetProvider := resolveProvider(provider)
-	objectKey := buildObjectKey(targetProvider, purpose, extension)
-
-	var result *Result
-	switch targetProvider {
-	case "aliyun_oss":
-		result, err = uploadToAliyunOSS(content, contentType, objectKey)
-	case "upyun":
-		result, err = uploadToUpYun(content, contentType, objectKey)
-	default:
-		result, err = uploadToLocal(content, objectKey)
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	// 仅对图片执行内容安全检查
-	if strings.HasPrefix(contentType, "image/") {
-		if err := contentsafety.CheckImageURL(result.URL); err != nil {
-			return nil, err
-		}
-	}
-
-	return result, nil
-}
-
-func detectFileMeta(fileHeader *multipart.FileHeader) (string, string, error) {
-	extension := strings.ToLower(filepath.Ext(fileHeader.Filename))
-	if extension == "" {
-		ct := fileHeader.Header.Get("Content-Type")
-		extensions, _ := mime.ExtensionsByType(ct)
-		if len(extensions) > 0 {
-			extension = strings.ToLower(extensions[0])
-		}
-	}
-	if !allowedFileExtensions[extension] {
-		return "", "", fmt.Errorf("仅支持 jpg、png、webp、gif、heic 图片和 pdf 文件")
-	}
-
-	contentType := fileHeader.Header.Get("Content-Type")
-	if extension == ".pdf" {
-		contentType = "application/pdf"
-	} else if !strings.HasPrefix(contentType, "image/") {
-		contentType = mime.TypeByExtension(extension)
-	}
-	if contentType == "" {
-		return "", "", fmt.Errorf("无法识别文件类型")
-	}
-
-	return contentType, extension, nil
 }

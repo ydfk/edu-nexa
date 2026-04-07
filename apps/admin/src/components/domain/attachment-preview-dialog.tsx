@@ -4,19 +4,12 @@ import { Document, Page, pdfjs } from "react-pdf";
 import Lightbox from "yet-another-react-lightbox";
 import Zoom from "yet-another-react-lightbox/plugins/zoom";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import type { FileItem } from "@/components/domain/file-upload";
+import { resolveAttachmentDisplayURL } from "@/components/domain/file-upload";
 import { useAttachmentAccessURLMap } from "@/hooks/use-attachment-access-url-map";
 
-pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-  "pdfjs-dist/build/pdf.worker.min.mjs",
-  import.meta.url,
-).toString();
+pdfjs.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/build/pdf.worker.min.mjs", import.meta.url).toString();
 
 const pdfOptions = {
   cMapPacked: true,
@@ -30,32 +23,20 @@ type AttachmentPreviewDialogProps = {
   onClose: () => void;
 };
 
-export function AttachmentPreviewDialog({
-  file,
-  items,
-  open,
-  onClose,
-}: AttachmentPreviewDialogProps) {
+export function AttachmentPreviewDialog({ file, items, open, onClose }: AttachmentPreviewDialogProps) {
   const currentFile = open ? file : null;
-  const [imageMetaMap, setImageMetaMap] = useState<
-    Record<string, { height: number; width: number }>
-  >({});
+  const [imageMetaMap, setImageMetaMap] = useState<Record<string, { height: number; width: number }>>({});
   const imageItems = useMemo(() => {
     const source = items?.length ? items : file ? [file] : [];
     const images = source.filter((item) => item.type === "image");
 
-    if (
-      file?.type === "image" &&
-      !images.some((item) => item.url === file.url)
-    ) {
+    if (file?.type === "image" && !images.some((item) => item.url === file.url)) {
       images.push(file);
     }
 
     return images;
   }, [file, items]);
-  const imageAccessURLMap = useAttachmentAccessURLMap(
-    imageItems.map((item) => ({ name: item.name, url: item.url })),
-  );
+  const imageAccessURLMap = useAttachmentAccessURLMap(imageItems.map((item) => ({ name: item.name, url: item.url })));
 
   useEffect(() => {
     let cancelled = false;
@@ -113,16 +94,6 @@ export function AttachmentPreviewDialog({
   }
 
   if (currentFile.type === "image") {
-    if (!imageSlides[currentImageIndex]?.src) {
-      return (
-        <Dialog open={open} onOpenChange={onClose}>
-          <DialogContent className="flex h-[60vh] w-[90vw] max-w-3xl items-center justify-center">
-            <PdfLoadingState />
-          </DialogContent>
-        </Dialog>
-      );
-    }
-
     return (
       <Lightbox
         open={open}
@@ -144,15 +115,7 @@ export function AttachmentPreviewDialog({
   return <PdfPreviewDialog file={currentFile} open={open} onClose={onClose} />;
 }
 
-function PdfPreviewDialog({
-  file,
-  open,
-  onClose,
-}: {
-  file: FileItem;
-  open: boolean;
-  onClose: () => void;
-}) {
+function PdfPreviewDialog({ file, open, onClose }: { file: FileItem; open: boolean; onClose: () => void }) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
   const [basePageWidth, setBasePageWidth] = useState(0);
@@ -160,10 +123,7 @@ function PdfPreviewDialog({
   const [pdfData, setPdfData] = useState<Uint8Array | null>(null);
   const [pdfError, setPdfError] = useState(false);
   const [zoom, setZoom] = useState(1);
-  const pdfAccessURLMap = useAttachmentAccessURLMap(
-    [{ name: file.name, url: file.url }],
-    { disposition: "inline" },
-  );
+  const pdfAccessURLMap = useAttachmentAccessURLMap([{ name: file.name, url: file.url }], { disposition: "inline" });
   const previewURL = resolveAttachmentDisplayURL(file.url, pdfAccessURLMap[file.url]);
 
   useEffect(() => {
@@ -287,16 +247,9 @@ function PdfPreviewDialog({
           <DialogTitle>{file.name}</DialogTitle>
         </DialogHeader>
         <div className="flex shrink-0 items-center justify-between border-b px-4 py-3">
-          <div className="text-sm text-muted-foreground">
-            {numPages > 0 ? `共 ${numPages} 页` : "正在加载 PDF"}
-          </div>
+          <div className="text-sm text-muted-foreground">{numPages > 0 ? `共 ${numPages} 页` : "正在加载 PDF"}</div>
           <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              className="h-8 px-3 text-xs"
-              onClick={() => setZoom(1)}
-            >
+            <Button type="button" variant="outline" className="h-8 px-3 text-xs" onClick={() => setZoom(1)}>
               适应宽度
             </Button>
             <Button
@@ -308,9 +261,7 @@ function PdfPreviewDialog({
             >
               <ZoomOut className="size-4" />
             </Button>
-            <span className="min-w-14 text-center text-sm font-medium">
-              {Math.round(zoom * 100)}%
-            </span>
+            <span className="min-w-14 text-center text-sm font-medium">{Math.round(zoom * 100)}%</span>
             <Button
               type="button"
               size="icon"
@@ -322,10 +273,7 @@ function PdfPreviewDialog({
             </Button>
           </div>
         </div>
-        <div
-          ref={viewportRef}
-          className="min-h-0 flex-1 overflow-auto bg-muted/20 p-4 sm:p-6"
-        >
+        <div ref={viewportRef} className="min-h-0 flex-1 overflow-auto bg-muted/20 p-4 sm:p-6">
           {pdfError ? (
             <PdfErrorState />
           ) : pdfFile ? (
@@ -350,10 +298,7 @@ function PdfPreviewDialog({
               <div className={zoom <= 1 ? "flex min-w-full justify-center" : "w-fit"}>
                 <div className="flex w-fit flex-col gap-4">
                   {Array.from({ length: numPages }, (_, index) => (
-                    <div
-                      key={`${file.url}-${index + 1}`}
-                      className="w-fit overflow-hidden rounded-lg border bg-background shadow-sm"
-                    >
+                    <div key={`${file.url}-${index + 1}`} className="w-fit overflow-hidden rounded-lg border bg-background shadow-sm">
                       <Page
                         pageNumber={index + 1}
                         scale={pageScale}
@@ -373,18 +318,6 @@ function PdfPreviewDialog({
       </DialogContent>
     </Dialog>
   );
-}
-
-function resolveAttachmentDisplayURL(rawURL: string, accessURL?: string) {
-  if (accessURL) {
-    return accessURL;
-  }
-
-  if (/^https?:\/\//i.test(rawURL)) {
-    return "";
-  }
-
-  return rawURL;
 }
 
 function PdfLoadingState({ compact = false }: { compact?: boolean }) {

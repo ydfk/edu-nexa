@@ -43,9 +43,7 @@ export function createFileItemFromUrl(url: string, fallbackName?: string): FileI
 }
 
 export function createFileItemsFromUrls(values: AttachmentValue[]) {
-  return values
-    .map((value) => normalizeAttachmentValue(value))
-    .filter((item): item is FileItem => !!item);
+  return values.map((value) => normalizeAttachmentValue(value)).filter((item): item is FileItem => !!item);
 }
 
 export function parseAttachments(json: string): FileItem[] {
@@ -82,11 +80,7 @@ export function FileUpload({
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [previewFile, setPreviewFile] = useState<FileItem | null>(null);
-  const accessURLMap = useAttachmentAccessURLMap(
-    value
-      .filter((item) => item.type === "image")
-      .map((item) => ({ name: item.name, url: item.url })),
-  );
+  const accessURLMap = useAttachmentAccessURLMap(value.filter((item) => item.type === "image").map((item) => ({ name: item.name, url: item.url })));
 
   const handleFiles = useCallback(
     async (files: FileList | null) => {
@@ -104,9 +98,7 @@ export function FileUpload({
           const result: UploadResult = await uploadFile(file);
           newItems.push(createFileItemFromUrl(result.url, file.name));
         } catch (error) {
-          toast.error(
-            `上传 ${file.name} 失败: ${error instanceof Error ? error.message : "未知错误"}`,
-          );
+          toast.error(`上传 ${file.name} 失败: ${error instanceof Error ? error.message : "未知错误"}`);
         }
       }
 
@@ -133,17 +125,10 @@ export function FileUpload({
           const previewImageURL = resolveAttachmentDisplayURL(item.url, accessURLMap[item.url]);
 
           return (
-            <div
-              key={`${item.url}-${index}`}
-              className="group relative flex items-center gap-2 rounded-md border bg-muted/30 px-3 py-2"
-            >
+            <div key={`${item.url}-${index}`} className="group relative flex items-center gap-2 rounded-md border bg-muted/30 px-3 py-2">
               {item.type === "image" ? (
                 previewImageURL ? (
-                  <img
-                    src={previewImageURL}
-                    alt={item.name}
-                    className="size-10 rounded object-cover"
-                  />
+                  <img src={previewImageURL} alt={item.name} className="size-10 rounded object-cover" />
                 ) : (
                   <div className="size-10 rounded bg-muted" />
                 )
@@ -152,22 +137,10 @@ export function FileUpload({
               )}
               <span className="max-w-[120px] truncate text-sm">{item.name}</span>
               <div className="flex gap-1">
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="ghost"
-                  className="size-6"
-                  onClick={() => setPreviewFile(item)}
-                >
+                <Button type="button" size="icon" variant="ghost" className="size-6" onClick={() => setPreviewFile(item)}>
                   <Eye className="size-3.5" />
                 </Button>
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="ghost"
-                  className="size-6 text-destructive"
-                  onClick={() => handleRemove(index)}
-                >
+                <Button type="button" size="icon" variant="ghost" className="size-6 text-destructive" onClick={() => handleRemove(index)}>
                   <X className="size-3.5" />
                 </Button>
               </div>
@@ -177,46 +150,26 @@ export function FileUpload({
       </div>
 
       {value.length < maxFiles && (
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={uploading}
-          onClick={() => inputRef.current?.click()}
-        >
+        <Button type="button" variant="outline" size="sm" disabled={uploading} onClick={() => inputRef.current?.click()}>
           <FileUp className="mr-2 size-4" />
           {uploading ? "上传中..." : "上传附件"}
         </Button>
       )}
 
-      <input
-        ref={inputRef}
-        type="file"
-        accept={accept}
-        multiple
-        className="hidden"
-        onChange={(e) => handleFiles(e.target.files)}
-      />
+      <input ref={inputRef} type="file" accept={accept} multiple className="hidden" onChange={(e) => handleFiles(e.target.files)} />
 
-      <AttachmentPreviewDialog
-        file={previewFile}
-        items={value}
-        open={!!previewFile}
-        onClose={() => setPreviewFile(null)}
-      />
+      <AttachmentPreviewDialog file={previewFile} items={value} open={!!previewFile} onClose={() => setPreviewFile(null)} />
     </div>
   );
 }
 
-function resolveAttachmentDisplayURL(rawURL: string, accessURL?: string) {
+export function resolveAttachmentDisplayURL(rawURL: string, accessURL?: string) {
   if (accessURL) {
     return accessURL;
   }
 
-  if (/^https?:\/\//i.test(rawURL)) {
-    return "";
-  }
-
+  // 始终用原始 URL 作为兜底，供 <img> 标签直接渲染
+  // 待签名 URL 异步返回后会自动切换
   return rawURL;
 }
 

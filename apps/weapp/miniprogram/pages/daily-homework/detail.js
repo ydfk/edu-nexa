@@ -1,9 +1,4 @@
-const {
-  getAttachmentAccessURL,
-  getDailyHomework,
-  saveDailyHomework,
-  uploadAttachment,
-} = require("../../services/records");
+const { getAttachmentAccessURL, getDailyHomework, saveDailyHomework, uploadAttachment } = require("../../services/records");
 const { getSchools, getGrades, getClasses } = require("../../services/schools");
 const { getRuntimeSettings } = require("../../services/common");
 const { requireEditor } = require("../../utils/permission");
@@ -59,7 +54,7 @@ Page({
       const settings = await getRuntimeSettings();
       const subjects = settings.subjects || settings.homeworkSubjects || [];
       this.setData({
-        subjectColumns: subjects.map((s) => typeof s === "string" ? { text: s, value: s } : { text: s.name || s.label, value: s.name || s.value }),
+        subjectColumns: subjects.map((s) => (typeof s === "string" ? { text: s, value: s } : { text: s.name || s.label, value: s.name || s.value })),
       });
     } catch (e) {
       console.warn("加载设置失败", e);
@@ -131,11 +126,19 @@ Page({
     }
   },
 
-  onContentInput(e) { this.setData({ content: e.detail.value }); },
-  onRemarkInput(e) { this.setData({ remark: e.detail.value }); },
+  onContentInput(e) {
+    this.setData({ content: e.detail.value });
+  },
+  onRemarkInput(e) {
+    this.setData({ remark: e.detail.value });
+  },
 
-  openSchoolPicker() { this.setData({ showSchoolPicker: true }); },
-  closeSchoolPicker() { this.setData({ showSchoolPicker: false }); },
+  openSchoolPicker() {
+    this.setData({ showSchoolPicker: true });
+  },
+  closeSchoolPicker() {
+    this.setData({ showSchoolPicker: false });
+  },
   onSchoolConfirm(e) {
     const val = e.detail.value;
     const school = this.data.schools.find((s) => s.id === val);
@@ -159,7 +162,9 @@ Page({
     }
     this.setData({ showGradePicker: true });
   },
-  closeGradePicker() { this.setData({ showGradePicker: false }); },
+  closeGradePicker() {
+    this.setData({ showGradePicker: false });
+  },
   onGradeConfirm(e) {
     const val = e.detail.value;
     const grade = this.data.grades.find((g) => g.id === val);
@@ -181,7 +186,9 @@ Page({
     }
     this.setData({ showClassPicker: true });
   },
-  closeClassPicker() { this.setData({ showClassPicker: false }); },
+  closeClassPicker() {
+    this.setData({ showClassPicker: false });
+  },
   onClassConfirm(e) {
     const val = e.detail.value;
     const cls = this.data.classes.find((c) => c.id === val);
@@ -191,14 +198,22 @@ Page({
     this.closeClassPicker();
   },
 
-  openSubjectPicker() { this.setData({ showSubjectPicker: true }); },
-  closeSubjectPicker() { this.setData({ showSubjectPicker: false }); },
+  openSubjectPicker() {
+    this.setData({ showSubjectPicker: true });
+  },
+  closeSubjectPicker() {
+    this.setData({ showSubjectPicker: false });
+  },
   onSubjectConfirm(e) {
     this.setData({ subject: e.detail.value, showSubjectPicker: false });
   },
 
-  openDatePicker() { this.setData({ showDatePicker: true }); },
-  closeDatePicker() { this.setData({ showDatePicker: false }); },
+  openDatePicker() {
+    this.setData({ showDatePicker: true });
+  },
+  closeDatePicker() {
+    this.setData({ showDatePicker: false });
+  },
   onDateConfirm(e) {
     this.setData({ showDatePicker: false, serviceDate: formatDate(new Date(e.detail)) });
   },
@@ -219,10 +234,7 @@ Page({
         const rawURL = res.url || res;
         const previewURL = await resolveAttachmentPreviewURL(rawURL, f.name);
         const urls = [...this.data.imageUrls, rawURL];
-        const fl = [
-          ...this.data.fileList,
-          buildAttachmentFileItem(rawURL, previewURL, f.name),
-        ];
+        const fl = [...this.data.fileList, buildAttachmentFileItem(rawURL, previewURL, f.name)];
         this.setData({ imageUrls: urls, fileList: fl });
       } catch (err) {
         wx.showToast({ title: "上传失败", icon: "none" });
@@ -299,11 +311,11 @@ function buildClassLabel(gradeName, className) {
 
 function parseAttachments(raw) {
   if (!raw) return [];
-  if (Array.isArray(raw)) return raw.filter(Boolean);
+  if (Array.isArray(raw)) return raw.map(extractAttachmentURL).filter(Boolean);
   try {
     const items = JSON.parse(String(raw));
     if (Array.isArray(items)) {
-      return items.filter((item) => typeof item === "string" && item.trim());
+      return items.map(extractAttachmentURL).filter(Boolean);
     }
   } catch (error) {
     // 兼容旧的逗号分隔格式
@@ -312,6 +324,13 @@ function parseAttachments(raw) {
     .split(",")
     .map((item) => item.trim().replace(/^\[/, "").replace(/\]$/, "").replace(/^"/, "").replace(/"$/, ""))
     .filter(Boolean);
+}
+
+// 从字符串或 {name, url} 对象中提取 URL
+function extractAttachmentURL(item) {
+  if (typeof item === "string") return item.trim();
+  if (item && typeof item === "object" && typeof item.url === "string") return item.url.trim();
+  return null;
 }
 
 function serializeAttachments(items) {
@@ -339,7 +358,10 @@ function buildAttachmentFileItem(rawURL, previewURL, fileName) {
 }
 
 function getAttachmentType(url) {
-  const lower = String(url || "").split("#")[0].split("?")[0].toLowerCase();
+  const lower = String(url || "")
+    .split("#")[0]
+    .split("?")[0]
+    .toLowerCase();
   if (lower.endsWith(".pdf")) {
     return "pdf";
   }
@@ -347,7 +369,10 @@ function getAttachmentType(url) {
 }
 
 function getAttachmentName(url) {
-  const parts = String(url || "").split("#")[0].split("?")[0].split("/");
+  const parts = String(url || "")
+    .split("#")[0]
+    .split("?")[0]
+    .split("/");
   return parts[parts.length - 1] || "附件";
 }
 
@@ -367,4 +392,3 @@ async function resolveAttachmentPreviewURL(rawURL, fileName) {
     return rawURL;
   }
 }
-

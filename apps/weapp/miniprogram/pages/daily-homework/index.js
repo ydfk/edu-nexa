@@ -1,8 +1,4 @@
-const {
-  getAttachmentAccessURL,
-  getDailyHomework,
-  getDailyHomeworkPrintPDF,
-} = require("../../services/records");
+const { getAttachmentAccessURL, getDailyHomework, getDailyHomeworkPrintPDF } = require("../../services/records");
 const { getSession, isGuardian, canEdit } = require("../../store/session");
 const { requireAuth } = require("../../utils/permission");
 const { getToday, shiftDate, formatDateCN, formatDate } = require("../../utils/date");
@@ -111,8 +107,7 @@ Page({
               .catch(() => item),
           ),
         );
-        const currentURL =
-          accessURLs[urls.findIndex((item) => item === url)] || accessURLs[0] || url;
+        const currentURL = accessURLs[urls.findIndex((item) => item === url)] || accessURLs[0] || url;
         wx.previewImage({ current: currentURL, urls: accessURLs });
       } catch (error) {
         wx.showToast({ title: "打开失败", icon: "none" });
@@ -237,11 +232,11 @@ function buildHomeworkContentText(item) {
 
 function parseAttachments(raw) {
   if (!raw) return [];
-  if (Array.isArray(raw)) return raw.filter(Boolean);
+  if (Array.isArray(raw)) return raw.map(extractAttachmentURL).filter(Boolean);
   try {
     const items = JSON.parse(String(raw));
     if (Array.isArray(items)) {
-      return items.filter((item) => typeof item === "string" && item.trim());
+      return items.map(extractAttachmentURL).filter(Boolean);
     }
   } catch (error) {
     // 兼容旧的逗号分隔格式
@@ -250,6 +245,13 @@ function parseAttachments(raw) {
     .split(",")
     .map((item) => item.trim().replace(/^\[/, "").replace(/\]$/, "").replace(/^"/, "").replace(/"$/, ""))
     .filter(Boolean);
+}
+
+// 从字符串或 {name, url} 对象中提取 URL
+function extractAttachmentURL(item) {
+  if (typeof item === "string") return item.trim();
+  if (item && typeof item === "object" && typeof item.url === "string") return item.url.trim();
+  return null;
 }
 
 function buildAttachmentItems(raw) {
@@ -278,7 +280,9 @@ function getAttachmentName(url) {
 }
 
 function stripAttachmentQuery(url) {
-  return String(url || "").split("#")[0].split("?")[0];
+  return String(url || "")
+    .split("#")[0]
+    .split("?")[0];
 }
 
 function downloadAndOpenHomeworkPrintPDF(url) {
