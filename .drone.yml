@@ -120,17 +120,17 @@ steps:
         - DRONE_BUILD_NUMBER
         - DRONE_TAG
         - ADMIN_WEB_ROOT
-      script:
-        - test -f /tmp/edunexa-admin/admin-dist.tar.gz || { echo "未找到上传包: /tmp/edunexa-admin/admin-dist.tar.gz"; ls -la /tmp/edunexa-admin; exit 1; }
-        - case "$ADMIN_WEB_ROOT" in ""|"/") echo "ADMIN_WEB_ROOT 配置不安全"; exit 1;; esac
-        - export ADMIN_DEPLOY_TMP="/tmp/edunexa-admin-extract-${DRONE_BUILD_NUMBER:-manual}"
-        - rm -rf "$ADMIN_DEPLOY_TMP"
-        - mkdir -p "$ADMIN_DEPLOY_TMP" "$ADMIN_WEB_ROOT"
-        - tar -xzf /tmp/edunexa-admin/admin-dist.tar.gz -C "$ADMIN_DEPLOY_TMP"
-        - find "$ADMIN_WEB_ROOT" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
-        - cp -R "$ADMIN_DEPLOY_TMP"/. "$ADMIN_WEB_ROOT"/
-        - rm -f /tmp/edunexa-admin/admin-dist.tar.gz
-        - rm -rf "$ADMIN_DEPLOY_TMP"
+      script: |
+        test -f /tmp/edunexa-admin/admin-dist.tar.gz || { echo "未找到上传包: /tmp/edunexa-admin/admin-dist.tar.gz"; ls -la /tmp/edunexa-admin; exit 1; }
+        case "$ADMIN_WEB_ROOT" in ""|"/") echo "ADMIN_WEB_ROOT 配置不安全"; exit 1;; esac
+        export ADMIN_DEPLOY_TMP="/tmp/edunexa-admin-extract-${DRONE_BUILD_NUMBER:-manual}"
+        rm -rf "$ADMIN_DEPLOY_TMP"
+        mkdir -p "$ADMIN_DEPLOY_TMP" "$ADMIN_WEB_ROOT"
+        tar -xzf /tmp/edunexa-admin/admin-dist.tar.gz -C "$ADMIN_DEPLOY_TMP"
+        find "$ADMIN_WEB_ROOT" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+        cp -R "$ADMIN_DEPLOY_TMP"/. "$ADMIN_WEB_ROOT"/
+        rm -f /tmp/edunexa-admin/admin-dist.tar.gz
+        rm -rf "$ADMIN_DEPLOY_TMP"
 
 trigger:
   event:
@@ -197,21 +197,21 @@ steps:
         - DRONE_TAG
         - API_COMPOSE_FILE
         - API_SOURCE_DIR
-      script:
-        - export SHORT_SHA="$(printf '%.7s' "$DRONE_COMMIT_SHA")"
-        - if [ -n "${DRONE_TAG:-}" ]; then export APP_VERSION="$DRONE_TAG"; elif [ -n "${DRONE_BUILD_NUMBER:-}" ]; then export APP_VERSION="build-${DRONE_BUILD_NUMBER}-${SHORT_SHA}"; else export APP_VERSION="$SHORT_SHA"; fi
-        - test -f /tmp/edunexa-api/api-source.tar.gz || { echo "未找到上传包: /tmp/edunexa-api/api-source.tar.gz"; ls -la /tmp/edunexa-api; exit 1; }
-        - case "$API_SOURCE_DIR" in ""|"/") echo "API_SOURCE_DIR 配置不安全"; exit 1;; esac
-        - test -f "$API_COMPOSE_FILE" || { echo "未找到 compose 文件: $API_COMPOSE_FILE"; exit 1; }
-        - export API_DEPLOY_TMP="/tmp/edunexa-api-extract-${DRONE_BUILD_NUMBER:-manual}"
-        - rm -rf "$API_DEPLOY_TMP"
-        - mkdir -p "$API_DEPLOY_TMP" "$API_SOURCE_DIR"
-        - tar -xzf /tmp/edunexa-api/api-source.tar.gz -C "$API_DEPLOY_TMP"
-        - find "$API_SOURCE_DIR" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
-        - cp -R "$API_DEPLOY_TMP"/. "$API_SOURCE_DIR"/
-        - rm -f /tmp/edunexa-api/api-source.tar.gz
-        - rm -rf "$API_DEPLOY_TMP"
-        - APP_VERSION="$APP_VERSION" docker compose -f "$API_COMPOSE_FILE" up -d --build
+      script: |
+        export SHORT_SHA="$(printf '%.7s' "$DRONE_COMMIT_SHA")"
+        if [ -n "${DRONE_TAG:-}" ]; then export APP_VERSION="$DRONE_TAG"; elif [ -n "${DRONE_BUILD_NUMBER:-}" ]; then export APP_VERSION="build-${DRONE_BUILD_NUMBER}-${SHORT_SHA}"; else export APP_VERSION="$SHORT_SHA"; fi
+        test -f /tmp/edunexa-api/api-source.tar.gz || { echo "未找到上传包: /tmp/edunexa-api/api-source.tar.gz"; ls -la /tmp/edunexa-api; exit 1; }
+        case "$API_SOURCE_DIR" in ""|"/") echo "API_SOURCE_DIR 配置不安全"; exit 1;; esac
+        test -f "$API_COMPOSE_FILE" || { echo "未找到 compose 文件: $API_COMPOSE_FILE"; exit 1; }
+        export API_DEPLOY_TMP="/tmp/edunexa-api-extract-${DRONE_BUILD_NUMBER:-manual}"
+        rm -rf "$API_DEPLOY_TMP"
+        mkdir -p "$API_DEPLOY_TMP" "$API_SOURCE_DIR"
+        tar -xzf /tmp/edunexa-api/api-source.tar.gz -C "$API_DEPLOY_TMP"
+        find "$API_SOURCE_DIR" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+        cp -R "$API_DEPLOY_TMP"/. "$API_SOURCE_DIR"/
+        rm -f /tmp/edunexa-api/api-source.tar.gz
+        rm -rf "$API_DEPLOY_TMP"
+        APP_VERSION="$APP_VERSION" docker compose -f "$API_COMPOSE_FILE" up -d --build
 
 trigger:
   event:
