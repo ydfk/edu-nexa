@@ -31,6 +31,8 @@ func CreateDirectUploadURL(c *fiber.Ctx) error {
 func CreateAccessURL(c *fiber.Ctx) error {
 	result, err := upload.ResolveAccessURL(
 		c.Query("url"),
+		c.Query("bucket"),
+		c.Query("objectKey"),
 		c.Query("disposition"),
 		c.Query("fileName"),
 	)

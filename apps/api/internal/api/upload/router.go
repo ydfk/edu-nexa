@@ -12,7 +12,6 @@ func RegisterPublicRoutes(router fiber.Router) {
 
 func RegisterRoutes(router fiber.Router) {
 	grp := router.Group("/uploads")
-	grp.Get("/access-url", CreateAccessURL)
 	grp.Get("/aliyun-post-form", CreateAliyunPostForm)
 	grp.Get("/aliyun-sts", CreateAliyunSTSUpload)
 	grp.Get("/direct-upload-url", CreateDirectUploadURL)

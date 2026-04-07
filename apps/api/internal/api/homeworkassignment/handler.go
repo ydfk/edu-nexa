@@ -1,6 +1,7 @@
 package homeworkassignment
 
 import (
+	"encoding/json"
 	"errors"
 	"strings"
 
@@ -8,6 +9,7 @@ import (
 	classgroupModel "github.com/ydfk/edu-nexa/apps/api/internal/model/classgroup"
 	model "github.com/ydfk/edu-nexa/apps/api/internal/model/homeworkassignment"
 	schoolModel "github.com/ydfk/edu-nexa/apps/api/internal/model/school"
+	attachmentservice "github.com/ydfk/edu-nexa/apps/api/internal/service/homeworkattachment"
 	"github.com/ydfk/edu-nexa/apps/api/internal/service"
 	"github.com/ydfk/edu-nexa/apps/api/internal/service/contentsafety"
 	"github.com/ydfk/edu-nexa/apps/api/pkg/db"
@@ -27,7 +29,7 @@ type assignmentPayload struct {
 	Subject     string `json:"subject"`
 	Content     string `json:"content"`
 	Items       []assignmentItemPayload `json:"items"`
-	Attachments string `json:"attachments"`
+	Attachments json.RawMessage `json:"attachments"`
 	Remark      string `json:"remark"`
 	SchoolID    string `json:"schoolId"`
 	SchoolName  string `json:"schoolName"`
@@ -40,6 +42,9 @@ type assignmentPayload struct {
 func List(c *fiber.Ctx) error {
 	var assignments []model.Assignment
 	query := db.DB.
+		Preload("Attachments", func(tx *gorm.DB) *gorm.DB {
+			return tx.Order("sort asc, created_at asc")
+		}).
 		Preload("Items", func(tx *gorm.DB) *gorm.DB {
 			return tx.Order("sort asc, created_at asc")
 		}).
@@ -90,6 +95,10 @@ func Create(c *fiber.Ctx) error {
 	if err := validateAssignmentPayload(req, serviceDate, itemContents); err != nil {
 		return response.Error(c, err.Error(), fiber.StatusBadRequest)
 	}
+	attachments, err := normalizeAssignmentAttachments(req.Attachments)
+	if err != nil {
+		return response.Error(c, err.Error(), fiber.StatusBadRequest)
+	}
 	content := joinAssignmentContent(itemContents)
 	if err := contentsafety.CheckText(content + "\n" + req.Remark); err != nil {
 		return response.Error(c, err.Error())
@@ -111,7 +120,6 @@ func Create(c *fiber.Ctx) error {
 		ClassName:   classInfo.ClassName,
 		Subject:     strings.TrimSpace(req.Subject),
 		Content:     content,
-		Attachments: strings.TrimSpace(req.Attachments),
 		Remark:      strings.TrimSpace(req.Remark),
 		SchoolID:    classInfo.SchoolID,
 		SchoolName:  classInfo.SchoolName,
@@ -125,9 +133,17 @@ func Create(c *fiber.Ctx) error {
 		if err := tx.Create(&assignment).Error; err != nil {
 			return err
 		}
+		builtAttachments, err := buildAssignmentAttachments(assignment.Id.String(), attachments)
+		if err != nil {
+			return err
+		}
+		if err := replaceAssignmentAttachments(tx, assignment.Id.String(), builtAttachments); err != nil {
+			return err
+		}
 		if err := replaceAssignmentItems(tx, assignment.Id.String(), itemContents); err != nil {
 			return err
 		}
+		assignment.Attachments = builtAttachments
 		assignment.Items = buildAssignmentItems(assignment.Id.String(), itemContents)
 		return nil
 	}); err != nil {
@@ -152,6 +168,10 @@ func Update(c *fiber.Ctx) error {
 	if err := validateAssignmentPayload(req, serviceDate, itemContents); err != nil {
 		return response.Error(c, err.Error(), fiber.StatusBadRequest)
 	}
+	attachments, err := normalizeAssignmentAttachments(req.Attachments)
+	if err != nil {
+		return response.Error(c, err.Error(), fiber.StatusBadRequest)
+	}
 	content := joinAssignmentContent(itemContents)
 	if err := contentsafety.CheckText(content + "\n" + req.Remark); err != nil {
 		return response.Error(c, err.Error())
@@ -171,7 +191,6 @@ func Update(c *fiber.Ctx) error {
 	assignment.ClassName = classInfo.ClassName
 	assignment.Subject = strings.TrimSpace(req.Subject)
 	assignment.Content = content
-	assignment.Attachments = strings.TrimSpace(req.Attachments)
 	assignment.Remark = strings.TrimSpace(req.Remark)
 	assignment.SchoolID = classInfo.SchoolID
 	assignment.SchoolName = classInfo.SchoolName
@@ -184,9 +203,17 @@ func Update(c *fiber.Ctx) error {
 		if err := tx.Save(&assignment).Error; err != nil {
 			return err
 		}
+		builtAttachments, err := buildAssignmentAttachments(assignment.Id.String(), attachments)
+		if err != nil {
+			return err
+		}
+		if err := replaceAssignmentAttachments(tx, assignment.Id.String(), builtAttachments); err != nil {
+			return err
+		}
 		if err := replaceAssignmentItems(tx, assignment.Id.String(), itemContents); err != nil {
 			return err
 		}
+		assignment.Attachments = builtAttachments
 		assignment.Items = buildAssignmentItems(assignment.Id.String(), itemContents)
 		return nil
 	}); err != nil {
@@ -203,6 +230,9 @@ func Delete(c *fiber.Ctx) error {
 	}
 
 	if err := db.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("assignment_id = ?", assignment.Id.String()).Delete(&model.Attachment{}).Error; err != nil {
+			return err
+		}
 		if err := tx.Where("assignment_id = ?", assignment.Id.String()).Delete(&model.Item{}).Error; err != nil {
 			return err
 		}
@@ -380,6 +410,29 @@ func buildAssignmentItems(assignmentID string, itemContents []string) []model.It
 	return items
 }
 
+func normalizeAssignmentAttachments(raw json.RawMessage) ([]attachmentservice.Payload, error) {
+	return attachmentservice.ParseRequest(raw)
+}
+
+func buildAssignmentAttachments(assignmentID string, payloads []attachmentservice.Payload) ([]model.Attachment, error) {
+	if len(payloads) == 0 {
+		return nil, nil
+	}
+
+	return attachmentservice.BuildModels(assignmentID, payloads)
+}
+
+func replaceAssignmentAttachments(tx *gorm.DB, assignmentID string, attachments []model.Attachment) error {
+	if err := tx.Where("assignment_id = ?", assignmentID).Delete(&model.Attachment{}).Error; err != nil {
+		return err
+	}
+	if len(attachments) == 0 {
+		return nil
+	}
+
+	return tx.Create(&attachments).Error
+}
+
 func replaceAssignmentItems(tx *gorm.DB, assignmentID string, itemContents []string) error {
 	if err := tx.Where("assignment_id = ?", assignmentID).Delete(&model.Item{}).Error; err != nil {
 		return err
@@ -407,6 +460,17 @@ func buildAssignmentPayload(assignment model.Assignment) fiber.Map {
 		})
 	}
 
+	payloadAttachments := make([]fiber.Map, 0, len(assignment.Attachments))
+	for _, attachment := range attachmentservice.BuildResponses(assignment.Attachments) {
+		payloadAttachments = append(payloadAttachments, fiber.Map{
+			"bucket":    attachment.Bucket,
+			"extension": attachment.Extension,
+			"name":      attachment.Name,
+			"objectKey": attachment.ObjectKey,
+			"size":      attachment.Size,
+		})
+	}
+
 	return fiber.Map{
 		"id":          assignment.Id,
 		"campusId":    assignment.CampusID,
@@ -415,7 +479,7 @@ func buildAssignmentPayload(assignment model.Assignment) fiber.Map {
 		"subject":     assignment.Subject,
 		"content":     assignment.Content,
 		"items":       payloadItems,
-		"attachments": assignment.Attachments,
+		"attachments": payloadAttachments,
 		"remark":      assignment.Remark,
 		"schoolId":    assignment.SchoolID,
 		"schoolName":  assignment.SchoolName,

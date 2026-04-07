@@ -2,6 +2,7 @@ package db
 
 import (
 	"fmt"
+	"path"
 	"strings"
 
 	classgroupModel "github.com/ydfk/edu-nexa/apps/api/internal/model/classgroup"
@@ -15,6 +16,7 @@ import (
 	paymentrecordModel "github.com/ydfk/edu-nexa/apps/api/internal/model/paymentrecord"
 	runtimeconfigModel "github.com/ydfk/edu-nexa/apps/api/internal/model/runtimeconfig"
 	schoolModel "github.com/ydfk/edu-nexa/apps/api/internal/model/school"
+	attachmentservice "github.com/ydfk/edu-nexa/apps/api/internal/service/homeworkattachment"
 	servicedayModel "github.com/ydfk/edu-nexa/apps/api/internal/model/serviceday"
 	studentModel "github.com/ydfk/edu-nexa/apps/api/internal/model/student"
 	studentserviceModel "github.com/ydfk/edu-nexa/apps/api/internal/model/studentservice"
@@ -38,6 +40,7 @@ func autoMigrate() error {
 		&paymentrecordModel.Record{},
 		&servicedayModel.Day{},
 		&homeworkassignmentModel.Assignment{},
+		&homeworkassignmentModel.Attachment{},
 		&homeworkassignmentModel.Item{},
 		&mealrecordModel.Record{},
 		&homeworkrecordModel.Record{},
@@ -55,6 +58,12 @@ func autoMigrate() error {
 		return err
 	}
 	if err := migrateLegacyHomeworkAssignmentItems(); err != nil {
+		return err
+	}
+	if err := migrateLegacyHomeworkAssignmentAttachments(); err != nil {
+		return err
+	}
+	if err := backfillHomeworkAttachmentMetadata(); err != nil {
 		return err
 	}
 	if err := migrateLegacyRecords(); err != nil {
@@ -277,6 +286,118 @@ func migrateLegacyHomeworkAssignmentItems() error {
 
 		items := buildHomeworkAssignmentItems(assignment.Id.String(), lines)
 		if err := DB.Create(&items).Error; err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func migrateLegacyHomeworkAssignmentAttachments() error {
+	migrator := DB.Migrator()
+	if !migrator.HasTable(&homeworkassignmentModel.Assignment{}) ||
+		!migrator.HasTable(homeworkassignmentModel.Attachment{}.TableName()) ||
+		!migrator.HasColumn("assignments", "attachments") {
+		return nil
+	}
+
+	type legacyAssignmentAttachment struct {
+		ID          string
+		Attachments string
+	}
+
+	var assignments []legacyAssignmentAttachment
+	if err := DB.Unscoped().
+		Table("assignments").
+		Select("id", "attachments").
+		Where("COALESCE(attachments, '') <> ''").
+		Scan(&assignments).Error; err != nil {
+		return err
+	}
+
+	hasUnsupportedAttachments := false
+	for _, assignment := range assignments {
+		payloads, err := attachmentservice.ParseLegacyString(assignment.Attachments)
+		if err != nil {
+			return err
+		}
+
+		_, skippedCount, err := attachmentservice.BuildMigratedModels(assignment.ID, payloads)
+		if err != nil {
+			return err
+		}
+		if skippedCount > 0 {
+			hasUnsupportedAttachments = true
+		}
+
+		var count int64
+		if err := DB.Unscoped().
+			Model(&homeworkassignmentModel.Attachment{}).
+			Where("assignment_id = ?", assignment.ID).
+			Count(&count).Error; err != nil {
+			return err
+		}
+		if count > 0 {
+			continue
+		}
+
+		attachments, skippedCount, err := attachmentservice.BuildMigratedModels(assignment.ID, payloads)
+		if err != nil {
+			return err
+		}
+		if len(attachments) == 0 {
+			continue
+		}
+
+		if err := DB.Create(&attachments).Error; err != nil {
+			return err
+		}
+	}
+
+	if hasUnsupportedAttachments {
+		return nil
+	}
+
+	return migrator.DropColumn("assignments", "attachments")
+}
+
+func backfillHomeworkAttachmentMetadata() error {
+	if !DB.Migrator().HasTable(homeworkassignmentModel.Attachment{}.TableName()) {
+		return nil
+	}
+
+	var attachments []homeworkassignmentModel.Attachment
+	if err := DB.Find(&attachments).Error; err != nil {
+		return err
+	}
+
+	for _, attachment := range attachments {
+		updates := map[string]interface{}{}
+		name := strings.TrimSpace(attachment.Name)
+		if name == "" {
+			name = path.Base(strings.TrimSpace(attachment.ObjectKey))
+		}
+		extension := strings.TrimSpace(attachment.Extension)
+		if extension == "" {
+			extension = strings.ToLower(path.Ext(name))
+			if extension == "" {
+				extension = strings.ToLower(path.Ext(strings.TrimSpace(attachment.ObjectKey)))
+			}
+		}
+		if strings.TrimSpace(attachment.Name) == "" {
+			updates["name"] = name
+		}
+		if strings.TrimSpace(attachment.Extension) == "" {
+			updates["extension"] = extension
+		}
+		if attachment.Size < 0 {
+			updates["size"] = int64(0)
+		}
+		if len(updates) == 0 {
+			continue
+		}
+
+		if err := DB.Model(&attachment).Updates(updates).Error; err != nil {
 			return err
 		}
 	}

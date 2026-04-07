@@ -13,9 +13,9 @@ type Assignment struct {
 	ClassName   string `gorm:"size:32;index;not null" json:"className"`
 	Subject     string `gorm:"size:32;index" json:"subject"`
 	Content     string `gorm:"type:text;not null" json:"content"`
-	Attachments string `gorm:"type:text" json:"attachments"`
 	Remark      string `gorm:"size:255" json:"remark"`
 	TeacherID   string `gorm:"size:36" json:"teacherId"`
 	TeacherName string `gorm:"size:32" json:"teacherName"`
-	Items       []Item `gorm:"foreignKey:AssignmentID" json:"items"`
+	Attachments []Attachment `gorm:"foreignKey:AssignmentID" json:"attachments"`
+	Items       []Item       `gorm:"foreignKey:AssignmentID" json:"items"`
 }

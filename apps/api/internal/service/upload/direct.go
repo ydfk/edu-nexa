@@ -16,6 +16,7 @@ import (
 const directURLExpireInSeconds int64 = 10 * 60
 
 type DirectUploadURLResult struct {
+	Bucket    string            `json:"bucket"`
 	ExpiresAt string            `json:"expiresAt"`
 	Headers   map[string]string `json:"headers"`
 	Method    string            `json:"method"`
@@ -26,6 +27,7 @@ type DirectUploadURLResult struct {
 }
 
 type AccessURLResult struct {
+	Bucket    string `json:"bucket"`
 	ExpiresAt string `json:"expiresAt"`
 	ObjectKey string `json:"objectKey"`
 	Provider  string `json:"provider"`
@@ -57,9 +59,11 @@ func CreateDirectUploadURL(fileName string, contentType string, fileSize int64, 
 	if err != nil {
 		return nil, fmt.Errorf("生成阿里云 OSS 上传地址失败")
 	}
+	uploadURL = normalizeAliyunSignedURL(uploadURL)
 
 	expiresAt := time.Now().UTC().Add(time.Duration(directURLExpireInSeconds) * time.Second)
 	return &DirectUploadURLResult{
+		Bucket:    ossConfig.Bucket,
 		ExpiresAt: expiresAt.Format(time.RFC3339),
 		Headers:   headers,
 		Method:    "PUT",
@@ -70,7 +74,16 @@ func CreateDirectUploadURL(fileName string, contentType string, fileSize int64, 
 	}, nil
 }
 
-func ResolveAccessURL(rawURL string, disposition string, fileName string) (*AccessURLResult, error) {
+func ResolveAccessURL(rawURL string, bucket string, objectKey string, disposition string, fileName string) (*AccessURLResult, error) {
+	if strings.TrimSpace(objectKey) != "" {
+		ref, err := NormalizeStoredObjectRef(bucket, objectKey, rawURL)
+		if err != nil {
+			return nil, err
+		}
+
+		return signAliyunAccessURL(ref.Bucket, ref.ObjectKey, disposition, fileName)
+	}
+
 	trimmedURL := strings.TrimSpace(rawURL)
 	if trimmedURL == "" {
 		return nil, fmt.Errorf("文件地址不能为空")
@@ -85,7 +98,19 @@ func ResolveAccessURL(rawURL string, disposition string, fileName string) (*Acce
 		}, nil
 	}
 
-	bucket, _, err := getAliyunOSSBucket()
+	resolvedBucket := strings.TrimSpace(bucket)
+	if resolvedBucket == "" {
+		resolvedBucket = resolveAliyunOSSBucketName(trimmedURL)
+	}
+	if resolvedBucket == "" {
+		resolvedBucket = strings.TrimSpace(config.Current.Storage.AliyunOSS.Bucket)
+	}
+
+	return signAliyunAccessURL(resolvedBucket, objectKey, disposition, fileName)
+}
+
+func signAliyunAccessURL(bucketName string, objectKey string, disposition string, fileName string) (*AccessURLResult, error) {
+	bucket, ossConfig, err := getAliyunOSSBucketWithName(bucketName)
 	if err != nil {
 		return nil, err
 	}
@@ -95,12 +120,14 @@ func ResolveAccessURL(rawURL string, disposition string, fileName string) (*Acce
 	if err != nil {
 		return nil, fmt.Errorf("生成阿里云 OSS 访问地址失败")
 	}
+	accessURL = normalizeAliyunSignedURL(accessURL)
 
 	expiresAt := time.Now().UTC().Add(time.Duration(directURLExpireInSeconds) * time.Second)
 	return &AccessURLResult{
+		Bucket:    strings.TrimSpace(ossConfig.Bucket),
 		ExpiresAt: expiresAt.Format(time.RFC3339),
 		ObjectKey: objectKey,
-		Provider:  provider,
+		Provider:  "aliyun_oss",
 		URL:       accessURL,
 	}, nil
 }
@@ -269,8 +296,16 @@ func isAliyunOSSHost(host string) bool {
 }
 
 func getAliyunOSSBucket() (*oss.Bucket, config.AliyunOSSConfig, error) {
+	return getAliyunOSSBucketWithName("")
+}
+
+func getAliyunOSSBucketWithName(bucketName string) (*oss.Bucket, config.AliyunOSSConfig, error) {
 	ossConfig := config.Current.Storage.AliyunOSS
-	if ossConfig.Endpoint == "" || ossConfig.Bucket == "" || ossConfig.AccessKeyID == "" || ossConfig.AccessKeySecret == "" {
+	targetBucket := strings.TrimSpace(bucketName)
+	if targetBucket == "" {
+		targetBucket = strings.TrimSpace(ossConfig.Bucket)
+	}
+	if ossConfig.Endpoint == "" || targetBucket == "" || ossConfig.AccessKeyID == "" || ossConfig.AccessKeySecret == "" {
 		return nil, ossConfig, fmt.Errorf("阿里云 OSS 配置不完整")
 	}
 
@@ -284,10 +319,29 @@ func getAliyunOSSBucket() (*oss.Bucket, config.AliyunOSSConfig, error) {
 		return nil, ossConfig, fmt.Errorf("初始化阿里云 OSS 失败")
 	}
 
-	bucket, err := client.Bucket(ossConfig.Bucket)
+	bucket, err := client.Bucket(targetBucket)
 	if err != nil {
 		return nil, ossConfig, fmt.Errorf("连接阿里云 OSS Bucket 失败")
 	}
 
+	ossConfig.Bucket = targetBucket
 	return bucket, ossConfig, nil
+}
+
+func normalizeAliyunSignedURL(rawURL string) string {
+	if strings.TrimSpace(rawURL) == "" {
+		return rawURL
+	}
+
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return strings.ReplaceAll(rawURL, "%2F", "/")
+	}
+
+	if parsed.Scheme == "" || parsed.Scheme == "http" {
+		parsed.Scheme = "https"
+	}
+	parsed.Path = strings.ReplaceAll(parsed.Path, "%2F", "/")
+	parsed.RawPath = strings.ReplaceAll(parsed.RawPath, "%2F", "/")
+	return parsed.String()
 }

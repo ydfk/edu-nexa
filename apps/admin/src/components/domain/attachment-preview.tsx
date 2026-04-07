@@ -4,7 +4,7 @@ import { AttachmentPreviewDialog } from "@/components/domain/attachment-preview-
 import { Button } from "@/components/ui/button";
 import { useAttachmentAccessURLMap } from "@/hooks/use-attachment-access-url-map";
 import { cn } from "@/lib/utils";
-import { type FileItem, resolveAttachmentDisplayURL } from "@/components/domain/file-upload";
+import { getFileItemKey, type FileItem, resolveAttachmentDisplayURL } from "@/components/domain/file-upload";
 
 type AttachmentPreviewListProps = {
   className?: string;
@@ -16,7 +16,11 @@ type AttachmentPreviewListProps = {
 
 export function AttachmentPreviewList({ className, compact = false, emptyText = "-", items, maxVisible }: AttachmentPreviewListProps) {
   const [previewFile, setPreviewFile] = useState<FileItem | null>(null);
-  const accessURLMap = useAttachmentAccessURLMap(items.filter((item) => item.type === "image").map((item) => ({ name: item.name, url: item.url })));
+  const accessURLMap = useAttachmentAccessURLMap(
+    items
+      .filter((item) => item.type === "image")
+      .map((item) => ({ name: item.name, bucket: item.bucket, objectKey: item.objectKey, url: item.url })),
+  );
   const visibleItems = useMemo(() => (typeof maxVisible === "number" ? items.slice(0, maxVisible) : items), [items, maxVisible]);
 
   if (items.length === 0) {
@@ -27,11 +31,12 @@ export function AttachmentPreviewList({ className, compact = false, emptyText = 
     <>
       <div className={cn("flex flex-wrap gap-2", className)}>
         {visibleItems.map((item, index) => {
-          const previewImageURL = resolveAttachmentDisplayURL(item.url, accessURLMap[item.url]);
+          const itemKey = getFileItemKey(item);
+          const previewImageURL = resolveAttachmentDisplayURL(item.url || "", accessURLMap[itemKey]);
 
           return (
             <button
-              key={`${item.url}-${index}`}
+              key={`${itemKey}-${index}`}
               type="button"
               className={cn(
                 "group flex items-center gap-2 rounded-md border bg-muted/20 text-left transition-colors hover:bg-muted/50",

@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
+import { getFileItemKey } from "@/components/domain/file-upload";
 import { resolveAttachmentAccessURL } from "@/lib/server-data";
 
 type AttachmentAccessItem = {
+  bucket?: string;
   name?: string;
-  url: string;
+  objectKey?: string;
+  url?: string;
 };
 
 export function useAttachmentAccessURLMap(
@@ -18,15 +21,17 @@ export function useAttachmentAccessURLMap(
     const results: AttachmentAccessItem[] = [];
 
     items.forEach((item) => {
-      const trimmedURL = item.url.trim();
-      if (!trimmedURL || seen.has(trimmedURL)) {
+      const itemKey = getFileItemKey(item);
+      if (!itemKey || seen.has(itemKey)) {
         return;
       }
 
-      seen.add(trimmedURL);
+      seen.add(itemKey);
       results.push({
+        bucket: item.bucket,
         name: item.name,
-        url: trimmedURL,
+        objectKey: item.objectKey,
+        url: item.url?.trim() || undefined,
       });
     });
 
@@ -51,14 +56,15 @@ export function useAttachmentAccessURLMap(
 
     Promise.all(
       normalizedItems.map(async (item) => {
+        const itemKey = getFileItemKey(item);
         try {
-          const accessURL = await resolveAttachmentAccessURL(item.url, {
+          const accessURL = await resolveAttachmentAccessURL(item, {
             disposition: options?.disposition,
             fileName: options?.disposition === "attachment" ? item.name : undefined,
           });
-          return [item.url, accessURL] as const;
+          return [itemKey, accessURL] as const;
         } catch {
-          return [item.url, item.url] as const;
+          return [itemKey, item.url || ""] as const;
         }
       }),
     ).then((entries) => {

@@ -1,6 +1,7 @@
 import { expireAdminSession, getAdminSessionSnapshot } from "@/lib/auth/session";
 import {
   type AliyunOSSBrowserUploadConfig,
+  createAliyunOSSAccessURL,
   uploadFileByAliyunOSS,
 } from "@/lib/aliyun-oss";
 
@@ -149,8 +150,25 @@ export type HomeworkContentItem = {
   sort: number;
 };
 
+export type AttachmentReference = {
+  bucket?: string;
+  extension?: string;
+  name?: string;
+  objectKey?: string;
+  size?: number;
+  url?: string;
+};
+
+export type DailyHomeworkAttachment = {
+  bucket: string;
+  extension: string;
+  name: string;
+  objectKey: string;
+  size: number;
+};
+
 export type DailyHomeworkItem = {
-  attachments: string;
+  attachments: DailyHomeworkAttachment[];
   classId: string;
   className: string;
   content: string;
@@ -484,7 +502,7 @@ export async function fetchDailyHomeworkPrintPDF(query?: ListQuery) {
 }
 
 export async function saveDailyHomework(input: {
-  attachments?: string;
+  attachments?: DailyHomeworkAttachment[];
   classId: string;
   className: string;
   content: string;
@@ -542,14 +560,12 @@ export async function deleteUser(id: string) {
 }
 
 export type UploadResult = {
+  bucket: string;
+  extension: string;
+  name: string;
   objectKey: string;
   provider: string;
-  url: string;
-};
-
-type AttachmentAccessURLResult = {
-  objectKey: string;
-  provider: string;
+  size: number;
   url: string;
 };
 
@@ -557,6 +573,12 @@ const attachmentAccessURLCache = new Map<
   string,
   { expiresAt: number; promise: Promise<string> }
 >();
+let aliyunPreviewSTSCache:
+  | {
+      expiresAt: number;
+      promise: Promise<AliyunOSSBrowserUploadConfig>;
+    }
+  | null = null;
 
 export async function uploadFile(file: File, purpose = "homework"): Promise<UploadResult> {
   try {
@@ -569,13 +591,21 @@ export async function uploadFile(file: File, purpose = "homework"): Promise<Uplo
       },
     });
 
-    await uploadFileByAliyunOSS(file, uploadConfig);
+    try {
+      await uploadFileByAliyunOSS(file, uploadConfig);
 
-    return {
-      objectKey: uploadConfig.objectKey,
-      provider: uploadConfig.provider,
-      url: uploadConfig.publicURL,
-    };
+      return {
+        bucket: uploadConfig.bucket,
+        extension: extractFileExtension(file.name),
+        name: file.name,
+        objectKey: uploadConfig.objectKey,
+        provider: uploadConfig.provider,
+        size: file.size,
+        url: uploadConfig.publicURL,
+      };
+    } catch {
+      return uploadFileBySignedURL(file, purpose);
+    }
   } catch (error) {
     if (!shouldFallbackToSignedUpload(error)) {
       throw error;
@@ -586,21 +616,23 @@ export async function uploadFile(file: File, purpose = "homework"): Promise<Uplo
 }
 
 export async function resolveAttachmentAccessURL(
-  url: string,
+  reference: string | AttachmentReference,
   options?: {
     disposition?: "attachment" | "inline";
     fileName?: string;
   },
 ) {
-  const trimmed = url.trim();
-  if (!trimmed) {
-    return trimmed;
+  const normalizedReference = normalizeAttachmentReference(reference);
+  if (!normalizedReference) {
+    return "";
   }
 
   const cacheKey = JSON.stringify({
+    bucket: normalizedReference.bucket || "",
     disposition: options?.disposition || "",
     fileName: options?.disposition === "attachment" ? options?.fileName || "" : "",
-    url: trimmed,
+    objectKey: normalizedReference.objectKey || "",
+    url: normalizedReference.url || "",
   });
   const cached = attachmentAccessURLCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) {
@@ -608,14 +640,7 @@ export async function resolveAttachmentAccessURL(
   }
   attachmentAccessURLCache.delete(cacheKey);
 
-  const promise = request<AttachmentAccessURLResult>("/api/uploads/access-url", {
-    query: {
-      disposition: options?.disposition,
-      fileName: options?.disposition === "attachment" ? options?.fileName : undefined,
-      url: trimmed,
-    },
-  })
-    .then((payload) => payload.url || trimmed)
+  const promise = resolveAliyunAttachmentAccessURL(normalizedReference, options)
     .catch((error) => {
       attachmentAccessURLCache.delete(cacheKey);
       throw error;
@@ -667,6 +692,7 @@ async function request<T>(
 
 async function uploadFileBySignedURL(file: File, purpose: string): Promise<UploadResult> {
   const uploadConfig = await request<{
+    bucket: string;
     headers: Record<string, string>;
     method: "PUT";
     objectKey: string;
@@ -693,8 +719,12 @@ async function uploadFileBySignedURL(file: File, purpose: string): Promise<Uploa
   }
 
   return {
+    bucket: uploadConfig.bucket,
+    extension: extractFileExtension(file.name),
+    name: file.name,
     objectKey: uploadConfig.objectKey,
     provider: uploadConfig.provider,
+    size: file.size,
     url: uploadConfig.publicURL,
   };
 }
@@ -711,6 +741,90 @@ function shouldFallbackToSignedUpload(error: unknown) {
   ].some((message) => error.message.includes(message));
 }
 
+function normalizeAttachmentReference(reference: string | AttachmentReference) {
+  if (typeof reference === "string") {
+    const trimmed = reference.trim();
+    if (!trimmed) {
+      return null;
+    }
+
+    return { url: trimmed };
+  }
+
+  const bucket = reference.bucket?.trim();
+  const extension = reference.extension?.trim();
+  const name = reference.name?.trim();
+  const objectKey = reference.objectKey?.trim();
+  const size = typeof reference.size === "number" && Number.isFinite(reference.size)
+    ? Math.max(reference.size, 0)
+    : undefined;
+  const url = reference.url?.trim();
+  if (!bucket && !objectKey && !url) {
+    return null;
+  }
+
+  return {
+    bucket,
+    extension,
+    name,
+    objectKey,
+    size,
+    url,
+  };
+}
+
+async function resolveAliyunAttachmentAccessURL(
+  reference: AttachmentReference,
+  options?: {
+    disposition?: "attachment" | "inline";
+    fileName?: string;
+  },
+) {
+  if (!reference.objectKey) {
+    return reference.url || "";
+  }
+
+  const stsConfig = await getAliyunPreviewSTSCredentials();
+  return createAliyunOSSAccessURL(reference.objectKey, {
+    ...stsConfig,
+    bucket: reference.bucket || stsConfig.bucket,
+  }, options);
+}
+
+async function getAliyunPreviewSTSCredentials() {
+  if (aliyunPreviewSTSCache && aliyunPreviewSTSCache.expiresAt > Date.now()) {
+    return aliyunPreviewSTSCache.promise;
+  }
+
+  const promise = request<AliyunOSSBrowserUploadConfig>("/api/uploads/aliyun-sts")
+    .then((config) => {
+      aliyunPreviewSTSCache = {
+        expiresAt: resolveAliyunSTSCacheExpiresAt(config.expiration),
+        promise: Promise.resolve(config),
+      };
+      return config;
+    })
+    .catch((error) => {
+      aliyunPreviewSTSCache = null;
+      throw error;
+    });
+
+  aliyunPreviewSTSCache = {
+    expiresAt: Date.now() + 60 * 1000,
+    promise,
+  };
+  return promise;
+}
+
+function resolveAliyunSTSCacheExpiresAt(expiration: string) {
+  const expiresAt = Date.parse(expiration);
+  if (Number.isNaN(expiresAt)) {
+    return Date.now() + 8 * 60 * 1000;
+  }
+
+  return Math.max(Date.now() + 60 * 1000, expiresAt - 60 * 1000);
+}
+
 function buildURL(path: string, query?: ListQuery) {
   const params = new URLSearchParams();
   Object.entries(query || {}).forEach(([key, value]) => {
@@ -722,4 +836,14 @@ function buildURL(path: string, query?: ListQuery) {
 
   const suffix = params.toString();
   return `${apiBaseURL}${path}${suffix ? `?${suffix}` : ""}`;
+}
+
+function extractFileExtension(fileName: string) {
+  const normalizedFileName = fileName.trim();
+  const extensionIndex = normalizedFileName.lastIndexOf(".");
+  if (extensionIndex <= 0 || extensionIndex === normalizedFileName.length - 1) {
+    return "";
+  }
+
+  return normalizedFileName.slice(extensionIndex).toLowerCase();
 }

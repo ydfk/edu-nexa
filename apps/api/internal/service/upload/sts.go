@@ -12,6 +12,7 @@ import (
 type AliyunSTSUploadResult struct {
 	AccessKeyID     string `json:"accessKeyId"`
 	AccessKeySecret string `json:"accessKeySecret"`
+	BaseURL         string `json:"baseURL"`
 	Bucket          string `json:"bucket"`
 	Expiration      string `json:"expiration"`
 	ObjectKey       string `json:"objectKey"`
@@ -26,28 +27,35 @@ func CreateAliyunSTSUpload(fileName string, contentType string, fileSize int64, 
 		return nil, fmt.Errorf("当前上传存储未配置为阿里云 OSS")
 	}
 
-	_, extension, err := detectDirectUploadMeta(fileName, contentType)
-	if err != nil {
-		return nil, err
-	}
-	if err := validateDirectUploadSize(extension, fileSize); err != nil {
-		return nil, err
-	}
-
 	credential, ossConfig, err := createAliyunSTSCredential(userID)
 	if err != nil {
 		return nil, err
 	}
 
-	objectKey := buildObjectKey("aliyun_oss", purpose, extension)
+	objectKey := ""
+	publicURL := ""
+	if strings.TrimSpace(fileName) != "" {
+		_, extension, err := detectDirectUploadMeta(fileName, contentType)
+		if err != nil {
+			return nil, err
+		}
+		if err := validateDirectUploadSize(extension, fileSize); err != nil {
+			return nil, err
+		}
+
+		objectKey = buildObjectKey("aliyun_oss", purpose, extension)
+		publicURL = buildAliyunOSSURL(ossConfig, objectKey)
+	}
+
 	return &AliyunSTSUploadResult{
 		AccessKeyID:     credential.accessKeyID,
 		AccessKeySecret: credential.accessKeySecret,
+		BaseURL:         strings.TrimSpace(ossConfig.BaseURL),
 		Bucket:          ossConfig.Bucket,
 		Expiration:      credential.expiration,
 		ObjectKey:       objectKey,
 		Provider:        "aliyun_oss",
-		PublicURL:       buildAliyunOSSURL(ossConfig, objectKey),
+		PublicURL:       publicURL,
 		Region:          resolveAliyunOSSBrowserRegion(ossConfig.Region),
 		SecurityToken:   credential.securityToken,
 	}, nil

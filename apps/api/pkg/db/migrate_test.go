@@ -1,6 +1,7 @@
 package db
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/glebarez/sqlite"
@@ -135,5 +136,238 @@ func TestAutoMigrateCreatesHomeworkAssignmentItemsFromLegacyContent(t *testing.T
 	}
 	if items[0].Content != "口算十题" || items[1].Content != "订正错题" {
 		t.Fatalf("unexpected migrated content: %#v", items)
+	}
+}
+
+func TestAutoMigrateMovesHomeworkAssignmentAttachmentsToTable(t *testing.T) {
+	prevDB := DB
+	t.Cleanup(func() {
+		DB = prevDB
+	})
+
+	testDB, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	DB = testDB
+
+	if err := DB.Exec(`
+		CREATE TABLE assignments (
+			id TEXT PRIMARY KEY,
+			created_at DATETIME,
+			updated_at DATETIME,
+			deleted_at DATETIME,
+			campus_id TEXT,
+			service_date TEXT NOT NULL,
+			school_id TEXT,
+			school_name TEXT NOT NULL,
+			grade_name TEXT,
+			class_id TEXT,
+			class_name TEXT NOT NULL,
+			subject TEXT,
+			content TEXT NOT NULL,
+			attachments TEXT,
+			remark TEXT,
+			teacher_id TEXT,
+			teacher_name TEXT
+		)
+	`).Error; err != nil {
+		t.Fatalf("create assignments table: %v", err)
+	}
+
+	legacyAttachments, err := json.Marshal([]map[string]string{
+		{
+			"url": "https://yiyixiaowu.cn-beijing.oss.aliyuncs.com/edunexa/homework/2026/04/demo-1.jpg",
+		},
+		{
+			"url": "https://yiyixiaowu.cn-beijing.oss.aliyuncs.com/edunexa/homework/2026/04/demo-2.pdf",
+		},
+	})
+	if err != nil {
+		t.Fatalf("marshal legacy attachments: %v", err)
+	}
+
+	if err := DB.Exec(`
+		INSERT INTO assignments (
+			id, created_at, updated_at, service_date, school_name, class_name, subject, content, attachments
+		) VALUES (
+			'assignment-1', '2026-04-02 10:00:00', '2026-04-02 10:00:00', '2026-04-02', '沣东九小', '一班', '数学', '口算十题', ?
+		)
+	`, string(legacyAttachments)).Error; err != nil {
+		t.Fatalf("seed assignments table: %v", err)
+	}
+
+	if err := autoMigrate(); err != nil {
+		t.Fatalf("auto migrate: %v", err)
+	}
+
+	if !DB.Migrator().HasTable(homeworkassignmentModel.Attachment{}.TableName()) {
+		t.Fatalf("expected homework assignment attachments table to exist")
+	}
+	if DB.Migrator().HasColumn("assignments", "attachments") {
+		t.Fatalf("expected legacy attachments column to be removed")
+	}
+
+	var attachments []homeworkassignmentModel.Attachment
+	if err := DB.Order("sort asc").Find(&attachments, "assignment_id = ?", "assignment-1").Error; err != nil {
+		t.Fatalf("query homework assignment attachments: %v", err)
+	}
+	if len(attachments) != 2 {
+		t.Fatalf("expected 2 migrated homework attachments, got %d", len(attachments))
+	}
+	if attachments[0].Bucket != "yiyixiaowu" {
+		t.Fatalf("unexpected bucket: %#v", attachments[0])
+	}
+	if attachments[0].ObjectKey != "edunexa/homework/2026/04/demo-1.jpg" {
+		t.Fatalf("unexpected object key: %#v", attachments[0])
+	}
+	if attachments[0].Name != "demo-1.jpg" {
+		t.Fatalf("unexpected name: %#v", attachments[0])
+	}
+	if attachments[0].Extension != ".jpg" {
+		t.Fatalf("unexpected extension: %#v", attachments[0])
+	}
+	if attachments[0].Size != 0 {
+		t.Fatalf("unexpected size: %#v", attachments[0])
+	}
+}
+
+func TestAutoMigrateKeepsLegacyAttachmentColumnWhenUnsupportedDataExists(t *testing.T) {
+	prevDB := DB
+	t.Cleanup(func() {
+		DB = prevDB
+	})
+
+	testDB, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	DB = testDB
+
+	if err := DB.Exec(`
+		CREATE TABLE assignments (
+			id TEXT PRIMARY KEY,
+			created_at DATETIME,
+			updated_at DATETIME,
+			deleted_at DATETIME,
+			campus_id TEXT,
+			service_date TEXT NOT NULL,
+			school_id TEXT,
+			school_name TEXT NOT NULL,
+			grade_name TEXT,
+			class_id TEXT,
+			class_name TEXT NOT NULL,
+			subject TEXT,
+			content TEXT NOT NULL,
+			attachments TEXT,
+			remark TEXT,
+			teacher_id TEXT,
+			teacher_name TEXT
+		)
+	`).Error; err != nil {
+		t.Fatalf("create assignments table: %v", err)
+	}
+
+	legacyAttachments, err := json.Marshal([]map[string]string{
+		{
+			"url": "/uploads/local/homework/2026/04/demo-1.jpg",
+		},
+		{
+			"url": "https://yiyixiaowu.cn-beijing.oss.aliyuncs.com/edunexa/homework/2026/04/demo-2.pdf",
+		},
+	})
+	if err != nil {
+		t.Fatalf("marshal legacy attachments: %v", err)
+	}
+
+	if err := DB.Exec(`
+		INSERT INTO assignments (
+			id, created_at, updated_at, service_date, school_name, class_name, subject, content, attachments
+		) VALUES (
+			'assignment-1', '2026-04-02 10:00:00', '2026-04-02 10:00:00', '2026-04-02', '沣东九小', '一班', '数学', '口算十题', ?
+		)
+	`, string(legacyAttachments)).Error; err != nil {
+		t.Fatalf("seed assignments table: %v", err)
+	}
+
+	if err := autoMigrate(); err != nil {
+		t.Fatalf("auto migrate: %v", err)
+	}
+
+	if !DB.Migrator().HasColumn("assignments", "attachments") {
+		t.Fatalf("expected legacy attachments column to be kept when unsupported data exists")
+	}
+
+	var attachments []homeworkassignmentModel.Attachment
+	if err := DB.Order("sort asc").Find(&attachments, "assignment_id = ?", "assignment-1").Error; err != nil {
+		t.Fatalf("query homework assignment attachments: %v", err)
+	}
+	if len(attachments) != 1 {
+		t.Fatalf("expected 1 migrated homework attachment, got %d", len(attachments))
+	}
+	if attachments[0].ObjectKey != "edunexa/homework/2026/04/demo-2.pdf" {
+		t.Fatalf("unexpected object key: %#v", attachments[0])
+	}
+	if attachments[0].Name != "demo-2.pdf" {
+		t.Fatalf("unexpected name: %#v", attachments[0])
+	}
+	if attachments[0].Extension != ".pdf" {
+		t.Fatalf("unexpected extension: %#v", attachments[0])
+	}
+}
+
+func TestAutoMigrateBackfillsHomeworkAttachmentMetadata(t *testing.T) {
+	prevDB := DB
+	t.Cleanup(func() {
+		DB = prevDB
+	})
+
+	testDB, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	DB = testDB
+
+	if err := DB.Exec(`
+		CREATE TABLE homework_assignment_attachments (
+			id TEXT PRIMARY KEY,
+			created_at DATETIME,
+			updated_at DATETIME,
+			deleted_at DATETIME,
+			assignment_id TEXT NOT NULL,
+			sort INTEGER NOT NULL DEFAULT 0,
+			bucket TEXT NOT NULL,
+			object_key TEXT NOT NULL
+		)
+	`).Error; err != nil {
+		t.Fatalf("create legacy attachments table: %v", err)
+	}
+
+	if err := DB.Exec(`
+		INSERT INTO homework_assignment_attachments (
+			id, created_at, updated_at, assignment_id, sort, bucket, object_key
+		) VALUES (
+			'attachment-1', '2026-04-02 10:00:00', '2026-04-02 10:00:00', 'assignment-1', 1, 'yiyixiaowu', 'edunexa/homework/2026/04/demo-3.png'
+		)
+	`).Error; err != nil {
+		t.Fatalf("seed legacy attachments table: %v", err)
+	}
+
+	if err := autoMigrate(); err != nil {
+		t.Fatalf("auto migrate: %v", err)
+	}
+
+	var attachment homeworkassignmentModel.Attachment
+	if err := DB.First(&attachment, "id = ?", "attachment-1").Error; err != nil {
+		t.Fatalf("query attachment: %v", err)
+	}
+	if attachment.Name != "demo-3.png" {
+		t.Fatalf("unexpected name: %#v", attachment)
+	}
+	if attachment.Extension != ".png" {
+		t.Fatalf("unexpected extension: %#v", attachment)
+	}
+	if attachment.Size != 0 {
+		t.Fatalf("unexpected size: %#v", attachment)
 	}
 }

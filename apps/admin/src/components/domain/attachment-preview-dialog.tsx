@@ -6,7 +6,7 @@ import Zoom from "yet-another-react-lightbox/plugins/zoom";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import type { FileItem } from "@/components/domain/file-upload";
-import { resolveAttachmentDisplayURL } from "@/components/domain/file-upload";
+import { getFileItemKey, resolveAttachmentDisplayURL } from "@/components/domain/file-upload";
 import { useAttachmentAccessURLMap } from "@/hooks/use-attachment-access-url-map";
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/build/pdf.worker.min.mjs", import.meta.url).toString();
@@ -30,19 +30,22 @@ export function AttachmentPreviewDialog({ file, items, open, onClose }: Attachme
     const source = items?.length ? items : file ? [file] : [];
     const images = source.filter((item) => item.type === "image");
 
-    if (file?.type === "image" && !images.some((item) => item.url === file.url)) {
+    if (file?.type === "image" && !images.some((item) => getFileItemKey(item) === getFileItemKey(file))) {
       images.push(file);
     }
 
     return images;
   }, [file, items]);
-  const imageAccessURLMap = useAttachmentAccessURLMap(imageItems.map((item) => ({ name: item.name, url: item.url })));
+  const imageAccessURLMap = useAttachmentAccessURLMap(
+    imageItems.map((item) => ({ name: item.name, bucket: item.bucket, objectKey: item.objectKey, url: item.url })),
+  );
 
   useEffect(() => {
     let cancelled = false;
 
     imageItems.forEach((item) => {
-      if (imageMetaMap[item.url]) {
+      const itemKey = getFileItemKey(item);
+      if (imageMetaMap[itemKey]) {
         return;
       }
 
@@ -53,20 +56,20 @@ export function AttachmentPreviewDialog({ file, items, open, onClose }: Attachme
         }
 
         setImageMetaMap((current) => {
-          if (current[item.url]) {
+          if (current[itemKey]) {
             return current;
           }
 
           return {
             ...current,
-            [item.url]: {
+            [itemKey]: {
               height: image.naturalHeight,
               width: image.naturalWidth,
             },
           };
         });
       };
-      image.src = resolveAttachmentDisplayURL(item.url, imageAccessURLMap[item.url]);
+      image.src = resolveAttachmentDisplayURL(item.url || "", imageAccessURLMap[itemKey]);
     });
 
     return () => {
@@ -78,14 +81,15 @@ export function AttachmentPreviewDialog({ file, items, open, onClose }: Attachme
     () =>
       imageItems.map((item) => ({
         alt: item.name,
-        src: resolveAttachmentDisplayURL(item.url, imageAccessURLMap[item.url]),
-        ...imageMetaMap[item.url],
+        src: resolveAttachmentDisplayURL(item.url || "", imageAccessURLMap[getFileItemKey(item)]),
+        ...imageMetaMap[getFileItemKey(item)],
       })),
     [imageAccessURLMap, imageItems, imageMetaMap],
   );
   const currentImageIndex = useMemo(() => {
     if (!currentFile || currentFile.type !== "image") return 0;
-    const index = imageItems.findIndex((item) => item.url === currentFile.url);
+    const currentFileKey = getFileItemKey(currentFile);
+    const index = imageItems.findIndex((item) => getFileItemKey(item) === currentFileKey);
     return index >= 0 ? index : 0;
   }, [currentFile, imageItems]);
 
@@ -123,8 +127,9 @@ function PdfPreviewDialog({ file, open, onClose }: { file: FileItem; open: boole
   const [pdfData, setPdfData] = useState<Uint8Array | null>(null);
   const [pdfError, setPdfError] = useState(false);
   const [zoom, setZoom] = useState(1);
-  const pdfAccessURLMap = useAttachmentAccessURLMap([{ name: file.name, url: file.url }], { disposition: "inline" });
-  const previewURL = resolveAttachmentDisplayURL(file.url, pdfAccessURLMap[file.url]);
+  const fileKey = getFileItemKey(file);
+  const pdfAccessURLMap = useAttachmentAccessURLMap([{ name: file.name, bucket: file.bucket, objectKey: file.objectKey, url: file.url }], { disposition: "inline" });
+  const previewURL = resolveAttachmentDisplayURL(file.url || "", pdfAccessURLMap[fileKey]);
 
   useEffect(() => {
     if (!open) {
@@ -142,7 +147,7 @@ function PdfPreviewDialog({ file, open, onClose }: { file: FileItem; open: boole
     setPdfData(null);
     setPdfError(false);
     setZoom(1);
-  }, [file.url, open]);
+  }, [fileKey, open]);
 
   useEffect(() => {
     if (!open) {
@@ -220,7 +225,7 @@ function PdfPreviewDialog({ file, open, onClose }: { file: FileItem; open: boole
 
     observer.observe(element);
     return () => observer.disconnect();
-  }, [file.url, open]);
+  }, [fileKey, open]);
 
   const fitWidthScale = useMemo(() => {
     if (!containerWidth || !basePageWidth) {
@@ -298,7 +303,7 @@ function PdfPreviewDialog({ file, open, onClose }: { file: FileItem; open: boole
               <div className={zoom <= 1 ? "flex min-w-full justify-center" : "w-fit"}>
                 <div className="flex w-fit flex-col gap-4">
                   {Array.from({ length: numPages }, (_, index) => (
-                    <div key={`${file.url}-${index + 1}`} className="w-fit overflow-hidden rounded-lg border bg-background shadow-sm">
+                    <div key={`${fileKey}-${index + 1}`} className="w-fit overflow-hidden rounded-lg border bg-background shadow-sm">
                       <Page
                         pageNumber={index + 1}
                         scale={pageScale}

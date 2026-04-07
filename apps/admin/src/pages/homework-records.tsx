@@ -268,7 +268,7 @@ function HomeworkRecordFormDialog() {
     return [
       ...baseItems,
       {
-        attachments: "",
+        attachments: [],
         classId: selectedStudent?.classId || "",
         className: selectedStudent?.className || currentItem.className,
         content: currentItem.subjectSummary,
