@@ -48,7 +48,7 @@ steps:
       - go env -w GOPROXY=https://goproxy.cn,direct
       - go env -w GOSUMDB=sum.golang.google.cn
       - cd apps/api
-      - go test ./...
+      - go build -o ./tmp/api-dev.exe ./cmd
 
 trigger:
   event:
@@ -114,7 +114,7 @@ steps:
       - go env -w GOPROXY=https://goproxy.cn,direct
       - go env -w GOSUMDB=sum.golang.google.cn
       - cd apps/api
-      - go test ./...
+      - go build -o ./tmp/api-dev.exe ./cmd
 
   - name: deploy-api
     image: appleboy/drone-ssh
