@@ -12,11 +12,11 @@
 
 根目录新增了 [`.drone.yml`](/F:/github-my/edu-nexa/.drone.yml)，当前包含 5 条流水线：
 
-- `admin-ci`：执行管理后台 lint、测试、构建
+- `admin-ci`：执行管理后台 lint、构建
 - `weapp-ci`：执行小程序配置文件和源码语法检查
-- `api-ci`：执行 Go 后端测试
-- `admin-release`：人工 promote 后发布管理后台静态资源
-- `api-release`：人工 promote 后通过服务器固定 compose 文件发布后端
+- `api-ci`：执行 Go 后端构建校验
+- `admin-release`：人工 promote 后上传 `admin-dist.tar.gz` 并发布管理后台静态资源
+- `api-release`：人工 promote 后上传 `api-source.tar.gz` 并通过服务器固定 compose 文件发布后端
 
 其中 Node 和 Go 相关步骤已经默认切到国内可用源：
 
@@ -125,6 +125,14 @@ api_source_dir=/app/edu-nexa/api/source
 - `admin_web_root`：管理后台构建产物的发布目录，通常由 Nginx 直接托管
 - `api_compose_file`：服务器上固定维护的 API compose 文件路径
 - `api_source_dir`：Drone 上传 API 源码包并解压的目录，compose 从这里构建镜像
+
+发布时的远端处理方式是：
+
+- Drone 先把 `admin-dist.tar.gz` 或 `api-source.tar.gz` 上传到 `/tmp`
+- 服务器先解压到临时目录
+- 解压成功后再清空正式目录并整体覆盖
+
+这样可以避免目录里旧文件残留，也能减少解压失败时对线上目录的影响。
 
 ## 发布命令
 

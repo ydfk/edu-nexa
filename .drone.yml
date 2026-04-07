@@ -82,8 +82,7 @@ steps:
       - export SHORT_SHA="$(printf '%.7s' "$DRONE_COMMIT_SHA")"
       - if [ -n "${DRONE_TAG:-}" ]; then export APP_VERSION="$DRONE_TAG"; elif [ -n "${DRONE_BUILD_NUMBER:-}" ]; then export APP_VERSION="build-${DRONE_BUILD_NUMBER}-${SHORT_SHA}"; else export APP_VERSION="$SHORT_SHA"; fi
       - APP_VERSION="$APP_VERSION" pnpm build:admin
-      - mkdir -p .drone-dist
-      - tar -C apps/admin/dist -czf .drone-dist/admin-dist.tar.gz .
+      - tar -C apps/admin/dist -czf admin-dist.tar.gz .
 
   - name: upload-admin
     image: appleboy/drone-scp
@@ -97,7 +96,8 @@ steps:
       key:
         from_secret: deploy_key
       command_timeout: 20m
-      source: .drone-dist/admin-dist.tar.gz
+      overwrite: true
+      source: admin-dist.tar.gz
       target: /tmp/edunexa-admin
 
   - name: deploy-admin
@@ -121,10 +121,16 @@ steps:
         - DRONE_TAG
         - ADMIN_WEB_ROOT
       script:
-        - mkdir -p "$ADMIN_WEB_ROOT"
+        - test -f /tmp/edunexa-admin/admin-dist.tar.gz || { echo "未找到上传包: /tmp/edunexa-admin/admin-dist.tar.gz"; ls -la /tmp/edunexa-admin; exit 1; }
+        - case "$ADMIN_WEB_ROOT" in ""|"/") echo "ADMIN_WEB_ROOT 配置不安全"; exit 1;; esac
+        - export ADMIN_DEPLOY_TMP="/tmp/edunexa-admin-extract-${DRONE_BUILD_NUMBER:-manual}"
+        - rm -rf "$ADMIN_DEPLOY_TMP"
+        - mkdir -p "$ADMIN_DEPLOY_TMP" "$ADMIN_WEB_ROOT"
+        - tar -xzf /tmp/edunexa-admin/admin-dist.tar.gz -C "$ADMIN_DEPLOY_TMP"
         - find "$ADMIN_WEB_ROOT" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
-        - tar -xzf /tmp/edunexa-admin/admin-dist.tar.gz -C "$ADMIN_WEB_ROOT"
+        - cp -R "$ADMIN_DEPLOY_TMP"/. "$ADMIN_WEB_ROOT"/
         - rm -f /tmp/edunexa-admin/admin-dist.tar.gz
+        - rm -rf "$ADMIN_DEPLOY_TMP"
 
 trigger:
   event:
@@ -150,8 +156,7 @@ steps:
       - cd apps/api
       - go build -o ./tmp/api-dev.exe ./cmd
       - cd ../..
-      - mkdir -p .drone-dist
-      - tar -C apps/api -czf .drone-dist/api-source.tar.gz .
+      - tar -C apps/api -czf api-source.tar.gz .
 
   - name: upload-api
     image: appleboy/drone-scp
@@ -165,7 +170,8 @@ steps:
       key:
         from_secret: deploy_key
       command_timeout: 20m
-      source: .drone-dist/api-source.tar.gz
+      overwrite: true
+      source: api-source.tar.gz
       target: /tmp/edunexa-api
 
   - name: deploy-api
@@ -194,10 +200,17 @@ steps:
       script:
         - export SHORT_SHA="$(printf '%.7s' "$DRONE_COMMIT_SHA")"
         - if [ -n "${DRONE_TAG:-}" ]; then export APP_VERSION="$DRONE_TAG"; elif [ -n "${DRONE_BUILD_NUMBER:-}" ]; then export APP_VERSION="build-${DRONE_BUILD_NUMBER}-${SHORT_SHA}"; else export APP_VERSION="$SHORT_SHA"; fi
-        - mkdir -p "$API_SOURCE_DIR"
+        - test -f /tmp/edunexa-api/api-source.tar.gz || { echo "未找到上传包: /tmp/edunexa-api/api-source.tar.gz"; ls -la /tmp/edunexa-api; exit 1; }
+        - case "$API_SOURCE_DIR" in ""|"/") echo "API_SOURCE_DIR 配置不安全"; exit 1;; esac
+        - test -f "$API_COMPOSE_FILE" || { echo "未找到 compose 文件: $API_COMPOSE_FILE"; exit 1; }
+        - export API_DEPLOY_TMP="/tmp/edunexa-api-extract-${DRONE_BUILD_NUMBER:-manual}"
+        - rm -rf "$API_DEPLOY_TMP"
+        - mkdir -p "$API_DEPLOY_TMP" "$API_SOURCE_DIR"
+        - tar -xzf /tmp/edunexa-api/api-source.tar.gz -C "$API_DEPLOY_TMP"
         - find "$API_SOURCE_DIR" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
-        - tar -xzf /tmp/edunexa-api/api-source.tar.gz -C "$API_SOURCE_DIR"
+        - cp -R "$API_DEPLOY_TMP"/. "$API_SOURCE_DIR"/
         - rm -f /tmp/edunexa-api/api-source.tar.gz
+        - rm -rf "$API_DEPLOY_TMP"
         - APP_VERSION="$APP_VERSION" docker compose -f "$API_COMPOSE_FILE" up -d --build
 
 trigger:
