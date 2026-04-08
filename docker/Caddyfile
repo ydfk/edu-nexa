@@ -1,0 +1,17 @@
+{
+  auto_https off
+  admin off
+}
+
+:80 {
+  encode zstd gzip
+  root * /srv
+
+  @backend path /api/* /uploads/* /swagger/* /swagger /health /health/*
+  handle @backend {
+    reverse_proxy 127.0.0.1:33001
+  }
+
+  try_files {path} /index.html
+  file_server
+}

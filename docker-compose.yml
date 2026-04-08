@@ -1,0 +1,23 @@
+version: "3.8"
+
+services:
+  edunexa:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        APP_VERSION: ${APP_VERSION:-dev}
+        GOPROXY: ${GOPROXY:-https://goproxy.cn,direct}
+        GOSUMDB: ${GOSUMDB:-sum.golang.google.cn}
+    image: edunexa:${APP_VERSION:-dev}
+    container_name: ${EDUNEXA_CONTAINER_NAME:-edunexa}
+    restart: unless-stopped
+    ports:
+      - "${EDUNEXA_HTTP_PORT:-80}:80"
+      - "${EDUNEXA_API_PORT:-33001}:33001"
+    environment:
+      TZ: Asia/Shanghai
+    volumes:
+      - "${EDUNEXA_CONFIG_DIR:-./deploy/config}:/app/config:ro"
+      - "${EDUNEXA_DATA_DIR:-./deploy/data}:/app/data"
+      - "${EDUNEXA_LOG_DIR:-./deploy/log}:/app/log"

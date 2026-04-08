@@ -100,4 +100,18 @@ pnpm dev:weapp
 - 管理后台已补到学生台账、每日作业、服务日历、用餐记录、作业记录等业务导航
 - 小程序已具备工作台、用餐、作业、我的四个页面，以及接口层、状态层、环境配置占位
 
+## Docker 部署
+
+仓库现在只保留根目录一套 Docker 部署文件：
+
+- [Dockerfile](/F:/github-my/edu-nexa/Dockerfile)
+- [docker-compose.yml](/F:/github-my/edu-nexa/docker-compose.yml)
+- [docs/docker-deploy.md](/F:/github-my/edu-nexa/docs/docker-deploy.md)
+
+这套部署会把：
+
+- 管理端打包后交给 Caddy 提供静态资源
+- API 一并打进同一个运行镜像
+- 小程序排除在 Docker 部署之外
+
 下一步建议见 [docs/product-structure.md](/F:/github-my/edu-nexa/docs/product-structure.md)、[docs/foundation-roadmap.md](/F:/github-my/edu-nexa/docs/foundation-roadmap.md) 和 [docs/weapp-review-checklist.md](/F:/github-my/edu-nexa/docs/weapp-review-checklist.md)。
