@@ -1,4 +1,4 @@
-import { StrictMode } from "react";
+import { Suspense, StrictMode, lazy } from "react";
 import { createRoot } from "react-dom/client";
 import { RouterProvider, createBrowserRouter } from "react-router-dom";
 import {
@@ -8,26 +8,39 @@ import {
 } from "@/components/auth/route-guards";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/theme-provider";
-import Layout from "@/components/layout/layout";
-import DashboardPage from "@/pages/dashboard";
-import DailyHomeworkPage from "@/pages/daily-homework";
-import GuardiansPage from "@/pages/guardians";
-import SchoolsPage from "@/pages/schools";
-import StudentsPage from "@/pages/students";
-import MealRecordsPage from "@/pages/meal-records";
-import HomeworkRecordsPage from "@/pages/homework-records";
-import PaymentsPage from "@/pages/payments";
-import ServiceCalendarPage from "@/pages/service-calendar";
-import TeachersPage from "@/pages/teachers";
-import LoginPage from "@/pages/login";
-import NotFoundPage from "@/pages/errors/not-found";
-import ForbiddenPage from "@/pages/errors/forbidden";
 import UnauthorizedPage from "@/components/error/unauthorized";
-import SettingsProfilePage from "@/pages/settings/index";
-import SettingsSystemPage from "@/pages/settings/system";
 import { PageContent } from "@/components/page-content";
 import "yet-another-react-lightbox/styles.css";
 import "./index.css";
+
+const Layout = lazy(() => import("@/components/layout/layout"));
+const DashboardPage = lazy(() => import("@/pages/dashboard"));
+const DailyHomeworkPage = lazy(() => import("@/pages/daily-homework"));
+const GuardiansPage = lazy(() => import("@/pages/guardians"));
+const SchoolsPage = lazy(() => import("@/pages/schools"));
+const StudentsPage = lazy(() => import("@/pages/students"));
+const MealRecordsPage = lazy(() => import("@/pages/meal-records"));
+const HomeworkRecordsPage = lazy(() => import("@/pages/homework-records"));
+const PaymentsPage = lazy(() => import("@/pages/payments"));
+const ServiceCalendarPage = lazy(() => import("@/pages/service-calendar"));
+const TeachersPage = lazy(() => import("@/pages/teachers"));
+const LoginPage = lazy(() => import("@/pages/login"));
+const NotFoundPage = lazy(() => import("@/pages/errors/not-found"));
+const ForbiddenPage = lazy(() => import("@/pages/errors/forbidden"));
+const SettingsProfilePage = lazy(() => import("@/pages/settings/index"));
+const SettingsSystemPage = lazy(() => import("@/pages/settings/system"));
+
+function RouteFallback() {
+  return (
+    <div className="flex min-h-[40vh] items-center justify-center text-sm text-muted-foreground">
+      页面加载中...
+    </div>
+  );
+}
+
+function withSuspense(element: React.ReactNode) {
+  return <Suspense fallback={<RouteFallback />}>{element}</Suspense>;
+}
 
 const router = createBrowserRouter([
   {
@@ -35,12 +48,12 @@ const router = createBrowserRouter([
     children: [
       {
         path: "/",
-        element: <Layout />,
+        element: withSuspense(<Layout />),
         children: [
-          { index: true, element: <DashboardPage /> },
+          { index: true, element: withSuspense(<DashboardPage />) },
           {
             path: "teachers",
-            element: (
+            element: withSuspense(
               <RequireRoles allowedRoles={["admin"]}>
                 <TeachersPage />
               </RequireRoles>
@@ -48,7 +61,7 @@ const router = createBrowserRouter([
           },
           {
             path: "schools",
-            element: (
+            element: withSuspense(
               <RequireRoles allowedRoles={["admin", "teacher"]}>
                 <SchoolsPage />
               </RequireRoles>
@@ -56,7 +69,7 @@ const router = createBrowserRouter([
           },
           {
             path: "grades",
-            element: (
+            element: withSuspense(
               <RequireRoles allowedRoles={["admin", "teacher"]}>
                 <SchoolsPage />
               </RequireRoles>
@@ -64,7 +77,7 @@ const router = createBrowserRouter([
           },
           {
             path: "classes",
-            element: (
+            element: withSuspense(
               <RequireRoles allowedRoles={["admin", "teacher"]}>
                 <SchoolsPage />
               </RequireRoles>
@@ -72,7 +85,7 @@ const router = createBrowserRouter([
           },
           {
             path: "guardians",
-            element: (
+            element: withSuspense(
               <RequireRoles allowedRoles={["admin", "teacher"]}>
                 <GuardiansPage />
               </RequireRoles>
@@ -80,17 +93,17 @@ const router = createBrowserRouter([
           },
           {
             path: "students",
-            element: (
+            element: withSuspense(
               <RequireRoles allowedRoles={["admin", "teacher", "guardian"]}>
                 <StudentsPage />
               </RequireRoles>
             ),
           },
-          { path: "meal-records", element: <MealRecordsPage /> },
-          { path: "homework-records", element: <HomeworkRecordsPage /> },
+          { path: "meal-records", element: withSuspense(<MealRecordsPage />) },
+          { path: "homework-records", element: withSuspense(<HomeworkRecordsPage />) },
           {
             path: "payments",
-            element: (
+            element: withSuspense(
               <RequireRoles allowedRoles={["admin", "teacher"]}>
                 <PaymentsPage />
               </RequireRoles>
@@ -98,7 +111,7 @@ const router = createBrowserRouter([
           },
           {
             path: "daily-homework",
-            element: (
+            element: withSuspense(
               <RequireRoles allowedRoles={["admin", "teacher"]}>
                 <DailyHomeworkPage />
               </RequireRoles>
@@ -106,24 +119,31 @@ const router = createBrowserRouter([
           },
           {
             path: "service-calendar",
-            element: (
+            element: withSuspense(
               <RequireRoles allowedRoles={["admin", "teacher"]}>
                 <ServiceCalendarPage />
               </RequireRoles>
             ),
           },
           // 设置页面
-          { path: "settings", element: <SettingsProfilePage /> },
+          { path: "settings", element: withSuspense(<SettingsProfilePage />) },
           {
             path: "settings/system",
-            element: (
+            element: withSuspense(
               <RequireRoles allowedRoles={["admin"]}>
                 <SettingsSystemPage />
               </RequireRoles>
             ),
           },
           // 未匹配路由 → 404
-          { path: "*", element: <PageContent><NotFoundPage /></PageContent> },
+          {
+            path: "*",
+            element: withSuspense(
+              <PageContent>
+                <NotFoundPage />
+              </PageContent>,
+            ),
+          },
         ],
       },
     ],
@@ -134,19 +154,19 @@ const router = createBrowserRouter([
   },
   {
     path: "/403",
-    element: <ForbiddenPage />,
+    element: withSuspense(<ForbiddenPage />),
   },
   {
     element: <RedirectAuthenticatedUser />,
     children: [
       {
         path: "/auth/login",
-        element: <LoginPage />,
+        element: withSuspense(<LoginPage />),
       },
     ],
   },
   // 未登录情况下的 404
-  { path: "*", element: <NotFoundPage /> },
+  { path: "*", element: withSuspense(<NotFoundPage />) },
 ]);
 
 createRoot(document.getElementById("root")!).render(
