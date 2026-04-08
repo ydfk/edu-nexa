@@ -8,7 +8,10 @@
 
 ```bash
 # 构建镜像
-docker build -t github.com/ydfk/edu-nexa/apps/api .
+docker build \
+  --build-arg GOPROXY=https://goproxy.cn,direct \
+  --build-arg GOSUMDB=sum.golang.google.cn \
+  -t github.com/ydfk/edu-nexa/apps/api .
 
 # 运行容器
 docker run -d -p 33001:33001 --name edunexa-api github.com/ydfk/edu-nexa/apps/api
@@ -54,6 +57,11 @@ database:
   path: ""
   dsn: "host=127.0.0.1 port=5432 user=postgres password=你的密码 dbname=edu_nexa sslmode=disable TimeZone=Asia/Shanghai"
 ```
+
+如果服务器在中国大陆，建议在构建阶段显式传入：
+
+- `GOPROXY=https://goproxy.cn,direct`
+- `GOSUMDB=sum.golang.google.cn`
 
 ## 持久化数据
 

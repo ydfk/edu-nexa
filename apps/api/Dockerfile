@@ -2,8 +2,14 @@
 # 第一阶段：构建阶段
 FROM golang:1.24-alpine AS builder
 
+ARG GOPROXY=https://goproxy.cn,direct
+ARG GOSUMDB=sum.golang.google.cn
+
 # 设置工作目录
 WORKDIR /app
+
+ENV GOPROXY=$GOPROXY
+ENV GOSUMDB=$GOSUMDB
 
 # 安装依赖
 RUN apk add --no-cache git

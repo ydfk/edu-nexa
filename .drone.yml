@@ -232,6 +232,8 @@ steps:
       script: |
         set -e
         export SHORT_SHA="$(printf '%.7s' "$DRONE_COMMIT_SHA")"
+        export GOPROXY="${GOPROXY:-https://goproxy.cn,direct}"
+        export GOSUMDB="${GOSUMDB:-sum.golang.google.cn}"
         if [ -n "${DRONE_TAG:-}" ]; then export APP_VERSION="$DRONE_TAG"; elif [ -n "${DRONE_BUILD_NUMBER:-}" ]; then export APP_VERSION="build-${DRONE_BUILD_NUMBER}-${SHORT_SHA}"; else export APP_VERSION="$SHORT_SHA"; fi
         test -f /tmp/edunexa-api/api-source.tar.gz || { echo "未找到上传包: /tmp/edunexa-api/api-source.tar.gz"; ls -la /tmp/edunexa-api; exit 1; }
         case "$API_SOURCE_DIR" in ""|"/") echo "API_SOURCE_DIR 配置不安全"; exit 1;; esac
@@ -245,7 +247,7 @@ steps:
         cp -R "$API_DEPLOY_TMP"/. "$API_SOURCE_DIR"/
         rm -f /tmp/edunexa-api/api-source.tar.gz
         rm -rf "$API_DEPLOY_TMP"
-        APP_VERSION="$APP_VERSION" docker compose -f "$API_COMPOSE_FILE" up -d --build
+        APP_VERSION="$APP_VERSION" GOPROXY="$GOPROXY" GOSUMDB="$GOSUMDB" docker compose -f "$API_COMPOSE_FILE" up -d --build
 
 trigger:
   event:
