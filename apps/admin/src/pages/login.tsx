@@ -18,6 +18,8 @@ import {
   getSystemDisplayName,
 } from "@/lib/runtime-settings";
 
+const appVersion = typeof __APP_VERSION__ === "string" ? __APP_VERSION__ : "dev";
+
 export default function LoginPage() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -49,7 +51,7 @@ export default function LoginPage() {
 
     const trimmedPhone = phone.trim();
     if (!trimmedPhone || !password) {
-      toast.error("请填写手机号和密码");
+      toast.error("请填写账号和密码");
       return;
     }
 
@@ -126,20 +128,23 @@ export default function LoginPage() {
 
           <Card className="border-none shadow-none">
             <CardHeader className="px-0">
-              <div className="mb-1 flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                <ShieldCheck className="size-5" />
+              <div className="mb-1 flex items-start justify-between gap-4">
+                <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <ShieldCheck className="size-5" />
+                </div>
+                <span className="text-xs text-muted-foreground">v{appVersion}</span>
               </div>
               <CardTitle className="text-2xl">管理端登录</CardTitle>
-              <CardDescription>使用手机号和密码登录管理后台</CardDescription>
+              <CardDescription>使用账号和密码登录管理后台</CardDescription>
             </CardHeader>
             <CardContent className="px-0">
               <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
                 <div className="grid gap-2">
-                  <Label htmlFor="phone">手机号</Label>
+                  <Label htmlFor="phone">账号</Label>
                   <Input
                     id="phone"
                     autoComplete="username"
-                    placeholder="13800000000"
+                    placeholder="请输入账号"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                   />
