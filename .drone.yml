@@ -3,15 +3,9 @@ type: docker
 name: admin-ci
 
 clone:
-  disable: true
+  retries: 3
 
 steps:
-  - name: clone-repository
-    image: alpine/git
-    commands:
-      - git clone https://gh.ydfkvps.site/https://github.com/ydfk/edu-nexa .
-      - git checkout "$DRONE_COMMIT_SHA"
-
   - name: verify-admin
     image: node:22.14.0-bullseye
     commands:
@@ -32,15 +26,9 @@ type: docker
 name: weapp-ci
 
 clone:
-  disable: true
+  retries: 3
 
 steps:
-  - name: clone-repository
-    image: alpine/git
-    commands:
-      - git clone https://gh.ydfkvps.site/https://github.com/ydfk/edu-nexa .
-      - git checkout "$DRONE_COMMIT_SHA"
-
   - name: verify-weapp
     image: node:22.14.0-bullseye
     commands:
@@ -60,15 +48,9 @@ type: docker
 name: api-ci
 
 clone:
-  disable: true
+  retries: 3
 
 steps:
-  - name: clone-repository
-    image: alpine/git
-    commands:
-      - git clone https://gh.ydfkvps.site/https://github.com/ydfk/edu-nexa .
-      - git checkout "$DRONE_COMMIT_SHA"
-
   - name: verify-api
     image: golang:1.24
     commands:
@@ -88,15 +70,9 @@ type: docker
 name: admin-release
 
 clone:
-  disable: true
+  retries: 3
 
 steps:
-  - name: clone-repository
-    image: alpine/git
-    commands:
-      - git clone https://gh.ydfkvps.site/https://github.com/ydfk/edu-nexa .
-      - git checkout "$DRONE_COMMIT_SHA"
-
   - name: verify-admin-release
     image: node:22.14.0-bullseye
     commands:
@@ -171,15 +147,9 @@ type: docker
 name: api-release
 
 clone:
-  disable: true
+  retries: 3
 
 steps:
-  - name: clone-repository
-    image: alpine/git
-    commands:
-      - git clone https://gh.ydfkvps.site/https://github.com/ydfk/edu-nexa .
-      - git checkout "$DRONE_COMMIT_SHA"
-
   - name: verify-api-release
     image: golang:1.24
     commands:
