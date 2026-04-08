@@ -34,6 +34,27 @@ docker-compose down
 - 日志存储在 `/app/log` 目录下
 - 配置文件位于 `/app/config` 目录下
 
+数据库配置同时支持 SQLite 和 PostgreSQL：
+
+- SQLite：`database.driver=sqlite`，并配置 `database.path`
+- PostgreSQL：`database.driver=postgres`，并配置 `database.dsn`
+
+示例：
+
+```yaml
+database:
+  driver: "sqlite"
+  path: "/app/data/edunexa.sqlite"
+  dsn: ""
+```
+
+```yaml
+database:
+  driver: "postgres"
+  path: ""
+  dsn: "host=127.0.0.1 port=5432 user=postgres password=你的密码 dbname=edu_nexa sslmode=disable TimeZone=Asia/Shanghai"
+```
+
 ## 持久化数据
 
 Docker Compose 默认把运行时目录挂载到宿主机：

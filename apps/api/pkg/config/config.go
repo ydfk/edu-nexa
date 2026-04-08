@@ -27,7 +27,9 @@ type JwtConfig struct {
 }
 
 type DatabaseConfig struct {
-	Path string `mapstructure:"path"`
+	Driver string `mapstructure:"driver"`
+	Path   string `mapstructure:"path"`
+	DSN    string `mapstructure:"dsn"`
 }
 
 type StorageConfig struct {

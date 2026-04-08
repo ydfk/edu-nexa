@@ -5,7 +5,9 @@ jwt:
   secret: "edunexa-dev-secret"
   expiration: 604800
 database:
+  driver: "sqlite"
   path: "data/edunexa.sqlite"
+  dsn: ""
 storage:
   default_provider: "local"
   local:

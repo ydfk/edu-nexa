@@ -18,3 +18,4 @@ apps/api/log/
 *.png
 !apps/weapp/miniprogram/assets/*.png
 .idea/
+docs/

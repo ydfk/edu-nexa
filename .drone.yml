@@ -3,9 +3,15 @@ type: docker
 name: admin-ci
 
 clone:
-  retries: 3
+  disable: true
 
 steps:
+  - name: clone-repository
+    image: alpine/git
+    commands:
+      - git clone https://gh.ydfkvps.site/https://github.com/ydfk/edu-nexa .
+      - git checkout "$DRONE_COMMIT_SHA"
+
   - name: verify-admin
     image: node:22.14.0-bullseye
     commands:
@@ -26,9 +32,15 @@ type: docker
 name: weapp-ci
 
 clone:
-  retries: 3
+  disable: true
 
 steps:
+  - name: clone-repository
+    image: alpine/git
+    commands:
+      - git clone https://gh.ydfkvps.site/https://github.com/ydfk/edu-nexa .
+      - git checkout "$DRONE_COMMIT_SHA"
+
   - name: verify-weapp
     image: node:22.14.0-bullseye
     commands:
@@ -48,9 +60,15 @@ type: docker
 name: api-ci
 
 clone:
-  retries: 3
+  disable: true
 
 steps:
+  - name: clone-repository
+    image: alpine/git
+    commands:
+      - git clone https://gh.ydfkvps.site/https://github.com/ydfk/edu-nexa .
+      - git checkout "$DRONE_COMMIT_SHA"
+
   - name: verify-api
     image: golang:1.24
     commands:
@@ -70,9 +88,15 @@ type: docker
 name: admin-release
 
 clone:
-  retries: 3
+  disable: true
 
 steps:
+  - name: clone-repository
+    image: alpine/git
+    commands:
+      - git clone https://gh.ydfkvps.site/https://github.com/ydfk/edu-nexa .
+      - git checkout "$DRONE_COMMIT_SHA"
+
   - name: verify-admin-release
     image: node:22.14.0-bullseye
     commands:
@@ -121,12 +145,14 @@ steps:
         - DRONE_TAG
         - ADMIN_WEB_ROOT
       script: |
+        set -e
         test -f /tmp/edunexa-admin/admin-dist.tar.gz || { echo "未找到上传包: /tmp/edunexa-admin/admin-dist.tar.gz"; ls -la /tmp/edunexa-admin; exit 1; }
         case "$ADMIN_WEB_ROOT" in ""|"/") echo "ADMIN_WEB_ROOT 配置不安全"; exit 1;; esac
         export ADMIN_DEPLOY_TMP="/tmp/edunexa-admin-extract-${DRONE_BUILD_NUMBER:-manual}"
         rm -rf "$ADMIN_DEPLOY_TMP"
         mkdir -p "$ADMIN_DEPLOY_TMP" "$ADMIN_WEB_ROOT"
         tar -xzf /tmp/edunexa-admin/admin-dist.tar.gz -C "$ADMIN_DEPLOY_TMP"
+        test -w "$ADMIN_WEB_ROOT" || { echo "ADMIN_WEB_ROOT 不可写: $ADMIN_WEB_ROOT"; ls -ld "$ADMIN_WEB_ROOT"; exit 1; }
         find "$ADMIN_WEB_ROOT" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
         cp -R "$ADMIN_DEPLOY_TMP"/. "$ADMIN_WEB_ROOT"/
         rm -f /tmp/edunexa-admin/admin-dist.tar.gz
@@ -145,9 +171,15 @@ type: docker
 name: api-release
 
 clone:
-  retries: 3
+  disable: true
 
 steps:
+  - name: clone-repository
+    image: alpine/git
+    commands:
+      - git clone https://gh.ydfkvps.site/https://github.com/ydfk/edu-nexa .
+      - git checkout "$DRONE_COMMIT_SHA"
+
   - name: verify-api-release
     image: golang:1.24
     commands:
@@ -198,6 +230,7 @@ steps:
         - API_COMPOSE_FILE
         - API_SOURCE_DIR
       script: |
+        set -e
         export SHORT_SHA="$(printf '%.7s' "$DRONE_COMMIT_SHA")"
         if [ -n "${DRONE_TAG:-}" ]; then export APP_VERSION="$DRONE_TAG"; elif [ -n "${DRONE_BUILD_NUMBER:-}" ]; then export APP_VERSION="build-${DRONE_BUILD_NUMBER}-${SHORT_SHA}"; else export APP_VERSION="$SHORT_SHA"; fi
         test -f /tmp/edunexa-api/api-source.tar.gz || { echo "未找到上传包: /tmp/edunexa-api/api-source.tar.gz"; ls -la /tmp/edunexa-api; exit 1; }
@@ -207,6 +240,7 @@ steps:
         rm -rf "$API_DEPLOY_TMP"
         mkdir -p "$API_DEPLOY_TMP" "$API_SOURCE_DIR"
         tar -xzf /tmp/edunexa-api/api-source.tar.gz -C "$API_DEPLOY_TMP"
+        test -w "$API_SOURCE_DIR" || { echo "API_SOURCE_DIR 不可写: $API_SOURCE_DIR"; ls -ld "$API_SOURCE_DIR"; exit 1; }
         find "$API_SOURCE_DIR" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
         cp -R "$API_DEPLOY_TMP"/. "$API_SOURCE_DIR"/
         rm -f /tmp/edunexa-api/api-source.tar.gz
