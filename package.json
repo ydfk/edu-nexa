@@ -3,11 +3,15 @@
   "private": true,
   "packageManager": "pnpm@10.6.2",
   "scripts": {
-    "dev:api": "scripts\\dev.bat",
+    "dev:api": "powershell -ExecutionPolicy Bypass -File ./scripts/dev-api.ps1",
     "dev:admin": "pnpm --dir apps/admin dev",
     "dev:weapp": "powershell -ExecutionPolicy Bypass -File ./scripts/dev-weapp.ps1",
     "build:admin": "pnpm --dir apps/admin build",
-    "package:docker": "powershell -ExecutionPolicy Bypass -File ./scripts/package-docker.ps1",
+    "version:print": "powershell -ExecutionPolicy Bypass -File ./scripts/print-version.ps1",
+    "build:api-image": "powershell -ExecutionPolicy Bypass -File ./scripts/build-api-image.ps1",
+    "push:api-image": "powershell -ExecutionPolicy Bypass -File ./scripts/push-api-image.ps1",
+    "buildpush:api-image": "powershell -ExecutionPolicy Bypass -File ./scripts/buildpush-api-image.ps1",
+    "deploy:admin": "powershell -ExecutionPolicy Bypass -File ./scripts/deploy-admin.ps1",
     "lint:admin": "pnpm --dir apps/admin lint",
     "test:admin": "pnpm --dir apps/admin test:run",
     "check:weapp": "node ./scripts/verify-weapp.mjs"

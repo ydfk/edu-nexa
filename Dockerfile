@@ -1,27 +1,12 @@
-FROM node:22.14.0-bullseye AS admin-builder
-
-ARG APP_VERSION=dev
-
-WORKDIR /workspace
-
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
-COPY apps/admin/package.json apps/admin/package.json
-
-RUN corepack enable
-RUN pnpm config set registry https://registry.npmmirror.com
-RUN pnpm install --frozen-lockfile
-
-COPY apps/admin ./apps/admin
-
-RUN APP_VERSION=$APP_VERSION pnpm build:admin
-
 FROM golang:1.24-alpine AS api-builder
 
-ARG GOPROXY=https://goproxy.cn,direct
+ARG APP_VERSION=dev
+ARG GOPROXY=https://goproxy.cn|https://goproxy.io|https://mirrors.aliyun.com/goproxy/|direct
 ARG GOSUMDB=sum.golang.google.cn
 
 WORKDIR /workspace/apps/api
 
+ENV APP_VERSION=$APP_VERSION
 ENV GOPROXY=$GOPROXY
 ENV GOSUMDB=$GOSUMDB
 
@@ -33,9 +18,12 @@ RUN go mod download
 
 COPY apps/api ./
 
-RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/api ./cmd
+RUN CGO_ENABLED=0 GOOS=linux go build \
+  -trimpath \
+  -ldflags="-s -w -X 'github.com/ydfk/edu-nexa/apps/api/pkg/buildinfo.version=${APP_VERSION}'" \
+  -o /out/api ./cmd
 
-FROM caddy:2.10-alpine
+FROM alpine:3.22
 
 ARG APP_VERSION=dev
 
@@ -43,19 +31,14 @@ ENV APP_VERSION=$APP_VERSION
 ENV TZ=Asia/Shanghai
 LABEL org.opencontainers.image.version=$APP_VERSION
 
-RUN apk add --no-cache tzdata
+RUN apk add --no-cache ca-certificates tzdata
 
 WORKDIR /app
 
-COPY docker/Caddyfile /etc/caddy/Caddyfile
-COPY docker/start.sh /usr/local/bin/start.sh
-COPY --from=admin-builder /workspace/apps/admin/dist /srv
 COPY --from=api-builder /out/api /app/main
 
-RUN chmod +x /usr/local/bin/start.sh && \
-  mkdir -p /app/config /app/data /app/log /data/caddy /config/caddy
+RUN mkdir -p /app/config /app/data /app/log
 
-EXPOSE 80
 EXPOSE 33001
 
-CMD ["/usr/local/bin/start.sh"]
+CMD ["/app/main"]

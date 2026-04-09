@@ -37,7 +37,7 @@ go run ./cmd
 Windows 下也可以直接使用热更新脚本：
 
 ```bat
-scripts\dev.bat
+pnpm dev:api
 ```
 
 这条脚本会：
@@ -92,7 +92,7 @@ pnpm dev:weapp
 ## 当前基础能力
 
 - 账号体系按手机号统一设计，管理员、教师、监护人、学生四类角色可复用同一账号
-- 管理端走手机号 + 密码登录
+- 管理端走账号 + 密码登录
 - 小程序走微信登录态 + 获取手机号授权
 - 管理端已具备登录页、会话存储和路由守卫基础结构
 - 小程序已具备会话落盘能力，开发环境可通过 `apps/api/config/config.yaml` 中的 `wechat.dev_phone` 走通手机号登录链路
@@ -100,18 +100,30 @@ pnpm dev:weapp
 - 管理后台已补到学生台账、每日作业、服务日历、用餐记录、作业记录等业务导航
 - 小程序已具备工作台、用餐、作业、我的四个页面，以及接口层、状态层、环境配置占位
 
-## Docker 部署
+## 发布与部署
 
-仓库现在只保留根目录一套 Docker 部署文件：
+仓库现在只保留根目录一套后端 Docker 配置与发布脚本：
 
 - [Dockerfile](/F:/github-my/edu-nexa/Dockerfile)
 - [docker-compose.yml](/F:/github-my/edu-nexa/docker-compose.yml)
-- [docs/docker-deploy.md](/F:/github-my/edu-nexa/docs/docker-deploy.md)
+- [docs/release-guide.md](/F:/github-my/edu-nexa/docs/release-guide.md)
 
-这套部署会把：
+这套发布方式会把：
 
-- 管理端打包后交给 Caddy 提供静态资源
-- API 一并打进同一个运行镜像
-- 小程序排除在 Docker 部署之外
+- 后端单独构建为 Docker 镜像
+- 后端镜像可推送到 `hub.ydfk.site`
+- 管理端在 Windows 本地打包后直接部署到远端 Debian
+- 管理端部署参数可从本地未提交配置文件读取
+- 小程序继续独立处理，不进入当前发布链路
+
+常用命令：
+
+```bash
+pnpm version:print
+pnpm build:api-image
+pnpm push:api-image
+pnpm buildpush:api-image
+pnpm deploy:admin
+```
 
 下一步建议见 [docs/product-structure.md](/F:/github-my/edu-nexa/docs/product-structure.md)、[docs/foundation-roadmap.md](/F:/github-my/edu-nexa/docs/foundation-roadmap.md) 和 [docs/weapp-review-checklist.md](/F:/github-my/edu-nexa/docs/weapp-review-checklist.md)。

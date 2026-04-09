@@ -15,6 +15,7 @@ apps/api/log/
 ./logs/
 .playwright-mcp/
 .deploy/
+scripts/deploy-admin.local.psd1
 *.png
 !apps/weapp/miniprogram/assets/*.png
 .idea/

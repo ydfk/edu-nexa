@@ -1,9 +1,8 @@
 package buildinfo
 
-import "os"
+var version = "dev"
 
 func Version() string {
-	version := os.Getenv("APP_VERSION")
 	if version == "" {
 		return "dev"
 	}
