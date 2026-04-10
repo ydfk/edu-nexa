@@ -1,10 +1,4 @@
-const {
-  getAttachmentAccessURL,
-  getMealRecords,
-  getStudents,
-  saveMealRecord,
-  uploadAttachment,
-} = require("../../services/records");
+const { getAttachmentAccessURL, getMealRecords, getStudents, saveMealRecord, uploadAttachment } = require("../../services/records");
 const { getSession, isGuardian } = require("../../store/session");
 const { requireAuth, requireEditor } = require("../../utils/permission");
 const { getToday, formatDate } = require("../../utils/date");
@@ -82,24 +76,33 @@ Page({
 
   async loadRecord(id) {
     try {
-      const res = await getMealRecords({ id });
+      const params = { id };
+      if (isGuardian()) {
+        params.guardianPhone = getSession().user?.phone;
+      }
+      const res = await getMealRecords(params);
       const records = res.items || res || [];
       const record = Array.isArray(records) ? records.find((r) => String(r.id) === String(id)) : records;
-      if (!record) return;
+      if (!record) {
+        wx.showToast({ title: "记录不存在或无权限", icon: "none" });
+        return;
+      }
 
       const student = this.data.students.find((s) => String(s.id) === String(record.studentId)) || {};
-      const fileList = await buildImageFileList(record.imageUrls || []);
+      const imageUrls = normalizeImageURLs(record.imageUrls);
+      const fileList = await buildImageFileList(imageUrls);
       this.setData({
         status: record.status || "completed",
         statusText: getMealStatusText(record.status || "completed"),
         remark: record.remark || "",
         serviceDate: record.serviceDate || getToday(),
         selectedStudent: { id: record.studentId, name: buildRecordStudentLabel(record, student) },
-        imageUrls: record.imageUrls || [],
+        imageUrls,
         fileList,
       });
     } catch (e) {
       console.warn("加载记录失败", e);
+      wx.showToast({ title: "加载记录失败", icon: "none" });
     }
   },
 
@@ -107,11 +110,13 @@ Page({
     if (this.data.readOnly) return;
     this.setData({ showStudentPicker: true });
   },
-  closeStudentPicker() { this.setData({ showStudentPicker: false }); },
+  closeStudentPicker() {
+    this.setData({ showStudentPicker: false });
+  },
 
   onStudentConfirm(e) {
-    const val = e.detail.value;
-    const student = this.data.students.find((s) => s.id === val);
+    const val = extractPickerValue(e.detail);
+    const student = this.data.students.find((s) => String(s.id) === String(val));
     if (student) {
       this.setData({ selectedStudent: { id: student.id, name: buildStudentLabel(student) } });
     }
@@ -122,7 +127,9 @@ Page({
     if (this.data.readOnly) return;
     this.setData({ showDatePicker: true });
   },
-  closeDatePicker() { this.setData({ showDatePicker: false }); },
+  closeDatePicker() {
+    this.setData({ showDatePicker: false });
+  },
 
   onDateConfirm(e) {
     this.setData({ showDatePicker: false, serviceDate: formatDate(new Date(e.detail)) });
@@ -131,7 +138,9 @@ Page({
   onStatusChange(e) {
     this.setData({ status: e.detail, statusText: getMealStatusText(e.detail) });
   },
-  onRemarkInput(e) { this.setData({ remark: e.detail.value }); },
+  onRemarkInput(e) {
+    this.setData({ remark: e.detail.value });
+  },
 
   async afterRead(e) {
     if (this.data.readOnly) return;
@@ -268,7 +277,45 @@ async function resolveImagePreviewURL(rawURL) {
 }
 
 function getImageName(url) {
-  const parts = String(url || "").split("#")[0].split("?")[0].split("/");
+  const parts = String(url || "")
+    .split("#")[0]
+    .split("?")[0]
+    .split("/");
   return parts[parts.length - 1] || "图片";
 }
 
+function normalizeImageURLs(raw) {
+  if (!raw) return [];
+  if (Array.isArray(raw)) {
+    return raw.map((item) => String(item || "").trim()).filter(Boolean);
+  }
+  try {
+    const parsed = JSON.parse(String(raw));
+    if (Array.isArray(parsed)) {
+      return parsed.map((item) => String(item || "").trim()).filter(Boolean);
+    }
+  } catch (error) {
+    // 兼容历史逗号分隔字段
+  }
+  return String(raw)
+    .split(",")
+    .map((item) => item.trim().replace(/^\[/, "").replace(/\]$/, "").replace(/^"/, "").replace(/"$/, ""))
+    .filter(Boolean);
+}
+
+function extractPickerValue(detail) {
+  if (!detail) return "";
+  let value = detail.value;
+  if (Array.isArray(value)) {
+    value = value[0];
+  }
+  if (value && typeof value === "object") {
+    if (Object.prototype.hasOwnProperty.call(value, "value")) {
+      return value.value;
+    }
+    if (Object.prototype.hasOwnProperty.call(value, "text")) {
+      return value.text;
+    }
+  }
+  return value;
+}

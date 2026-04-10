@@ -1,51 +1,19 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { addDays, format, subDays } from "date-fns";
-import {
-  AlertTriangle,
-  CalendarDays,
-  Check,
-  ChevronLeft,
-  ChevronRight,
-  Clock,
-  ImageIcon,
-  X,
-} from "lucide-react";
+import { AlertTriangle, CalendarDays, Check, ChevronLeft, ChevronRight, Clock, ImageIcon, X } from "lucide-react";
 import { toast } from "sonner";
-import {
-  AttachmentPreviewList,
-} from "@/components/domain/attachment-preview";
-import {
-  FileUpload,
-  createFileItemsFromUrls,
-  type FileItem,
-} from "@/components/domain/file-upload";
+import { AttachmentPreviewList } from "@/components/domain/attachment-preview";
+import { FileUpload, createFileItemsFromUrls, type FileItem } from "@/components/domain/file-upload";
 import { MealStatusBadge } from "@/components/domain/meal-status-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { LongText } from "@/components/long-text";
 import { useAdminSession } from "@/lib/auth/session";
 import {
   deleteMealRecord,
@@ -160,21 +128,12 @@ function RecordEditDialog({ open, onOpenChange, student, record, defaultStatus, 
 
           <div className="grid gap-2">
             <Label>上传附件（图片 / PDF）</Label>
-            <FileUpload
-              value={images}
-              onChange={setImages}
-              maxFiles={9}
-            />
+            <FileUpload value={images} onChange={setImages} maxFiles={9} />
           </div>
 
           <div className="grid gap-2">
             <Label htmlFor="meal-board-remark">备注</Label>
-            <Textarea
-              id="meal-board-remark"
-              placeholder="可选填写备注"
-              value={remark}
-              onChange={(e) => setRemark(e.target.value)}
-            />
+            <Textarea id="meal-board-remark" placeholder="可选填写备注" value={remark} onChange={(e) => setRemark(e.target.value)} />
           </div>
         </div>
 
@@ -209,42 +168,27 @@ type StudentSection = {
 function StudentMealCard({ student, record, onRecord, onDelete, canEdit }: StudentCardProps) {
   const isPaid = student.serviceSummary?.paymentStatus === "paid";
 
+  const schoolClassInfo = [student.schoolName, student.grade, student.className].filter(Boolean).join(" / ");
+
   return (
-    <Card className="relative">
+    <Card className="relative flex flex-col">
       <CardHeader className="pb-2">
-        <div className="flex items-start justify-between">
-          <div>
-            <CardTitle className="text-base">{student.name}</CardTitle>
-            <CardDescription className="text-xs">
-              {[student.schoolName, student.grade, student.className]
-                .filter(Boolean)
-                .join(" / ")}
-            </CardDescription>
+        <div>
+          <CardTitle className="text-base">{student.name}</CardTitle>
+          <div className="mt-1">
+            <LongText className="text-xs text-muted-foreground">{schoolClassInfo || "-"}</LongText>
           </div>
-          {record && (
-            statusMap[record.status] ? (
-              <MealStatusBadge status={record.status as "absent" | "completed" | "pending"} />
-            ) : (
-              <Badge variant="secondary">{record.status}</Badge>
-            )
-          )}
         </div>
       </CardHeader>
-      <CardContent className="space-y-2">
+      <CardContent className="flex-1 space-y-2">
         {/* 家长 & 缴费信息 */}
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-          {student.guardianName && (
-            <span>家长: {student.guardianName}</span>
-          )}
-          <span className={isPaid ? "text-green-600" : "text-amber-600"}>
-            {isPaid ? "已缴费" : "未缴费"}
-          </span>
+          {student.guardianName && <span>家长: {student.guardianName}</span>}
+          <span className={isPaid ? "text-green-600" : "text-amber-600"}>{isPaid ? "已缴费" : "未缴费"}</span>
         </div>
 
         {/* 已记录的备注与图片 */}
-        {record?.remark && (
-          <p className="text-xs text-muted-foreground">备注: {record.remark}</p>
-        )}
+        {record?.remark && <p className="text-xs text-muted-foreground">备注: {record.remark}</p>}
         {record?.imageUrls && record.imageUrls.length > 0 && (
           <div className="flex gap-1">
             <ImageIcon className="size-3 text-muted-foreground" />
@@ -253,16 +197,12 @@ function StudentMealCard({ student, record, onRecord, onDelete, canEdit }: Stude
         )}
 
         {record?.imageUrls && record.imageUrls.length > 0 && (
-          <AttachmentPreviewList
-            compact
-            items={createFileItemsFromUrls(record.imageUrls)}
-            maxVisible={3}
-          />
+          <AttachmentPreviewList compact items={createFileItemsFromUrls(record.imageUrls)} maxVisible={3} />
         )}
 
         {/* 操作按钮 */}
         {canEdit && (
-          <div className="flex flex-wrap gap-1.5 pt-1">
+          <div className="flex flex-wrap gap-1.5 pt-2">
             {!record ? (
               <>
                 <Button
@@ -285,19 +225,23 @@ function StudentMealCard({ student, record, onRecord, onDelete, canEdit }: Stude
                 </Button>
               </>
             ) : (
-              <>
-                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => onRecord(record.status)}>
-                  编辑
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-7 text-xs text-destructive"
-                  onClick={onDelete}
-                >
-                  删除
-                </Button>
-              </>
+              <div className="flex w-full items-center justify-between gap-2">
+                {statusMap[record.status] ? (
+                  <MealStatusBadge status={record.status as "absent" | "completed" | "pending"} />
+                ) : (
+                  <Badge variant="secondary" className="h-7 text-xs">
+                    {record.status}
+                  </Badge>
+                )}
+                <div className="ml-auto flex gap-1.5">
+                  <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => onRecord(record.status)}>
+                    编辑
+                  </Button>
+                  <Button size="sm" variant="outline" className="h-7 text-xs text-destructive" onClick={onDelete}>
+                    删除
+                  </Button>
+                </div>
+              </div>
             )}
           </div>
         )}
@@ -324,19 +268,13 @@ export default function MealRecordBoard() {
   const [dialogRecord, setDialogRecord] = useState<MealRecordItem | null>(null);
   const [dialogDefaultStatus, setDialogDefaultStatus] = useState("completed");
 
-  const canEdit = !!session.user?.roles.some(
-    (role) => role === "admin" || role === "teacher",
-  );
+  const canEdit = !!session.user?.roles.some((role) => role === "admin" || role === "teacher");
 
   // 加载学生
   useEffect(() => {
     async function loadStudents() {
       try {
-        const items = await fetchStudents(
-          session.user?.roles.includes("guardian")
-            ? { guardianPhone: session.user?.phone || "" }
-            : undefined,
-        );
+        const items = await fetchStudents(session.user?.roles.includes("guardian") ? { guardianPhone: session.user?.phone || "" } : undefined);
         setStudents(items.filter((s) => !s.status || s.status === "active"));
       } catch {
         setStudents([]);
@@ -378,9 +316,7 @@ export default function MealRecordBoard() {
   }, [records]);
 
   const studentSections = useMemo<StudentSection[]>(() => {
-    const schoolNames = Array.from(
-      new Set(students.map((student) => student.schoolName?.trim()).filter(Boolean)),
-    );
+    const schoolNames = Array.from(new Set(students.map((student) => student.schoolName?.trim()).filter(Boolean)));
     if (schoolNames.length <= 1) {
       return [
         {
@@ -458,12 +394,7 @@ export default function MealRecordBoard() {
           <Button variant="outline" size="icon" onClick={goPrevDay}>
             <ChevronLeft className="size-4" />
           </Button>
-          <Input
-            type="date"
-            value={selectedDate}
-            className="w-auto"
-            onChange={(e) => e.target.value && setSelectedDate(e.target.value)}
-          />
+          <Input type="date" value={selectedDate} className="w-auto" onChange={(e) => e.target.value && setSelectedDate(e.target.value)} />
           <Button variant="outline" size="icon" onClick={goNextDay}>
             <ChevronRight className="size-4" />
           </Button>
@@ -497,9 +428,15 @@ export default function MealRecordBoard() {
       {/* 统计信息 */}
       {!loading && students.length > 0 && (
         <div className="flex flex-wrap gap-4 text-sm">
-          <span>共 <strong>{stats.total}</strong> 名学生</span>
-          <span className="text-green-600">已用餐 <strong>{stats.completed}</strong></span>
-          <span className="text-orange-600">未用餐 <strong>{stats.absent}</strong></span>
+          <span>
+            共 <strong>{stats.total}</strong> 名学生
+          </span>
+          <span className="text-green-600">
+            已用餐 <strong>{stats.completed}</strong>
+          </span>
+          <span className="text-orange-600">
+            未用餐 <strong>{stats.absent}</strong>
+          </span>
           <span className="text-muted-foreground">
             <Clock className="mr-0.5 inline size-3" />
             未记录 <strong>{stats.pending}</strong>
@@ -509,9 +446,7 @@ export default function MealRecordBoard() {
 
       {/* 学生列表 */}
       {loading ? (
-        <div className="py-12 text-center text-sm text-muted-foreground">
-          加载中…
-        </div>
+        <div className="py-12 text-center text-sm text-muted-foreground">加载中…</div>
       ) : students.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">

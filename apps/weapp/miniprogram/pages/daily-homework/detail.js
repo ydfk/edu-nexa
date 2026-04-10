@@ -140,8 +140,8 @@ Page({
     this.setData({ showSchoolPicker: false });
   },
   onSchoolConfirm(e) {
-    const val = e.detail.value;
-    const school = this.data.schools.find((s) => s.id === val);
+    const val = extractPickerValue(e.detail);
+    const school = this.data.schools.find((s) => String(s.id) === String(val));
     if (school) {
       this.setData({
         selectedSchool: { id: school.id, name: school.name },
@@ -166,8 +166,8 @@ Page({
     this.setData({ showGradePicker: false });
   },
   onGradeConfirm(e) {
-    const val = e.detail.value;
-    const grade = this.data.grades.find((g) => g.id === val);
+    const val = extractPickerValue(e.detail);
+    const grade = this.data.grades.find((g) => String(g.id) === String(val));
     if (grade) {
       this.setData({
         selectedGrade: { id: grade.id, name: grade.name },
@@ -190,8 +190,8 @@ Page({
     this.setData({ showClassPicker: false });
   },
   onClassConfirm(e) {
-    const val = e.detail.value;
-    const cls = this.data.classes.find((c) => c.id === val);
+    const val = extractPickerValue(e.detail);
+    const cls = this.data.classes.find((c) => String(c.id) === String(val));
     if (cls) {
       this.setData({ selectedClass: { id: cls.id, name: buildClassLabel(this.data.selectedGrade.name, cls.name) } });
     }
@@ -205,7 +205,7 @@ Page({
     this.setData({ showSubjectPicker: false });
   },
   onSubjectConfirm(e) {
-    this.setData({ subject: e.detail.value, showSubjectPicker: false });
+    this.setData({ subject: String(extractPickerValue(e.detail) || ""), showSubjectPicker: false });
   },
 
   openDatePicker() {
@@ -366,6 +366,23 @@ function getAttachmentType(url) {
     return "pdf";
   }
   return "image";
+}
+
+function extractPickerValue(detail) {
+  if (!detail) return "";
+  let value = detail.value;
+  if (Array.isArray(value)) {
+    value = value[0];
+  }
+  if (value && typeof value === "object") {
+    if (Object.prototype.hasOwnProperty.call(value, "value")) {
+      return value.value;
+    }
+    if (Object.prototype.hasOwnProperty.call(value, "text")) {
+      return value.text;
+    }
+  }
+  return value;
 }
 
 function getAttachmentName(url) {

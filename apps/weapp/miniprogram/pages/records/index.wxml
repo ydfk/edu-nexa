@@ -13,7 +13,6 @@
           <van-icon name="arrow" />
         </view>
       </view>
-
       <view class="records-toolbar__tabs">
         <view class="records-toolbar__tab {{activeTab === 0 ? 'records-toolbar__tab--active' : ''}}" bindtap="onTabTap" data-tab="0">
           用餐
@@ -24,60 +23,29 @@
       </view>
     </view>
   </view>
-
   <view class="records-layout" wx:if="{{currentGroups.length > 0}}">
     <scroll-view class="records-sidebar" scroll-y="true">
-      <view
-        wx:for="{{currentGroups}}"
-        wx:key="key"
-        class="records-student {{currentStudentIndex === index ? 'records-student--active' : ''}}"
-        bindtap="onStudentTap"
-        data-index="{{index}}"
-      >
+      <view wx:for="{{currentGroups}}" wx:key="key" class="records-student {{currentStudentIndex === index ? 'records-student--active' : ''}}" bindtap="onStudentTap" data-index="{{index}}">
         <view class="records-student__name">{{item.studentName}}</view>
         <view class="records-student__meta" wx:if="{{item.meta}}">{{item.meta}}</view>
       </view>
     </scroll-view>
-
     <scroll-view class="records-content" scroll-y="true">
       <view class="list" wx:if="{{currentRecords.length > 0}}">
-        <view
-          class="record-card {{item.recordId || canEdit ? 'record-card--clickable' : ''}}"
-          wx:for="{{currentRecords}}"
-          wx:key="id"
-          data-record-id="{{item.recordId}}"
-          data-student-id="{{item.studentId}}"
-          data-subject="{{item.subject}}"
-          data-assignment-id="{{item.assignmentId}}"
-        >
-          <view
-            class="record-card__body"
-            bindtap="goRecordTap"
-            data-record-id="{{item.recordId}}"
-            data-student-id="{{item.studentId}}"
-            data-subject="{{item.subject}}"
-            data-assignment-id="{{item.assignmentId}}"
-          >
+        <view class="record-card {{item.recordId || canEdit ? 'record-card--clickable' : ''}}" wx:for="{{currentRecords}}" wx:key="id" bindtap="goRecordTap" data-record-id="{{item.recordId}}" data-student-id="{{item.studentId}}" data-subject="{{item.subject}}" data-assignment-id="{{item.assignmentId}}">
+          <view class="record-card__body">
             <view class="record-card__header">
               <view class="record-card__title">{{item.title}}</view>
               <view class="tag tag--{{item.tagType}}">{{item.statusText}}</view>
             </view>
             <view class="record-card__meta" wx:if="{{item.metaText}}">{{item.metaText}}</view>
-            <view class="record-card__summary" wx:if="{{item.summaryText}}">{{item.summaryText}}</view>
+            <view class="record-card__summary" wx:if="{{item.summaryText}}">
+              {{item.summaryText}}
+            </view>
             <view class="record-card__remark" wx:if="{{item.detailText}}">{{item.detailText}}</view>
           </view>
           <view class="record-card__images" wx:if="{{item.imageUrls && item.imageUrls.length > 0}}">
-            <image
-              wx:for="{{item.imageUrls}}"
-              wx:for-item="img"
-              wx:key="*this"
-              src="{{img}}"
-              mode="aspectFill"
-              class="record-card__thumb"
-              catchtap="previewRecordImages"
-              data-current="{{img}}"
-              data-urls="{{item.imageUrls}}"
-            />
+            <image wx:for="{{item.imageUrls}}" wx:for-item="img" wx:key="*this" src="{{img}}" mode="aspectFill" class="record-card__thumb" catchtap="previewRecordImages" data-current="{{img}}" data-urls="{{item.imageUrls}}" />
           </view>
         </view>
       </view>
@@ -91,16 +59,8 @@
       <van-empty wx:else description="{{currentEmptyText}}" image="search" />
     </scroll-view>
   </view>
-
   <view class="records-empty" wx:else>
     <van-empty description="{{currentEmptyText}}" image="search" />
   </view>
-
-  <van-calendar
-    show="{{showCalendar}}"
-    bind:close="closeCalendar"
-    bind:confirm="onCalendarConfirm"
-    default-date="{{calendarDate}}"
-    color="#07C160"
-  />
+  <van-calendar show="{{showCalendar}}" bind:close="closeCalendar" bind:confirm="onCalendarConfirm" default-date="{{calendarDate}}" color="#07C160" />
 </view>

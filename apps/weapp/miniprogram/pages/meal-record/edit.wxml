@@ -1,57 +1,39 @@
 <view class="page safe-bottom">
   <view class="card">
     <view class="form-group">
-      <view class="form-label form-label--required">选择学生</view>
+      <view class="form-label {{readOnly ? '' : 'form-label--required'}}">选择学生</view>
       <van-cell wx:if="{{!readOnly}}" title="{{selectedStudent.name || '请选择学生'}}" is-link bindtap="openStudentPicker" title-class="{{selectedStudent.name ? '' : 'text-secondary'}}" />
       <van-cell wx:else title="{{selectedStudent.name || '未设置'}}" />
     </view>
-
     <view class="form-group">
-      <view class="form-label form-label--required">服务日期</view>
+      <view class="form-label {{readOnly ? '' : 'form-label--required'}}">服务日期</view>
       <van-cell wx:if="{{!readOnly}}" title="{{serviceDate}}" is-link bindtap="openDatePicker" />
       <van-cell wx:else title="{{serviceDate}}" />
     </view>
-
     <view class="form-group">
-      <view class="form-label form-label--required">用餐状态</view>
+      <view class="form-label {{readOnly ? '' : 'form-label--required'}}">用餐状态</view>
       <van-radio-group wx:if="{{!readOnly}}" value="{{status}}" bind:change="onStatusChange" direction="horizontal">
         <van-radio name="completed" icon-size="36rpx">已用餐</van-radio>
         <van-radio name="absent" icon-size="36rpx">未用餐</van-radio>
       </van-radio-group>
       <view wx:else class="detail-value">{{statusText || "未设置"}}</view>
     </view>
-
     <view class="form-group">
       <view class="form-label">照片记录</view>
-      <van-uploader
-        wx:if="{{!readOnly}}"
-        file-list="{{fileList}}"
-        bind:after-read="afterRead"
-        bind:delete="onDeleteImage"
-        max-count="9"
-        accept="image"
-        upload-text="拍照/选图"
-      />
+      <van-uploader wx:if="{{!readOnly}}" file-list="{{fileList}}" bind:after-read="afterRead" bind:delete="onDeleteImage" max-count="9" accept="image" upload-text="拍照/选图" />
       <view wx:elif="{{fileList.length > 0}}" class="detail-images">
         <image wx:for="{{fileList}}" wx:key="url" src="{{item.url}}" mode="aspectFill" class="detail-image" />
       </view>
       <view wx:else class="detail-value detail-value--muted">暂无照片</view>
     </view>
-
     <view class="form-group">
       <view class="form-label">备注</view>
-      <textarea
-        wx:if="{{!readOnly}}"
-        class="form-textarea"
-        value="{{remark}}"
-        bindinput="onRemarkInput"
-        placeholder="选填备注信息"
-        maxlength="200"
-      />
-      <view wx:else class="detail-value {{remark ? '' : 'detail-value--muted'}}">{{remark || "暂无备注"}}</view>
+      <textarea wx:if="{{!readOnly}}" class="form-textarea" value="{{remark}}" bindinput="onRemarkInput" placeholder="选填备注信息" maxlength="200" />
+      <view wx:else class="detail-value {{remark ? '' : 'detail-value--muted'}}">
+        {{remark || "暂无备注"}}
+      </view>
     </view>
   </view>
-
   <view class="mt-lg flex gap-sm" wx:if="{{!readOnly}}">
     <button class="btn btn--primary btn--block btn--round" bindtap="onSubmit" disabled="{{submitting}}">
       {{isEdit ? '保存修改' : '提交记录'}}
@@ -60,23 +42,9 @@
   <view class="mt-sm" wx:if="{{isEdit && !readOnly}}">
     <button class="btn btn--ghost btn--block btn--round" bindtap="onDelete">删除记录</button>
   </view>
-
   <van-popup show="{{showStudentPicker}}" position="bottom" round bind:close="closeStudentPicker">
-    <van-picker
-      columns="{{studentColumns}}"
-      bind:confirm="onStudentConfirm"
-      bind:cancel="closeStudentPicker"
-      show-toolbar
-      title="选择学生"
-    />
+    <van-picker columns="{{studentColumns}}" bind:confirm="onStudentConfirm" bind:cancel="closeStudentPicker" show-toolbar title="选择学生" />
   </van-popup>
-
-  <van-calendar
-    show="{{showDatePicker}}"
-    bind:close="closeDatePicker"
-    bind:confirm="onDateConfirm"
-    color="#07C160"
-  />
-
+  <van-calendar show="{{showDatePicker}}" bind:close="closeDatePicker" bind:confirm="onDateConfirm" color="#07C160" />
   <van-dialog id="van-dialog" />
 </view>

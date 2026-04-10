@@ -1,9 +1,4 @@
-const {
-  getDailyHomework,
-  getHomeworkRecords,
-  getMealRecords,
-  getStudents,
-} = require("../../services/records");
+const { getDailyHomework, getHomeworkRecords, getMealRecords, getStudents } = require("../../services/records");
 const { getSession, isLoggedIn, isGuardian, canEdit } = require("../../store/session");
 const { getStatusName, getStatusTagType } = require("../../utils/permission");
 const { getToday, shiftDate, formatDateCN, formatDate } = require("../../utils/date");
@@ -208,7 +203,9 @@ Page({
     }
 
     if (recordId) {
-      wx.navigateTo({ url: this.data.canEdit ? `/pages/homework-record/edit?id=${recordId}` : `/pages/homework-record/edit?id=${recordId}&mode=view` });
+      wx.navigateTo({
+        url: this.data.canEdit ? `/pages/homework-record/edit?id=${recordId}` : `/pages/homework-record/edit?id=${recordId}&mode=view`,
+      });
       return;
     }
     if (!this.data.canEdit || !studentId || !subject) {
@@ -235,10 +232,10 @@ Page({
 function buildMealCards(records) {
   return (records || []).map((item) => ({
     assignmentId: "",
-    detailText: item.remark || "",
+    detailText: String(item.remark || ""),
     id: item.id,
-    imageUrls: item.imageUrls || [],
-    metaText: item.serviceDate || "",
+    imageUrls: normalizeImageURLs(item.imageUrls),
+    metaText: String(item.serviceDate || ""),
     recorded: true,
     recordId: item.id,
     statusText: getMealStatusText(item.status),
@@ -261,7 +258,7 @@ function buildHomeworkRecordList(records) {
 function buildMealGroups(students, records, studentMetaMap, serviceDate) {
   const recordMap = {};
   records.forEach((item) => {
-    const key = item.studentId || item.studentName;
+    const key = normalizeKey(item.studentId || item.studentName);
     if (!recordMap[key]) {
       recordMap[key] = [];
     }
@@ -274,7 +271,7 @@ function buildMealGroups(students, records, studentMetaMap, serviceDate) {
     studentId: student.id || "",
     studentName: student.name || "未命名学生",
     meta: buildStudentMeta(student, studentMetaMap),
-    items: recordMap[student.id] || [],
+    items: recordMap[normalizeKey(student.id)] || [],
   }));
 }
 
@@ -304,7 +301,7 @@ function buildHomeworkCard(student, assignment, recordMap) {
     assignmentId: assignment.id || "",
     detailText: record && record.remark ? `备注：${record.remark}` : "",
     id: record ? record.id : `${student.id}-${assignment.id || subject}`,
-    imageUrls: record ? record.imageUrls || [] : [],
+    imageUrls: normalizeImageURLs(record ? record.imageUrls : []),
     metaText: buildHomeworkMetaText(assignment),
     recorded: !!record,
     recordId: record ? record.id : "",
@@ -327,7 +324,10 @@ function buildHomeworkMetaText(assignment) {
 function buildHomeworkSummary(assignment) {
   const items = assignment.items || [];
   if (items.length > 0) {
-    return items.map((item) => item.content).filter(Boolean).join("；");
+    return items
+      .map((item) => item.content)
+      .filter(Boolean)
+      .join("；");
   }
   return assignment.content || "";
 }
@@ -339,14 +339,14 @@ function getAssignmentsForStudent(student, assignments) {
 
   return (assignments || []).filter((assignment) => {
     if (assignment.classId && student.classId) {
-      return assignment.classId === student.classId;
+      return String(assignment.classId) === String(student.classId);
     }
     return assignment.schoolName === student.schoolName && assignment.className === student.className;
   });
 }
 
 function buildHomeworkRecordKey(studentId, subject) {
-  return `${studentId}::${subject || ""}`;
+  return `${normalizeKey(studentId)}::${normalizeKey(subject)}`;
 }
 
 function buildStudentMetaMap(students) {
@@ -398,4 +398,27 @@ function getMealStatusText(status) {
     absent: "未用餐",
   };
   return map[status] || status;
+}
+
+function normalizeImageURLs(raw) {
+  if (!raw) return [];
+  if (Array.isArray(raw)) {
+    return raw.map((item) => String(item || "").trim()).filter(Boolean);
+  }
+  try {
+    const parsed = JSON.parse(String(raw));
+    if (Array.isArray(parsed)) {
+      return parsed.map((item) => String(item || "").trim()).filter(Boolean);
+    }
+  } catch (error) {
+    // 兼容逗号分隔的历史数据
+  }
+  return String(raw)
+    .split(",")
+    .map((item) => item.trim().replace(/^\[/, "").replace(/\]$/, "").replace(/^"/, "").replace(/"$/, ""))
+    .filter(Boolean);
+}
+
+function normalizeKey(value) {
+  return String(value || "").trim();
 }

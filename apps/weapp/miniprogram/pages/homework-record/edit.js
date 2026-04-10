@@ -1,10 +1,4 @@
-const {
-  getAttachmentAccessURL,
-  getStudents,
-  getHomeworkRecords,
-  saveHomeworkRecord,
-  uploadAttachment,
-} = require("../../services/records");
+const { getAttachmentAccessURL, getStudents, getHomeworkRecords, saveHomeworkRecord, uploadAttachment } = require("../../services/records");
 const { getRuntimeSettings } = require("../../services/common");
 const { getSession, isGuardian } = require("../../store/session");
 const { requireAuth, requireEditor } = require("../../utils/permission");
@@ -23,6 +17,7 @@ Page({
     status: "completed",
     statusText: "已完成",
     subject: "",
+    homeworkContent: "",
     remark: "",
     fileList: [],
     imageUrls: [],
@@ -58,8 +53,10 @@ Page({
     wx.setNavigationBarTitle({
       title: readOnly ? "查看作业记录" : isEdit ? "编辑作业记录" : "新增作业记录",
     });
-    this.loadStudents();
-    this.loadSubjects();
+    if (!readOnly) {
+      this.loadStudents();
+      this.loadSubjects();
+    }
     if (options.id) this.loadRecord(options.id);
   },
 
@@ -91,7 +88,7 @@ Page({
     try {
       const settings = await getRuntimeSettings();
       const subjects = settings.homeworkSubjects || ["语文", "数学", "英语"];
-      const nextData = { subjectColumns: subjects.map((s) => ({ text: s, value: s })) };
+      const nextData = { subjectColumns: subjects.map((s) => toPickerOption(s)) };
       if (!this.data.isEdit && this.data.pendingSubject) {
         nextData.subject = this.data.pendingSubject;
       }
@@ -107,24 +104,34 @@ Page({
 
   async loadRecord(id) {
     try {
-      const res = await getHomeworkRecords({ id });
+      const params = { id };
+      if (isGuardian()) {
+        params.guardianPhone = getSession().user?.phone;
+      }
+      const res = await getHomeworkRecords(params);
       const records = res.items || res || [];
       const record = Array.isArray(records) ? records.find((r) => String(r.id) === String(id)) : records;
-      if (!record) return;
-      const fileList = await buildImageFileList(record.imageUrls || []);
+      if (!record) {
+        wx.showToast({ title: "记录不存在或无权限", icon: "none" });
+        return;
+      }
+      const imageUrls = normalizeImageURLs(record.imageUrls);
+      const fileList = await buildImageFileList(imageUrls);
       this.setData({
-        assignmentId: record.assignmentId || "",
-        status: record.status || "completed",
-        statusText: getHomeworkStatusText(record.status || "completed"),
-        subject: record.subject || "",
-        remark: record.remark || "",
-        serviceDate: record.serviceDate || getToday(),
-        selectedStudent: { id: record.studentId, name: buildRecordStudentLabel(record) },
-        imageUrls: record.imageUrls || [],
+        assignmentId: String(record.assignmentId || ""),
+        status: String(record.status || "completed"),
+        statusText: getHomeworkStatusText(String(record.status || "completed")),
+        subject: String(record.subject || ""),
+        homeworkContent: buildHomeworkContent(record),
+        remark: String(record.remark || ""),
+        serviceDate: String(record.serviceDate || getToday()),
+        selectedStudent: { id: String(record.studentId || ""), name: buildRecordStudentLabel(record) },
+        imageUrls,
         fileList,
       });
     } catch (e) {
       console.warn("加载记录失败", e);
+      wx.showToast({ title: "加载记录失败", icon: "none" });
     }
   },
 
@@ -132,10 +139,12 @@ Page({
     if (this.data.readOnly) return;
     this.setData({ showStudentPicker: true });
   },
-  closeStudentPicker() { this.setData({ showStudentPicker: false }); },
+  closeStudentPicker() {
+    this.setData({ showStudentPicker: false });
+  },
   onStudentConfirm(e) {
-    const val = e.detail.value;
-    const student = this.data.students.find((s) => s.id === val);
+    const val = extractPickerValue(e.detail);
+    const student = this.data.students.find((s) => String(s.id) === String(val));
     if (student) this.setData({ selectedStudent: { id: student.id, name: buildStudentLabel(student) } });
     this.closeStudentPicker();
   },
@@ -144,22 +153,30 @@ Page({
     if (this.data.readOnly) return;
     this.setData({ showSubjectPicker: true });
   },
-  closeSubjectPicker() { this.setData({ showSubjectPicker: false }); },
+  closeSubjectPicker() {
+    this.setData({ showSubjectPicker: false });
+  },
   onSubjectConfirm(e) {
-    this.setData({ subject: e.detail.value, showSubjectPicker: false });
+    this.setData({ subject: String(extractPickerValue(e.detail) || ""), showSubjectPicker: false });
   },
 
   openDatePicker() {
     if (this.data.readOnly) return;
     this.setData({ showDatePicker: true });
   },
-  closeDatePicker() { this.setData({ showDatePicker: false }); },
+  closeDatePicker() {
+    this.setData({ showDatePicker: false });
+  },
   onDateConfirm(e) {
     this.setData({ showDatePicker: false, serviceDate: formatDate(new Date(e.detail)) });
   },
 
-  onStatusChange(e) { this.setData({ status: e.detail, statusText: getHomeworkStatusText(e.detail) }); },
-  onRemarkInput(e) { this.setData({ remark: e.detail.value }); },
+  onStatusChange(e) {
+    this.setData({ status: e.detail, statusText: getHomeworkStatusText(e.detail) });
+  },
+  onRemarkInput(e) {
+    this.setData({ remark: e.detail.value });
+  },
 
   async afterRead(e) {
     if (this.data.readOnly) return;
@@ -211,6 +228,7 @@ Page({
         serviceDate: this.data.serviceDate,
         status: this.data.status,
         subject: this.data.subject,
+        subjectSummary: this.data.homeworkContent,
         remark: this.data.remark,
         imageUrls: this.data.imageUrls,
       };
@@ -250,10 +268,11 @@ function buildStudentLabel(student) {
 }
 
 function buildRecordStudentLabel(record) {
-  const gradeName = record.gradeName || record.grade || "";
-  const className = record.className || "";
+  const gradeName = String(record.gradeName || record.grade || "");
+  const className = String(record.className || "");
   const suffix = [gradeName, className].filter(Boolean).join(" ");
-  return suffix ? `${record.studentName}（${suffix}）` : record.studentName;
+  const studentName = String(record.studentName || "");
+  return suffix ? `${studentName}（${suffix}）` : studentName;
 }
 
 function getHomeworkStatusText(status) {
@@ -298,7 +317,77 @@ async function resolveImagePreviewURL(rawURL) {
 }
 
 function getImageName(url) {
-  const parts = String(url || "").split("#")[0].split("?")[0].split("/");
+  const parts = String(url || "")
+    .split("#")[0]
+    .split("?")[0]
+    .split("/");
   return parts[parts.length - 1] || "图片";
 }
 
+function toPickerOption(item) {
+  if (typeof item === "string") {
+    return { text: item, value: item };
+  }
+  if (item && typeof item === "object") {
+    const value = item.value || item.name || item.label || "";
+    const text = item.text || item.name || item.label || String(value || "");
+    return { text, value: value || text };
+  }
+  const value = String(item || "");
+  return { text: value, value };
+}
+
+function normalizeImageURLs(raw) {
+  if (!raw) return [];
+  if (Array.isArray(raw)) {
+    return raw.map((item) => String(item || "").trim()).filter(Boolean);
+  }
+  try {
+    const parsed = JSON.parse(String(raw));
+    if (Array.isArray(parsed)) {
+      return parsed.map((item) => String(item || "").trim()).filter(Boolean);
+    }
+  } catch (error) {
+    // 兼容历史逗号分隔字段
+  }
+  return String(raw)
+    .split(",")
+    .map((item) => item.trim().replace(/^\[/, "").replace(/\]$/, "").replace(/^"/, "").replace(/"$/, ""))
+    .filter(Boolean);
+}
+
+function extractPickerValue(detail) {
+  if (!detail) return "";
+  let value = detail.value;
+  if (Array.isArray(value)) {
+    value = value[0];
+  }
+  if (value && typeof value === "object") {
+    if (Object.prototype.hasOwnProperty.call(value, "value")) {
+      return value.value;
+    }
+    if (Object.prototype.hasOwnProperty.call(value, "text")) {
+      return value.text;
+    }
+  }
+  return value;
+}
+
+function buildHomeworkContent(record) {
+  if (!record || typeof record !== "object") {
+    return "";
+  }
+  const summary = String(record.subjectSummary || "").trim();
+  if (summary) {
+    return summary;
+  }
+  const content = String(record.content || "").trim();
+  if (content) {
+    return content;
+  }
+  const items = Array.isArray(record.items) ? record.items : [];
+  return items
+    .map((item) => String((item && item.content) || "").trim())
+    .filter(Boolean)
+    .join("；");
+}

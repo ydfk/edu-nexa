@@ -112,6 +112,11 @@
   margin-top: var(--spacing-lg);
 }
 
+.login-privacy__text {
+  display: inline-flex;
+  align-items: center;
+}
+
 .login-tip {
   margin-top: var(--spacing-md);
   text-align: center;

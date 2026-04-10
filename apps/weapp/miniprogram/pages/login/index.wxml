@@ -26,12 +26,14 @@
     <button class="btn btn--primary btn--block btn--round login-submit" bindtap="onPasswordLogin" loading="{{submitting}}" disabled="{{submitting}}">
       手机号密码登录
     </button>
-    <view class="login-privacy" bindtap="togglePrivacy">
+    <view class="login-privacy">
       <van-checkbox value="{{agreedPrivacy}}" shape="round" icon-size="32rpx" bind:change="onPrivacyChange" />
-      <text class="text-sm text-secondary">
-        我已阅读并同意
-        <text class="text-primary" catchtap="goPrivacy">《隐私协议》</text>
-      </text>
+      <view class="login-privacy__text" bindtap="togglePrivacy">
+        <text class="text-sm text-secondary">
+          我已阅读并同意
+          <text class="text-primary" catchtap="goPrivacy">《隐私协议》</text>
+        </text>
+      </view>
     </view>
     <view class="login-tip text-sm text-secondary">未登录时会以游客身份浏览首页与功能页。</view>
   </view>

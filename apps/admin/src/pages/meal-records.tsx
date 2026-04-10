@@ -15,62 +15,24 @@ import {
 } from "@tanstack/react-table";
 import { CircleCheck, CircleX, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import {
-  DataTableColumnHeader,
-  DataTablePagination,
-  DataTableToolbar,
-} from "@/components/data-table";
+import { DataTableColumnHeader, DataTablePagination, DataTableToolbar } from "@/components/data-table";
 import { AttachmentPreviewList } from "@/components/domain/attachment-preview";
-import {
-  FileUpload,
-  createFileItemsFromUrls,
-  type FileItem,
-} from "@/components/domain/file-upload";
+import { FileUpload, createFileItemsFromUrls, type FileItem } from "@/components/domain/file-upload";
 import { MealStatusBadge } from "@/components/domain/meal-status-badge";
 import { PageContent } from "@/components/page-content";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { LongText } from "@/components/long-text";
 import useDialogState from "@/hooks/use-dialog-state";
 import { useAdminSession } from "@/lib/auth/session";
-import {
-  deleteMealRecord,
-  fetchMealRecords,
-  fetchStudents,
-  saveMealRecord,
-  type MealRecordItem,
-  type StudentItem,
-} from "@/lib/server-data";
+import { deleteMealRecord, fetchMealRecords, fetchStudents, saveMealRecord, type MealRecordItem, type StudentItem } from "@/lib/server-data";
 import MealRecordBoard from "./meal-record-board";
 
 // ---------------------------------------------------------------------------
@@ -84,10 +46,7 @@ const statusOptions = [
   { label: "未用餐", value: "absent", icon: CircleX },
 ] as const;
 
-const statusMap: Record<
-  string,
-  { label: string }
-> = {
+const statusMap: Record<string, { label: string }> = {
   pending: { label: "待处理" },
   completed: { label: "已用餐" },
   absent: { label: "未用餐" },
@@ -125,8 +84,7 @@ const MealRecordsContext = createContext<MealRecordsContextValue | null>(null);
 
 function useMealRecords() {
   const ctx = useContext(MealRecordsContext);
-  if (!ctx)
-    throw new Error("useMealRecords must be used within MealRecordsProvider");
+  if (!ctx) throw new Error("useMealRecords must be used within MealRecordsProvider");
   return ctx;
 }
 
@@ -137,43 +95,28 @@ function useMealRecords() {
 const columns: ColumnDef<MealRecordItem>[] = [
   {
     accessorKey: "serviceDate",
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="日期" />
-    ),
+    header: ({ column }) => <DataTableColumnHeader column={column} title="日期" />,
     cell: ({ row }) => <div>{row.getValue("serviceDate")}</div>,
   },
   {
     accessorKey: "studentName",
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="学生" />
-    ),
-    cell: ({ row }) => (
-      <div className="font-medium">{row.getValue("studentName")}</div>
-    ),
+    header: ({ column }) => <DataTableColumnHeader column={column} title="学生" />,
+    cell: ({ row }) => <div className="font-medium">{row.getValue("studentName")}</div>,
   },
   {
     id: "schoolClass",
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="学校 / 班级" />
-    ),
+    header: ({ column }) => <DataTableColumnHeader column={column} title="学校 / 班级" />,
     cell: function SchoolClassCell({ row }) {
       const { studentMap } = useMealRecords();
       const student = studentMap[row.original.studentId];
-      return (
-        <div>
-          {[student?.schoolName, student?.className]
-            .filter(Boolean)
-            .join(" / ") || "-"}
-        </div>
-      );
+      const schoolClass = [student?.schoolName, student?.className].filter(Boolean).join(" / ") || "-";
+      return <LongText className="text-sm">{schoolClass}</LongText>;
     },
     enableSorting: false,
   },
   {
     accessorKey: "status",
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="状态" />
-    ),
+    header: ({ column }) => <DataTableColumnHeader column={column} title="状态" />,
     cell: ({ row }) => {
       const status = row.getValue<string>("status");
       if (!statusMap[status]) {
@@ -186,16 +129,12 @@ const columns: ColumnDef<MealRecordItem>[] = [
   {
     id: "attachments",
     header: "附件",
-    cell: ({ row }) => (
-      <AttachmentPreviewList compact items={createFileItemsFromUrls(row.original.imageUrls)} />
-    ),
+    cell: ({ row }) => <AttachmentPreviewList compact items={createFileItemsFromUrls(row.original.imageUrls)} />,
     enableSorting: false,
   },
   {
     accessorKey: "remark",
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="备注" />
-    ),
+    header: ({ column }) => <DataTableColumnHeader column={column} title="备注" />,
     cell: ({ row }) => <div>{row.getValue("remark") || "-"}</div>,
     enableSorting: false,
   },
@@ -314,19 +253,12 @@ function MealRecordFormDialog() {
     <Dialog open={isOpen} onOpenChange={() => setOpen(null)}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>
-            {isEdit ? "编辑用餐记录" : "新增用餐记录"}
-          </DialogTitle>
+          <DialogTitle>{isEdit ? "编辑用餐记录" : "新增用餐记录"}</DialogTitle>
         </DialogHeader>
         <div className="grid gap-4 py-2 md:grid-cols-2">
           <div className="grid gap-2">
             <Label required>学生</Label>
-            <Select
-              value={form.studentId}
-              onValueChange={(value) =>
-                setForm((current) => ({ ...current, studentId: value }))
-              }
-            >
+            <Select value={form.studentId} onValueChange={(value) => setForm((current) => ({ ...current, studentId: value }))}>
               <SelectTrigger>
                 <SelectValue placeholder="选择学生" />
               </SelectTrigger>
@@ -340,7 +272,9 @@ function MealRecordFormDialog() {
             </Select>
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="meal-service-date" required>日期</Label>
+            <Label htmlFor="meal-service-date" required>
+              日期
+            </Label>
             <Input
               id="meal-service-date"
               placeholder="2026-03-31"
@@ -355,12 +289,7 @@ function MealRecordFormDialog() {
           </div>
           <div className="grid gap-2">
             <Label>状态</Label>
-            <Select
-              value={form.status}
-              onValueChange={(value) =>
-                setForm((current) => ({ ...current, status: value }))
-              }
-            >
+            <Select value={form.status} onValueChange={(value) => setForm((current) => ({ ...current, status: value }))}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -372,11 +301,7 @@ function MealRecordFormDialog() {
           </div>
           <div className="grid gap-2 md:col-span-2">
             <Label>附件（图片 / PDF）</Label>
-            <FileUpload
-              value={form.imageUrls}
-              onChange={(value) => setForm((current) => ({ ...current, imageUrls: value }))}
-              maxFiles={9}
-            />
+            <FileUpload value={form.imageUrls} onChange={(value) => setForm((current) => ({ ...current, imageUrls: value }))} maxFiles={9} />
           </div>
           <div className="grid gap-2 md:col-span-2">
             <Label htmlFor="meal-remark">备注</Label>
@@ -447,9 +372,7 @@ function MealRecordListView() {
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
 
-  const canEdit = !!session.user?.roles.some(
-    (role) => role === "admin" || role === "teacher",
-  );
+  const canEdit = !!session.user?.roles.some((role) => role === "admin" || role === "teacher");
 
   const studentMap = useMemo(() => {
     return students.reduce<Record<string, StudentItem>>((acc, item) => {
@@ -465,22 +388,12 @@ function MealRecordListView() {
   async function loadData() {
     setLoading(true);
     try {
-      const studentItems = await fetchStudents(
-        session.user?.roles.includes("guardian")
-          ? { guardianPhone: session.user?.phone || "" }
-          : undefined,
-      );
+      const studentItems = await fetchStudents(session.user?.roles.includes("guardian") ? { guardianPhone: session.user?.phone || "" } : undefined);
       const recordItems = await fetchMealRecords();
       const visibleStudentIDs = new Set(studentItems.map((item) => item.id));
 
       setStudents(studentItems);
-      setItems(
-        canEdit
-          ? recordItems
-          : recordItems.filter((item) =>
-              visibleStudentIDs.has(item.studentId),
-            ),
-      );
+      setItems(canEdit ? recordItems : recordItems.filter((item) => visibleStudentIDs.has(item.studentId)));
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "加载失败");
       setStudents([]);
@@ -506,13 +419,7 @@ function MealRecordListView() {
     globalFilterFn: (row, _columnId, filterValue: string) => {
       const keyword = filterValue.toLowerCase();
       const student = studentMap[row.original.studentId];
-      return [
-        row.original.studentName,
-        row.original.serviceDate,
-        row.original.remark,
-        student?.schoolName,
-        student?.className,
-      ]
+      return [row.original.studentName, row.original.serviceDate, row.original.remark, student?.schoolName, student?.className]
         .filter((v): v is string => Boolean(v))
         .some((v) => v.toLowerCase().includes(keyword));
     },
@@ -546,9 +453,7 @@ function MealRecordListView() {
 
         {/* 数据表格 */}
         {loading ? (
-          <div className="py-8 text-center text-sm text-muted-foreground">
-            加载中…
-          </div>
+          <div className="py-8 text-center text-sm text-muted-foreground">加载中…</div>
         ) : (
           <div className="space-y-4">
             <DataTableToolbar
@@ -574,12 +479,7 @@ function MealRecordListView() {
                     <TableRow key={headerGroup.id}>
                       {headerGroup.headers.map((header) => (
                         <TableHead key={header.id} colSpan={header.colSpan}>
-                          {header.isPlaceholder
-                            ? null
-                            : flexRender(
-                                header.column.columnDef.header,
-                                header.getContext(),
-                              )}
+                          {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
                         </TableHead>
                       ))}
                     </TableRow>
@@ -590,24 +490,15 @@ function MealRecordListView() {
                     table.getRowModel().rows.map((row) => (
                       <TableRow key={row.id} className="group/row">
                         {row.getVisibleCells().map((cell) => (
-                          <TableCell
-                            key={cell.id}
-                            className="bg-background group-hover/row:bg-muted"
-                          >
-                            {flexRender(
-                              cell.column.columnDef.cell,
-                              cell.getContext(),
-                            )}
+                          <TableCell key={cell.id} className="bg-background group-hover/row:bg-muted">
+                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
                           </TableCell>
                         ))}
                       </TableRow>
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell
-                        colSpan={columns.length}
-                        className="h-24 text-center"
-                      >
+                      <TableCell colSpan={columns.length} className="h-24 text-center">
                         暂无数据
                       </TableCell>
                     </TableRow>
