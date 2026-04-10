@@ -266,6 +266,9 @@ func isAliyunOSSHost(host string) bool {
 	if trimmedHost == "" {
 		return false
 	}
+	if strings.Contains(trimmedHost, ".aliyuncs.com") {
+		return true
+	}
 
 	ossConfig := config.Current.Storage.AliyunOSS
 	if ossConfig.Bucket == "" {

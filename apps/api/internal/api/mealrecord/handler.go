@@ -12,6 +12,7 @@ import (
 	"github.com/ydfk/edu-nexa/apps/api/pkg/db"
 
 	"github.com/gofiber/fiber/v2"
+	"gorm.io/gorm"
 )
 
 type mealRecordPayload struct {
@@ -28,7 +29,8 @@ type mealRecordPayload struct {
 
 func List(c *fiber.Ctx) error {
 	var records []model.Record
-	query := db.DB.Order("service_date desc, created_at desc")
+	database := db.FromFiber(c)
+	query := database.Order("service_date desc, created_at desc")
 
 	if studentID := c.Query("studentId"); studentID != "" {
 		query = query.Where("student_id = ?", studentID)
@@ -56,6 +58,7 @@ func List(c *fiber.Ctx) error {
 }
 
 func Create(c *fiber.Ctx) error {
+	database := db.FromFiber(c)
 	var req mealRecordPayload
 	if err := c.BodyParser(&req); err != nil {
 		return response.Error(c, "参数不正确")
@@ -64,7 +67,7 @@ func Create(c *fiber.Ctx) error {
 	if err := validateMealRecordPayload(req); err != nil {
 		return response.Error(c, err.Error())
 	}
-	student, err := findMealStudent(req.StudentID, "")
+	student, err := findMealStudent(database, req.StudentID, "")
 	if err != nil {
 		return response.Error(c, err.Error())
 	}
@@ -84,7 +87,7 @@ func Create(c *fiber.Ctx) error {
 		StudentName:  student.Name,
 	}
 
-	if err := db.DB.Create(&record).Error; err != nil {
+	if err := database.Create(&record).Error; err != nil {
 		return response.Error(c, "创建用餐记录失败")
 	}
 
@@ -92,19 +95,20 @@ func Create(c *fiber.Ctx) error {
 }
 
 func Update(c *fiber.Ctx) error {
+	database := db.FromFiber(c)
 	var req mealRecordPayload
 	if err := c.BodyParser(&req); err != nil {
 		return response.Error(c, "参数不正确")
 	}
 
 	var record model.Record
-	if err := db.DB.First(&record, "id = ?", c.Params("id")).Error; err != nil {
+	if err := database.First(&record, "id = ?", c.Params("id")).Error; err != nil {
 		return response.Error(c, "用餐记录不存在")
 	}
 	if err := validateMealRecordPayload(req); err != nil {
 		return response.Error(c, err.Error())
 	}
-	student, err := findMealStudent(req.StudentID, record.StudentID)
+	student, err := findMealStudent(database, req.StudentID, record.StudentID)
 	if err != nil {
 		return response.Error(c, err.Error())
 	}
@@ -122,7 +126,7 @@ func Update(c *fiber.Ctx) error {
 	record.StudentID = student.Id.String()
 	record.StudentName = student.Name
 
-	if err := db.DB.Save(&record).Error; err != nil {
+	if err := database.Save(&record).Error; err != nil {
 		return response.Error(c, "更新用餐记录失败")
 	}
 
@@ -130,12 +134,13 @@ func Update(c *fiber.Ctx) error {
 }
 
 func Delete(c *fiber.Ctx) error {
+	database := db.FromFiber(c)
 	var record model.Record
-	if err := db.DB.First(&record, "id = ?", c.Params("id")).Error; err != nil {
+	if err := database.First(&record, "id = ?", c.Params("id")).Error; err != nil {
 		return response.Error(c, "用餐记录不存在")
 	}
 
-	if err := db.DB.Delete(&record).Error; err != nil {
+	if err := database.Delete(&record).Error; err != nil {
 		return response.Error(c, "删除用餐记录失败")
 	}
 
@@ -194,9 +199,9 @@ func validateMealRecordPayload(req mealRecordPayload) error {
 	return nil
 }
 
-func findMealStudent(studentID string, currentStudentID string) (*studentModel.Student, error) {
+func findMealStudent(database *gorm.DB, studentID string, currentStudentID string) (*studentModel.Student, error) {
 	var item studentModel.Student
-	if err := db.DB.First(&item, "id = ?", strings.TrimSpace(studentID)).Error; err != nil {
+	if err := database.First(&item, "id = ?", strings.TrimSpace(studentID)).Error; err != nil {
 		return nil, errors.New("学生不存在")
 	}
 	if strings.TrimSpace(currentStudentID) != item.Id.String() && !service.IsActiveStatus(item.Status) {

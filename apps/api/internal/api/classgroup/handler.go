@@ -26,7 +26,8 @@ type classPayload struct {
 
 func List(c *fiber.Ctx) error {
 	var items []model.Class
-	query := db.DB.Order("created_at desc")
+	database := db.FromFiber(c)
+	query := database.Order("created_at desc")
 
 	if keyword := strings.TrimSpace(c.Query("keyword")); keyword != "" {
 		query = query.Where("name LIKE ? OR school_name LIKE ? OR grade_name LIKE ?", "%"+keyword+"%", "%"+keyword+"%", "%"+keyword+"%")
@@ -49,6 +50,7 @@ func List(c *fiber.Ctx) error {
 }
 
 func Create(c *fiber.Ctx) error {
+	database := db.FromFiber(c)
 	var req classPayload
 	if err := c.BodyParser(&req); err != nil {
 		return response.Error(c, "参数不正确")
@@ -56,7 +58,7 @@ func Create(c *fiber.Ctx) error {
 	if err := validateClassPayload(req); err != nil {
 		return response.Error(c, err.Error())
 	}
-	if err := ensureClassNameUnique(strings.TrimSpace(req.Name), strings.TrimSpace(req.GradeID), ""); err != nil {
+	if err := ensureClassNameUnique(database, strings.TrimSpace(req.Name), strings.TrimSpace(req.GradeID), ""); err != nil {
 		return response.Error(c, err.Error())
 	}
 
@@ -68,7 +70,7 @@ func Create(c *fiber.Ctx) error {
 		SchoolName: strings.TrimSpace(req.SchoolName),
 		Status:     defaultClassStatus(req.Status),
 	}
-	if err := db.DB.Create(&item).Error; err != nil {
+	if err := database.Create(&item).Error; err != nil {
 		return response.Error(c, "创建班级失败")
 	}
 
@@ -76,19 +78,20 @@ func Create(c *fiber.Ctx) error {
 }
 
 func Update(c *fiber.Ctx) error {
+	database := db.FromFiber(c)
 	var req classPayload
 	if err := c.BodyParser(&req); err != nil {
 		return response.Error(c, "参数不正确")
 	}
 
 	var item model.Class
-	if err := db.DB.First(&item, "id = ?", c.Params("id")).Error; err != nil {
+	if err := database.First(&item, "id = ?", c.Params("id")).Error; err != nil {
 		return response.Error(c, "班级不存在")
 	}
 	if err := validateClassPayload(req); err != nil {
 		return response.Error(c, err.Error())
 	}
-	if err := ensureClassNameUnique(strings.TrimSpace(req.Name), strings.TrimSpace(req.GradeID), item.Id.String()); err != nil {
+	if err := ensureClassNameUnique(database, strings.TrimSpace(req.Name), strings.TrimSpace(req.GradeID), item.Id.String()); err != nil {
 		return response.Error(c, err.Error())
 	}
 
@@ -98,7 +101,7 @@ func Update(c *fiber.Ctx) error {
 	item.SchoolID = strings.TrimSpace(req.SchoolID)
 	item.SchoolName = strings.TrimSpace(req.SchoolName)
 	item.Status = defaultClassStatus(req.Status)
-	if err := db.DB.Save(&item).Error; err != nil {
+	if err := database.Save(&item).Error; err != nil {
 		return response.Error(c, "更新班级失败")
 	}
 
@@ -106,15 +109,16 @@ func Update(c *fiber.Ctx) error {
 }
 
 func Delete(c *fiber.Ctx) error {
+	database := db.FromFiber(c)
 	var item model.Class
-	if err := db.DB.First(&item, "id = ?", c.Params("id")).Error; err != nil {
+	if err := database.First(&item, "id = ?", c.Params("id")).Error; err != nil {
 		return response.Error(c, "班级不存在")
 	}
-	if err := ensureClassDeletable(item); err != nil {
+	if err := ensureClassDeletable(database, item); err != nil {
 		return response.Error(c, err.Error())
 	}
 
-	if err := db.DB.Delete(&item).Error; err != nil {
+	if err := database.Delete(&item).Error; err != nil {
 		return response.Error(c, "删除班级失败")
 	}
 
@@ -143,9 +147,9 @@ func validateClassPayload(req classPayload) error {
 	return nil
 }
 
-func ensureClassNameUnique(name string, gradeID string, excludeID string) error {
+func ensureClassNameUnique(database *gorm.DB, name string, gradeID string, excludeID string) error {
 	var item model.Class
-	query := db.DB.Where("LOWER(name) = LOWER(?)", strings.TrimSpace(name))
+	query := database.Where("LOWER(name) = LOWER(?)", strings.TrimSpace(name))
 	if strings.TrimSpace(gradeID) != "" {
 		query = query.Where("grade_id = ?", strings.TrimSpace(gradeID))
 	}
@@ -163,16 +167,16 @@ func ensureClassNameUnique(name string, gradeID string, excludeID string) error 
 	return errors.New("班级名称已存在")
 }
 
-func ensureClassDeletable(item model.Class) error {
+func ensureClassDeletable(database *gorm.DB, item model.Class) error {
 	var count int64
-	if err := db.DB.Model(&studentModel.Student{}).Where("class_id = ?", item.Id.String()).Count(&count).Error; err != nil {
+	if err := database.Model(&studentModel.Student{}).Where("class_id = ?", item.Id.String()).Count(&count).Error; err != nil {
 		return errors.New("校验班级关联学生失败")
 	}
 	if count > 0 {
 		return errors.New("班级下存在学生，不能删除")
 	}
 
-	if err := db.DB.Model(&homeworkassignmentModel.Assignment{}).
+	if err := database.Model(&homeworkassignmentModel.Assignment{}).
 		Where("school_name = ? AND class_name = ?", item.SchoolName, item.Name).
 		Count(&count).Error; err != nil {
 		return errors.New("校验班级关联每日作业失败")
@@ -181,7 +185,7 @@ func ensureClassDeletable(item model.Class) error {
 		return errors.New("班级已关联每日作业，不能删除")
 	}
 
-	if err := db.DB.Model(&homeworkrecordModel.Record{}).
+	if err := database.Model(&homeworkrecordModel.Record{}).
 		Where("school_name = ? AND class_name = ?", item.SchoolName, item.Name).
 		Count(&count).Error; err != nil {
 		return errors.New("校验班级关联作业记录失败")

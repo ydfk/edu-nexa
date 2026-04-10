@@ -15,12 +15,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import {
-  fetchRuntimeSettings,
+  fetchAdminRuntimeSettings,
   getDefaultRuntimeSettings,
   parsePaymentTypes,
   getSystemDisplayName,
+  initializeDemoEnvironment,
   parseHomeworkSubjects,
-  saveRuntimeSettings,
+  saveAdminRuntimeSettings,
   type RuntimeSettings,
 } from "@/lib/runtime-settings";
 
@@ -30,6 +31,7 @@ export default function SettingsSystemPage() {
   );
   const [loadingSettings, setLoadingSettings] = useState(true);
   const [savingSettings, setSavingSettings] = useState(false);
+  const [initializingDemo, setInitializingDemo] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -37,7 +39,7 @@ export default function SettingsSystemPage() {
     async function loadRuntimeSettings() {
       setLoadingSettings(true);
       try {
-        const settings = await fetchRuntimeSettings();
+        const settings = await fetchAdminRuntimeSettings();
         if (!cancelled) {
           setRuntimeSettings(settings);
         }
@@ -63,13 +65,26 @@ export default function SettingsSystemPage() {
   async function handleSaveRuntimeSettings() {
     setSavingSettings(true);
     try {
-      const saved = await saveRuntimeSettings(runtimeSettings);
+      const saved = await saveAdminRuntimeSettings(runtimeSettings);
       setRuntimeSettings(saved);
       toast.success("系统设置已保存");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "保存失败");
     } finally {
       setSavingSettings(false);
+    }
+  }
+
+  async function handleInitializeDemo() {
+    setInitializingDemo(true);
+    try {
+      await saveAdminRuntimeSettings(runtimeSettings);
+      await initializeDemoEnvironment();
+      toast.success("demo 数据已初始化");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "初始化失败");
+    } finally {
+      setInitializingDemo(false);
     }
   }
 
@@ -132,6 +147,15 @@ export default function SettingsSystemPage() {
           loading={loadingSettings}
           saving={savingSettings}
           onSave={handleSaveRuntimeSettings}
+        />
+        <DemoConfigCard
+          runtimeSettings={runtimeSettings}
+          setRuntimeSettings={setRuntimeSettings}
+          loading={loadingSettings}
+          saving={savingSettings}
+          initializing={initializingDemo}
+          onSave={handleSaveRuntimeSettings}
+          onInitialize={handleInitializeDemo}
         />
       </div>
     </PageContent>
@@ -339,6 +363,152 @@ function PaymentTypesCard({
         <div className="flex justify-end">
           <Button disabled={loading || saving} onClick={onSave}>
             {saving ? "保存中..." : "保存缴费类型"}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function DemoConfigCard({
+  runtimeSettings,
+  setRuntimeSettings,
+  loading,
+  saving,
+  initializing,
+  onSave,
+  onInitialize,
+}: {
+  runtimeSettings: RuntimeSettings;
+  setRuntimeSettings: React.Dispatch<React.SetStateAction<RuntimeSettings>>;
+  loading: boolean;
+  saving: boolean;
+  initializing: boolean;
+  onSave: () => void;
+  onInitialize: () => void;
+}) {
+  const disabled = loading || saving || initializing;
+
+  return (
+    <Card className="max-w-3xl">
+      <CardHeader>
+        <CardTitle>Demo 环境</CardTitle>
+        <CardDescription>
+          配置 demo 教师与家长账号，并手动初始化独立的 demo 数据库。
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="grid gap-6 md:grid-cols-2">
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <h3 className="text-sm font-semibold">Demo 教师</h3>
+              <p className="text-xs text-muted-foreground">
+                该账号同时拥有管理员与教师权限。
+              </p>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="demo-teacher-name">名称</Label>
+              <Input
+                id="demo-teacher-name"
+                disabled={disabled}
+                value={runtimeSettings.demoTeacherName}
+                onChange={(event) =>
+                  setRuntimeSettings((current) => ({
+                    ...current,
+                    demoTeacherName: event.target.value,
+                  }))
+                }
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="demo-teacher-phone">手机号</Label>
+              <Input
+                id="demo-teacher-phone"
+                disabled={disabled}
+                value={runtimeSettings.demoTeacherPhone}
+                onChange={(event) =>
+                  setRuntimeSettings((current) => ({
+                    ...current,
+                    demoTeacherPhone: event.target.value,
+                  }))
+                }
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="demo-teacher-password">密码</Label>
+              <Input
+                id="demo-teacher-password"
+                disabled={disabled}
+                value={runtimeSettings.demoTeacherPassword}
+                onChange={(event) =>
+                  setRuntimeSettings((current) => ({
+                    ...current,
+                    demoTeacherPassword: event.target.value,
+                  }))
+                }
+              />
+            </div>
+          </div>
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <h3 className="text-sm font-semibold">Demo 家长</h3>
+              <p className="text-xs text-muted-foreground">
+                该账号会看到 demo 学生、用餐记录与每日作业。
+              </p>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="demo-guardian-name">名称</Label>
+              <Input
+                id="demo-guardian-name"
+                disabled={disabled}
+                value={runtimeSettings.demoGuardianName}
+                onChange={(event) =>
+                  setRuntimeSettings((current) => ({
+                    ...current,
+                    demoGuardianName: event.target.value,
+                  }))
+                }
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="demo-guardian-phone">手机号</Label>
+              <Input
+                id="demo-guardian-phone"
+                disabled={disabled}
+                value={runtimeSettings.demoGuardianPhone}
+                onChange={(event) =>
+                  setRuntimeSettings((current) => ({
+                    ...current,
+                    demoGuardianPhone: event.target.value,
+                  }))
+                }
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="demo-guardian-password">密码</Label>
+              <Input
+                id="demo-guardian-password"
+                disabled={disabled}
+                value={runtimeSettings.demoGuardianPassword}
+                onChange={(event) =>
+                  setRuntimeSettings((current) => ({
+                    ...current,
+                    demoGuardianPassword: event.target.value,
+                  }))
+                }
+              />
+            </div>
+          </div>
+        </div>
+        <div className="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground">
+          初始化会重建 demo 数据库，并生成一套新的学校、班级、学生、用餐记录、每日作业、作业记录和缴费数据。
+        </div>
+        <div className="flex flex-wrap justify-end gap-3">
+          <Button disabled={disabled} variant="outline" onClick={onSave}>
+            {saving ? "保存中..." : "保存 demo 配置"}
+          </Button>
+          <Button disabled={disabled} onClick={onInitialize}>
+            {initializing ? "初始化中..." : "初始化 demo 数据"}
           </Button>
         </div>
       </CardContent>

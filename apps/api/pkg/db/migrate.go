@@ -22,10 +22,15 @@ import (
 	studentserviceModel "github.com/ydfk/edu-nexa/apps/api/internal/model/studentservice"
 	teacherprofileModel "github.com/ydfk/edu-nexa/apps/api/internal/model/teacherprofile"
 	userModel "github.com/ydfk/edu-nexa/apps/api/internal/model/user"
+	"gorm.io/gorm"
 )
 
 func autoMigrate() error {
-	if err := DB.AutoMigrate(
+	return autoMigrateFor(DB)
+}
+
+func autoMigrateFor(database *gorm.DB) error {
+	if err := database.AutoMigrate(
 		&userModel.User{},
 		&homeconfigModel.Config{},
 		&runtimeconfigModel.Config{},
@@ -48,33 +53,33 @@ func autoMigrate() error {
 		return err
 	}
 
-	if err := migrateLegacyProfiles(); err != nil {
+	if err := migrateLegacyProfiles(database); err != nil {
 		return err
 	}
-	if err := migrateLegacyConfigs(); err != nil {
+	if err := migrateLegacyConfigs(database); err != nil {
 		return err
 	}
-	if err := migrateLegacyPaymentRecords(); err != nil {
+	if err := migrateLegacyPaymentRecords(database); err != nil {
 		return err
 	}
-	if err := migrateLegacyHomeworkAssignmentItems(); err != nil {
+	if err := migrateLegacyHomeworkAssignmentItems(database); err != nil {
 		return err
 	}
-	if err := migrateLegacyHomeworkAssignmentAttachments(); err != nil {
+	if err := migrateLegacyHomeworkAssignmentAttachments(database); err != nil {
 		return err
 	}
-	if err := backfillHomeworkAttachmentMetadata(); err != nil {
+	if err := backfillHomeworkAttachmentMetadata(database); err != nil {
 		return err
 	}
-	if err := migrateLegacyRecords(); err != nil {
+	if err := migrateLegacyRecords(database); err != nil {
 		return err
 	}
 
-	return backfillHomeworkRecordAssignments()
+	return backfillHomeworkRecordAssignments(database)
 }
 
-func migrateLegacyProfiles() error {
-	migrator := DB.Migrator()
+func migrateLegacyProfiles(database *gorm.DB) error {
+	migrator := database.Migrator()
 	if !migrator.HasTable("profiles") {
 		return nil
 	}
@@ -85,14 +90,14 @@ func migrateLegacyProfiles() error {
 	teacherTable := teacherprofileModel.Profile{}.TableName()
 
 	var count int64
-	if err := DB.Table(teacherTable).Count(&count).Error; err != nil {
+	if err := database.Table(teacherTable).Count(&count).Error; err != nil {
 		return err
 	}
 	if count > 0 {
 		return nil
 	}
 
-	return DB.Exec(
+	return database.Exec(
 		fmt.Sprintf(
 			"INSERT INTO %s (id, created_at, updated_at, user_id, name, phone, role_scope, status, description) "+
 				"SELECT id, created_at, updated_at, user_id, name, phone, role_scope, status, description FROM profiles",
@@ -101,8 +106,8 @@ func migrateLegacyProfiles() error {
 	).Error
 }
 
-func migrateLegacyRecords() error {
-	migrator := DB.Migrator()
+func migrateLegacyRecords(database *gorm.DB) error {
+	migrator := database.Migrator()
 	if !migrator.HasTable("records") {
 		return nil
 	}
@@ -111,11 +116,11 @@ func migrateLegacyRecords() error {
 	homeworkTable := homeworkrecordModel.Record{}.TableName()
 
 	var mealCount int64
-	if err := DB.Table(mealTable).Count(&mealCount).Error; err != nil {
+	if err := database.Table(mealTable).Count(&mealCount).Error; err != nil {
 		return err
 	}
 	if mealCount == 0 {
-		if err := DB.Exec(
+		if err := database.Exec(
 			fmt.Sprintf(
 				"INSERT INTO %s (id, created_at, updated_at, campus_id, student_id, student_name, service_date, status, remark, image_urls, recorded_by_id, recorded_by, deleted_at) "+
 					"SELECT id, created_at, updated_at, COALESCE(campus_id, ''), student_id, student_name, service_date, status, remark, image_urls, recorded_by_id, recorded_by, deleted_at "+
@@ -128,11 +133,11 @@ func migrateLegacyRecords() error {
 	}
 
 	var homeworkCount int64
-	if err := DB.Table(homeworkTable).Count(&homeworkCount).Error; err != nil {
+	if err := database.Table(homeworkTable).Count(&homeworkCount).Error; err != nil {
 		return err
 	}
 	if homeworkCount == 0 {
-		if err := DB.Exec(
+		if err := database.Exec(
 			fmt.Sprintf(
 				"INSERT INTO %s (id, created_at, updated_at, campus_id, student_id, student_name, school_name, class_name, service_date, status, subject_summary, remark, image_urls, recorded_by_id, recorded_by, deleted_at) "+
 					"SELECT id, created_at, updated_at, COALESCE(campus_id, ''), student_id, student_name, school_name, class_name, service_date, status, subject_summary, remark, image_urls, recorded_by_id, recorded_by, deleted_at "+
@@ -147,15 +152,15 @@ func migrateLegacyRecords() error {
 	return nil
 }
 
-func migrateLegacyConfigs() error {
-	migrator := DB.Migrator()
+func migrateLegacyConfigs(database *gorm.DB) error {
+	migrator := database.Migrator()
 	if !migrator.HasTable("configs") || !migrator.HasColumn("configs", "scene") {
 		return nil
 	}
 
 	homeTable := homeconfigModel.Config{}.TableName()
 	var homeCount int64
-	if err := DB.Table(homeTable).Count(&homeCount).Error; err != nil {
+	if err := database.Table(homeTable).Count(&homeCount).Error; err != nil {
 		return err
 	}
 	if homeCount == 0 {
@@ -163,7 +168,7 @@ func migrateLegacyConfigs() error {
 			migrator.HasColumn("configs", "hero_subtitle") &&
 			migrator.HasColumn("configs", "announcement") &&
 			migrator.HasColumn("configs", "banners_json") {
-			if err := DB.Exec(
+			if err := database.Exec(
 				fmt.Sprintf(
 					"INSERT INTO %s (id, created_at, updated_at, scene, hero_title, hero_subtitle, announcement, banners_json, deleted_at) "+
 						"SELECT id, created_at, updated_at, scene, hero_title, hero_subtitle, announcement, banners_json, deleted_at "+
@@ -178,11 +183,11 @@ func migrateLegacyConfigs() error {
 
 	runtimeTable := runtimeconfigModel.Config{}.TableName()
 	var runtimeCount int64
-	if err := DB.Table(runtimeTable).Count(&runtimeCount).Error; err != nil {
+	if err := database.Table(runtimeTable).Count(&runtimeCount).Error; err != nil {
 		return err
 	}
 	if runtimeCount == 0 {
-		if err := DB.Exec(
+		if err := database.Exec(
 			fmt.Sprintf(
 				"INSERT INTO %s (id, created_at, updated_at, scene, system_name_prefix, image_security_enable, image_security_strict, text_security_enable, text_security_strict, homework_subjects, payment_types, deleted_at) "+
 					"SELECT id, created_at, updated_at, scene, COALESCE(system_name_prefix, ''), image_security_enable, image_security_strict, text_security_enable, text_security_strict, COALESCE(homework_subjects, ''), '', deleted_at "+
@@ -197,11 +202,11 @@ func migrateLegacyConfigs() error {
 	return nil
 }
 
-func migrateLegacyPaymentRecords() error {
+func migrateLegacyPaymentRecords(database *gorm.DB) error {
 	paymentTable := paymentrecordModel.Record{}.TableName()
 
 	var paymentCount int64
-	if err := DB.Table(paymentTable).Count(&paymentCount).Error; err != nil {
+	if err := database.Table(paymentTable).Count(&paymentCount).Error; err != nil {
 		return err
 	}
 	if paymentCount > 0 {
@@ -209,7 +214,7 @@ func migrateLegacyPaymentRecords() error {
 	}
 
 	var plans []studentserviceModel.Plan
-	if err := DB.Find(&plans).Error; err != nil {
+	if err := database.Find(&plans).Error; err != nil {
 		return err
 	}
 	if len(plans) == 0 {
@@ -222,7 +227,7 @@ func migrateLegacyPaymentRecords() error {
 		}
 
 		var student studentModel.Student
-		if err := DB.First(&student, "id = ?", plan.StudentID).Error; err != nil {
+		if err := database.First(&student, "id = ?", plan.StudentID).Error; err != nil {
 			continue
 		}
 
@@ -248,7 +253,7 @@ func migrateLegacyPaymentRecords() error {
 			Status:          "paid",
 		}
 
-		if err := DB.Create(&item).Error; err != nil {
+		if err := database.Create(&item).Error; err != nil {
 			return err
 		}
 	}
@@ -256,20 +261,20 @@ func migrateLegacyPaymentRecords() error {
 	return nil
 }
 
-func migrateLegacyHomeworkAssignmentItems() error {
-	migrator := DB.Migrator()
+func migrateLegacyHomeworkAssignmentItems(database *gorm.DB) error {
+	migrator := database.Migrator()
 	if !migrator.HasTable(&homeworkassignmentModel.Assignment{}) || !migrator.HasTable(homeworkassignmentModel.Item{}.TableName()) {
 		return nil
 	}
 
 	var assignments []homeworkassignmentModel.Assignment
-	if err := DB.Unscoped().Find(&assignments).Error; err != nil {
+	if err := database.Unscoped().Find(&assignments).Error; err != nil {
 		return err
 	}
 
 	for _, assignment := range assignments {
 		var count int64
-		if err := DB.Unscoped().
+		if err := database.Unscoped().
 			Model(&homeworkassignmentModel.Item{}).
 			Where("assignment_id = ?", assignment.Id.String()).
 			Count(&count).Error; err != nil {
@@ -285,7 +290,7 @@ func migrateLegacyHomeworkAssignmentItems() error {
 		}
 
 		items := buildHomeworkAssignmentItems(assignment.Id.String(), lines)
-		if err := DB.Create(&items).Error; err != nil {
+		if err := database.Create(&items).Error; err != nil {
 			return err
 		}
 	}
@@ -293,8 +298,8 @@ func migrateLegacyHomeworkAssignmentItems() error {
 	return nil
 }
 
-func migrateLegacyHomeworkAssignmentAttachments() error {
-	migrator := DB.Migrator()
+func migrateLegacyHomeworkAssignmentAttachments(database *gorm.DB) error {
+	migrator := database.Migrator()
 	if !migrator.HasTable(&homeworkassignmentModel.Assignment{}) ||
 		!migrator.HasTable(homeworkassignmentModel.Attachment{}.TableName()) ||
 		!migrator.HasColumn("assignments", "attachments") {
@@ -307,7 +312,7 @@ func migrateLegacyHomeworkAssignmentAttachments() error {
 	}
 
 	var assignments []legacyAssignmentAttachment
-	if err := DB.Unscoped().
+	if err := database.Unscoped().
 		Table("assignments").
 		Select("id", "attachments").
 		Where("COALESCE(attachments, '') <> ''").
@@ -331,7 +336,7 @@ func migrateLegacyHomeworkAssignmentAttachments() error {
 		}
 
 		var count int64
-		if err := DB.Unscoped().
+		if err := database.Unscoped().
 			Model(&homeworkassignmentModel.Attachment{}).
 			Where("assignment_id = ?", assignment.ID).
 			Count(&count).Error; err != nil {
@@ -349,7 +354,7 @@ func migrateLegacyHomeworkAssignmentAttachments() error {
 			continue
 		}
 
-		if err := DB.Create(&attachments).Error; err != nil {
+		if err := database.Create(&attachments).Error; err != nil {
 			return err
 		}
 	}
@@ -358,16 +363,16 @@ func migrateLegacyHomeworkAssignmentAttachments() error {
 		return nil
 	}
 
-	return migrator.DropColumn("assignments", "attachments")
+	return dropLegacyAttachmentsColumn(database, migrator)
 }
 
-func backfillHomeworkAttachmentMetadata() error {
-	if !DB.Migrator().HasTable(homeworkassignmentModel.Attachment{}.TableName()) {
+func backfillHomeworkAttachmentMetadata(database *gorm.DB) error {
+	if !database.Migrator().HasTable(homeworkassignmentModel.Attachment{}.TableName()) {
 		return nil
 	}
 
 	var attachments []homeworkassignmentModel.Attachment
-	if err := DB.Find(&attachments).Error; err != nil {
+	if err := database.Find(&attachments).Error; err != nil {
 		return err
 	}
 
@@ -397,7 +402,7 @@ func backfillHomeworkAttachmentMetadata() error {
 			continue
 		}
 
-		if err := DB.Model(&attachment).Updates(updates).Error; err != nil {
+		if err := database.Model(&attachment).Updates(updates).Error; err != nil {
 			return err
 		}
 	}
@@ -405,14 +410,14 @@ func backfillHomeworkAttachmentMetadata() error {
 	return nil
 }
 
-func backfillHomeworkRecordAssignments() error {
-	migrator := DB.Migrator()
+func backfillHomeworkRecordAssignments(database *gorm.DB) error {
+	migrator := database.Migrator()
 	if !migrator.HasTable(homeworkrecordModel.Record{}.TableName()) || !migrator.HasTable(&homeworkassignmentModel.Assignment{}) {
 		return nil
 	}
 
 	var records []homeworkrecordModel.Record
-	if err := DB.Find(&records).Error; err != nil {
+	if err := database.Find(&records).Error; err != nil {
 		return err
 	}
 
@@ -422,11 +427,11 @@ func backfillHomeworkRecordAssignments() error {
 		}
 
 		var student studentModel.Student
-		if err := DB.Select("id", "school_name", "class_id", "class_name", "grade").First(&student, "id = ?", record.StudentID).Error; err != nil {
+		if err := database.Select("id", "school_name", "class_id", "class_name", "grade").First(&student, "id = ?", record.StudentID).Error; err != nil {
 			continue
 		}
 
-		assignment, ok := matchLegacyHomeworkAssignment(record, student)
+		assignment, ok := matchLegacyHomeworkAssignment(database, record, student)
 		if !ok {
 			continue
 		}
@@ -445,7 +450,7 @@ func backfillHomeworkRecordAssignments() error {
 			continue
 		}
 
-		if err := DB.Model(&record).Updates(updates).Error; err != nil {
+		if err := database.Model(&record).Updates(updates).Error; err != nil {
 			return err
 		}
 	}
@@ -478,8 +483,8 @@ func buildHomeworkAssignmentItems(assignmentID string, lines []string) []homewor
 	return items
 }
 
-func matchLegacyHomeworkAssignment(record homeworkrecordModel.Record, student studentModel.Student) (homeworkassignmentModel.Assignment, bool) {
-	query := DB.Model(&homeworkassignmentModel.Assignment{}).
+func matchLegacyHomeworkAssignment(database *gorm.DB, record homeworkrecordModel.Record, student studentModel.Student) (homeworkassignmentModel.Assignment, bool) {
+	query := database.Model(&homeworkassignmentModel.Assignment{}).
 		Where("service_date = ?", record.ServiceDate)
 
 	if student.ClassID != "" {
@@ -514,4 +519,26 @@ func matchLegacyHomeworkAssignment(record homeworkrecordModel.Record, student st
 	}
 
 	return homeworkassignmentModel.Assignment{}, false
+}
+
+func dropLegacyAttachmentsColumn(database *gorm.DB, migrator gorm.Migrator) error {
+	if !migrator.HasColumn("assignments", "attachments") {
+		return nil
+	}
+
+	if err := dropLegacyAttachmentsColumnWithMigrator(migrator); err == nil {
+		return nil
+	}
+
+	return database.Exec("ALTER TABLE assignments DROP COLUMN attachments").Error
+}
+
+func dropLegacyAttachmentsColumnWithMigrator(migrator gorm.Migrator) (err error) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			err = fmt.Errorf("drop attachments column panic: %v", recovered)
+		}
+	}()
+
+	return migrator.DropColumn("assignments", "attachments")
 }

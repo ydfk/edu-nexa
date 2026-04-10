@@ -9,5 +9,7 @@ func RegisterPublicRoutes(router fiber.Router) {
 
 func RegisterRoutes(router fiber.Router) {
 	grp := router.Group("/runtime-settings")
+	grp.Get("/admin", GetAdmin)
 	grp.Put("/", Update)
+	grp.Post("/demo/initialize", InitializeDemo)
 }

@@ -1,15 +1,18 @@
 package auth
 
 import (
+	"errors"
 	"strings"
 
 	"github.com/ydfk/edu-nexa/apps/api/internal/api/response"
 	model "github.com/ydfk/edu-nexa/apps/api/internal/model/user"
 	"github.com/ydfk/edu-nexa/apps/api/internal/service"
+	runtimeconfigService "github.com/ydfk/edu-nexa/apps/api/internal/service/runtimeconfig"
 	"github.com/ydfk/edu-nexa/apps/api/pkg/db"
 
 	"github.com/gofiber/fiber/v2"
 	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
 )
 
 var generateFromPassword = bcrypt.GenerateFromPassword
@@ -81,9 +84,23 @@ func Login(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		return response.Error(c, "参数不正确")
 	}
+	req.Phone = strings.TrimSpace(req.Phone)
+	req.Password = strings.TrimSpace(req.Password)
+
+	loginDB := db.DB
+	isDemoLogin, err := runtimeconfigService.IsDemoPhone(req.Phone)
+	if err != nil {
+		return response.Error(c, "读取 demo 配置失败")
+	}
+	if isDemoLogin {
+		loginDB = db.DemoDB
+	}
 
 	var user model.User
-	if err := db.DB.Where("phone = ?", req.Phone).First(&user).Error; err != nil {
+	if err := loginDB.Where("phone = ?", req.Phone).First(&user).Error; err != nil {
+		if isDemoLogin && errors.Is(err, gorm.ErrRecordNotFound) {
+			return response.Error(c, "demo 数据尚未初始化，请先在管理端系统设置中初始化")
+		}
 		return response.Error(c, "手机号不存在")
 	}
 	if err := service.EnsureUserActive(user); err != nil {
@@ -98,12 +115,17 @@ func Login(c *fiber.Ctx) error {
 		return response.Error(c, "密码不正确")
 	}
 
-	token, err := service.GenerateJWT(&user)
+	token, err := service.GenerateJWTForDomain(&user, isDemoLogin)
 	if err != nil {
 		return response.Error(c, "token 生成失败")
 	}
 
-	return response.Success(c, buildLoginPayload(user, token, "admin_password"))
+	loginType := "admin_password"
+	if isDemoLogin {
+		loginType = "demo_password"
+	}
+
+	return response.Success(c, buildLoginPayload(user, token, loginType))
 }
 
 func Profile(c *fiber.Ctx) error {
@@ -132,7 +154,7 @@ func UpdateProfile(c *fiber.Ctx) error {
 	}
 
 	user.DisplayName = displayName
-	if err := db.DB.Save(user).Error; err != nil {
+	if err := db.FromFiber(c).Save(user).Error; err != nil {
 		return response.Error(c, "保存个人设置失败")
 	}
 
@@ -171,7 +193,7 @@ func ChangePassword(c *fiber.Ctx) error {
 	}
 
 	user.Password = string(hash)
-	if err := db.DB.Save(user).Error; err != nil {
+	if err := db.FromFiber(c).Save(user).Error; err != nil {
 		return response.Error(c, "修改密码失败")
 	}
 

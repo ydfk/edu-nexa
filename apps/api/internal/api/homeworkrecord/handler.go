@@ -13,6 +13,7 @@ import (
 	"github.com/ydfk/edu-nexa/apps/api/pkg/db"
 
 	"github.com/gofiber/fiber/v2"
+	"gorm.io/gorm"
 )
 
 type homeworkRecordPayload struct {
@@ -34,7 +35,8 @@ type homeworkRecordPayload struct {
 
 func List(c *fiber.Ctx) error {
 	var records []model.Record
-	query := db.DB.Order("service_date desc, created_at desc")
+	database := db.FromFiber(c)
+	query := database.Order("service_date desc, created_at desc")
 
 	if studentID := c.Query("studentId"); studentID != "" {
 		query = query.Where("student_id = ?", studentID)
@@ -68,6 +70,7 @@ func List(c *fiber.Ctx) error {
 }
 
 func Create(c *fiber.Ctx) error {
+	database := db.FromFiber(c)
 	var req homeworkRecordPayload
 	if err := c.BodyParser(&req); err != nil {
 		return response.Error(c, "参数不正确")
@@ -76,15 +79,15 @@ func Create(c *fiber.Ctx) error {
 	if err := validateHomeworkRecordPayload(req); err != nil {
 		return response.Error(c, err.Error(), fiber.StatusBadRequest)
 	}
-	student, err := findHomeworkStudent(req.StudentID, "")
+	student, err := findHomeworkStudent(database, req.StudentID, "")
 	if err != nil {
 		return response.Error(c, err.Error(), fiber.StatusBadRequest)
 	}
-	assignment, err := findHomeworkAssignment(req, student)
+	assignment, err := findHomeworkAssignment(database, req, student)
 	if err != nil {
 		return response.Error(c, err.Error(), fiber.StatusBadRequest)
 	}
-	if err := ensureHomeworkRecordUnique(student.Id.String(), req.ServiceDate, assignment.Subject, assignment.Id.String(), ""); err != nil {
+	if err := ensureHomeworkRecordUniqueWithDB(database, student.Id.String(), req.ServiceDate, assignment.Subject, assignment.Id.String(), ""); err != nil {
 		return response.Error(c, err.Error(), fiber.StatusBadRequest)
 	}
 	if err := contentsafety.CheckText(req.Remark + "\n" + req.SubjectSummary); err != nil {
@@ -108,7 +111,7 @@ func Create(c *fiber.Ctx) error {
 		SubjectSummary: buildHomeworkSubjectSummary(req.SubjectSummary, assignment),
 	}
 
-	if err := db.DB.Create(&record).Error; err != nil {
+	if err := database.Create(&record).Error; err != nil {
 		return response.Error(c, "创建作业记录失败")
 	}
 
@@ -116,27 +119,28 @@ func Create(c *fiber.Ctx) error {
 }
 
 func Update(c *fiber.Ctx) error {
+	database := db.FromFiber(c)
 	var req homeworkRecordPayload
 	if err := c.BodyParser(&req); err != nil {
 		return response.Error(c, "参数不正确")
 	}
 
 	var record model.Record
-	if err := db.DB.First(&record, "id = ?", c.Params("id")).Error; err != nil {
+	if err := database.First(&record, "id = ?", c.Params("id")).Error; err != nil {
 		return response.Error(c, "作业记录不存在")
 	}
 	if err := validateHomeworkRecordPayload(req); err != nil {
 		return response.Error(c, err.Error(), fiber.StatusBadRequest)
 	}
-	student, err := findHomeworkStudent(req.StudentID, record.StudentID)
+	student, err := findHomeworkStudent(database, req.StudentID, record.StudentID)
 	if err != nil {
 		return response.Error(c, err.Error(), fiber.StatusBadRequest)
 	}
-	assignment, err := findHomeworkAssignment(req, student)
+	assignment, err := findHomeworkAssignment(database, req, student)
 	if err != nil {
 		return response.Error(c, err.Error(), fiber.StatusBadRequest)
 	}
-	if err := ensureHomeworkRecordUnique(student.Id.String(), req.ServiceDate, assignment.Subject, assignment.Id.String(), record.Id.String()); err != nil {
+	if err := ensureHomeworkRecordUniqueWithDB(database, student.Id.String(), req.ServiceDate, assignment.Subject, assignment.Id.String(), record.Id.String()); err != nil {
 		return response.Error(c, err.Error(), fiber.StatusBadRequest)
 	}
 	if err := contentsafety.CheckText(req.Remark + "\n" + req.SubjectSummary); err != nil {
@@ -158,7 +162,7 @@ func Update(c *fiber.Ctx) error {
 	record.Subject = assignment.Subject
 	record.SubjectSummary = buildHomeworkSubjectSummary(req.SubjectSummary, assignment)
 
-	if err := db.DB.Save(&record).Error; err != nil {
+	if err := database.Save(&record).Error; err != nil {
 		return response.Error(c, "更新作业记录失败")
 	}
 
@@ -166,12 +170,13 @@ func Update(c *fiber.Ctx) error {
 }
 
 func Delete(c *fiber.Ctx) error {
+	database := db.FromFiber(c)
 	var record model.Record
-	if err := db.DB.First(&record, "id = ?", c.Params("id")).Error; err != nil {
+	if err := database.First(&record, "id = ?", c.Params("id")).Error; err != nil {
 		return response.Error(c, "作业记录不存在")
 	}
 
-	if err := db.DB.Delete(&record).Error; err != nil {
+	if err := database.Delete(&record).Error; err != nil {
 		return response.Error(c, "删除作业记录失败")
 	}
 
@@ -239,9 +244,9 @@ func validateHomeworkRecordPayload(req homeworkRecordPayload) error {
 	return nil
 }
 
-func findHomeworkStudent(studentID string, currentStudentID string) (*studentModel.Student, error) {
+func findHomeworkStudent(database *gorm.DB, studentID string, currentStudentID string) (*studentModel.Student, error) {
 	var item studentModel.Student
-	if err := db.DB.First(&item, "id = ?", strings.TrimSpace(studentID)).Error; err != nil {
+	if err := database.First(&item, "id = ?", strings.TrimSpace(studentID)).Error; err != nil {
 		return nil, errors.New("学生不存在")
 	}
 	if strings.TrimSpace(currentStudentID) != item.Id.String() && !service.IsActiveStatus(item.Status) {
@@ -251,12 +256,12 @@ func findHomeworkStudent(studentID string, currentStudentID string) (*studentMod
 	return &item, nil
 }
 
-func findHomeworkAssignment(req homeworkRecordPayload, student *studentModel.Student) (*assignmentModel.Assignment, error) {
+func findHomeworkAssignment(database *gorm.DB, req homeworkRecordPayload, student *studentModel.Student) (*assignmentModel.Assignment, error) {
 	assignmentID := strings.TrimSpace(req.AssignmentID)
 	subject := strings.TrimSpace(req.Subject)
 	serviceDate := strings.TrimSpace(req.ServiceDate)
 
-	query := db.DB.Model(&assignmentModel.Assignment{})
+	query := database.Model(&assignmentModel.Assignment{})
 	var item assignmentModel.Assignment
 
 	if assignmentID != "" {
@@ -292,8 +297,12 @@ func findHomeworkAssignment(req homeworkRecordPayload, student *studentModel.Stu
 }
 
 func ensureHomeworkRecordUnique(studentID string, serviceDate string, subject string, assignmentID string, excludeID string) error {
+	return ensureHomeworkRecordUniqueWithDB(db.DB, studentID, serviceDate, subject, assignmentID, excludeID)
+}
+
+func ensureHomeworkRecordUniqueWithDB(database *gorm.DB, studentID string, serviceDate string, subject string, assignmentID string, excludeID string) error {
 	var records []model.Record
-	if err := db.DB.Where("student_id = ? AND service_date = ?", studentID, serviceDate).Find(&records).Error; err != nil {
+	if err := database.Where("student_id = ? AND service_date = ?", studentID, serviceDate).Find(&records).Error; err != nil {
 		return errors.New("校验作业记录失败")
 	}
 

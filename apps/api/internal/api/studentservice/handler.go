@@ -23,7 +23,8 @@ type planPayload struct {
 
 func List(c *fiber.Ctx) error {
 	var plans []model.Plan
-	query := db.DB.Order("service_end_date desc, created_at desc")
+	database := db.FromFiber(c)
+	query := database.Order("service_end_date desc, created_at desc")
 
 	if studentID := strings.TrimSpace(c.Query("studentId")); studentID != "" {
 		query = query.Where("student_id = ?", studentID)
@@ -40,6 +41,7 @@ func List(c *fiber.Ctx) error {
 }
 
 func Create(c *fiber.Ctx) error {
+	database := db.FromFiber(c)
 	var req planPayload
 	if err := c.BodyParser(&req); err != nil {
 		return response.Error(c, "参数不正确")
@@ -72,7 +74,7 @@ func Create(c *fiber.Ctx) error {
 		})
 	}
 
-	if err := db.DB.Create(&plan).Error; err != nil {
+	if err := database.Create(&plan).Error; err != nil {
 		return response.Error(c, "创建服务计划失败")
 	}
 
@@ -80,13 +82,14 @@ func Create(c *fiber.Ctx) error {
 }
 
 func Update(c *fiber.Ctx) error {
+	database := db.FromFiber(c)
 	var req planPayload
 	if err := c.BodyParser(&req); err != nil {
 		return response.Error(c, "参数不正确")
 	}
 
 	var plan model.Plan
-	if err := db.DB.First(&plan, "id = ?", c.Params("id")).Error; err != nil {
+	if err := database.First(&plan, "id = ?", c.Params("id")).Error; err != nil {
 		return response.Error(c, "服务计划不存在")
 	}
 
@@ -99,7 +102,7 @@ func Update(c *fiber.Ctx) error {
 	plan.ServiceStartDate = strings.TrimSpace(req.ServiceStartDate)
 	plan.StudentID = strings.TrimSpace(req.StudentID)
 	if isEmptyPlan(plan) {
-		if err := db.DB.Delete(&plan).Error; err != nil {
+		if err := database.Delete(&plan).Error; err != nil {
 			return response.Error(c, "删除服务计划失败")
 		}
 		return response.Success(c, fiber.Map{
@@ -114,7 +117,7 @@ func Update(c *fiber.Ctx) error {
 		})
 	}
 
-	if err := db.DB.Save(&plan).Error; err != nil {
+	if err := database.Save(&plan).Error; err != nil {
 		return response.Error(c, "更新服务计划失败")
 	}
 
@@ -122,12 +125,13 @@ func Update(c *fiber.Ctx) error {
 }
 
 func Delete(c *fiber.Ctx) error {
+	database := db.FromFiber(c)
 	var plan model.Plan
-	if err := db.DB.First(&plan, "id = ?", c.Params("id")).Error; err != nil {
+	if err := database.First(&plan, "id = ?", c.Params("id")).Error; err != nil {
 		return response.Error(c, "服务计划不存在")
 	}
 
-	if err := db.DB.Delete(&plan).Error; err != nil {
+	if err := database.Delete(&plan).Error; err != nil {
 		return response.Error(c, "删除服务计划失败")
 	}
 

@@ -187,9 +187,6 @@ Page({
   goRecordTap(e) {
     if (!isLoggedIn()) {
       wx.showToast({ title: "请先登录", icon: "none" });
-      setTimeout(() => {
-        wx.navigateTo({ url: "/pages/login/index" });
-      }, 200);
       return;
     }
 

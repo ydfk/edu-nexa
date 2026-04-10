@@ -80,7 +80,7 @@ func PrintPDF(c *fiber.Ctx) error {
 		return response.Error(c, "日期不能为空", fiber.StatusBadRequest)
 	}
 
-	result, err := generateDailyHomeworkPDF(serviceDate)
+	result, err := generateDailyHomeworkPDF(db.FromFiber(c), serviceDate)
 	if err != nil {
 		return response.Error(c, err.Error(), fiber.StatusBadRequest)
 	}
@@ -105,8 +105,8 @@ func canPrintDailyHomework(rawRoles string) bool {
 	return false
 }
 
-func generateDailyHomeworkPDF(serviceDate string) (*uploadService.Result, error) {
-	assignments, err := loadDailyHomeworkAssignments(serviceDate)
+func generateDailyHomeworkPDF(database *gorm.DB, serviceDate string) (*uploadService.Result, error) {
+	assignments, err := loadDailyHomeworkAssignments(database, serviceDate)
 	if err != nil {
 		return nil, err
 	}
@@ -115,7 +115,7 @@ func generateDailyHomeworkPDF(serviceDate string) (*uploadService.Result, error)
 	}
 
 	subjectOrder := loadDailyHomeworkSubjectOrder()
-	groups, err := buildDailyHomeworkPrintGroups(assignments, subjectOrder)
+	groups, err := buildDailyHomeworkPrintGroups(database, assignments, subjectOrder)
 	if err != nil {
 		return nil, err
 	}
@@ -147,9 +147,9 @@ func generateDailyHomeworkPDF(serviceDate string) (*uploadService.Result, error)
 	return result, nil
 }
 
-func loadDailyHomeworkAssignments(serviceDate string) ([]model.Assignment, error) {
+func loadDailyHomeworkAssignments(database *gorm.DB, serviceDate string) ([]model.Assignment, error) {
 	var assignments []model.Assignment
-	err := db.DB.
+	err := database.
 		Preload("Items", func(tx *gorm.DB) *gorm.DB {
 			return tx.Order("sort asc, created_at asc")
 		}).
@@ -162,7 +162,7 @@ func loadDailyHomeworkAssignments(serviceDate string) ([]model.Assignment, error
 	return assignments, nil
 }
 
-func buildDailyHomeworkPrintGroups(assignments []model.Assignment, subjectOrder []string) ([]dailyHomeworkPrintGroup, error) {
+func buildDailyHomeworkPrintGroups(database *gorm.DB, assignments []model.Assignment, subjectOrder []string) ([]dailyHomeworkPrintGroup, error) {
 	type groupedAssignments struct {
 		SchoolName string
 		GradeName  string
@@ -189,7 +189,7 @@ func buildDailyHomeworkPrintGroups(assignments []model.Assignment, subjectOrder 
 	}
 
 	var students []studentModel.Student
-	if err := db.DB.
+	if err := database.
 		Where("status = ?", "active").
 		Order("school_name asc, grade asc, class_name asc, name asc").
 		Find(&students).Error; err != nil {

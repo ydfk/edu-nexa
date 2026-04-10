@@ -41,7 +41,8 @@ type assignmentPayload struct {
 
 func List(c *fiber.Ctx) error {
 	var assignments []model.Assignment
-	query := db.DB.
+	database := db.FromFiber(c)
+	query := database.
 		Preload("Attachments", func(tx *gorm.DB) *gorm.DB {
 			return tx.Order("sort asc, created_at asc")
 		}).
@@ -85,6 +86,7 @@ func List(c *fiber.Ctx) error {
 }
 
 func Create(c *fiber.Ctx) error {
+	database := db.FromFiber(c)
 	var req assignmentPayload
 	if err := c.BodyParser(&req); err != nil {
 		return response.Error(c, "参数不正确")
@@ -103,14 +105,14 @@ func Create(c *fiber.Ctx) error {
 	if err := contentsafety.CheckText(content + "\n" + req.Remark); err != nil {
 		return response.Error(c, err.Error())
 	}
-	classInfo, err := resolveAssignmentClass(req)
+	classInfo, err := resolveAssignmentClass(database, req)
 	if err != nil {
 		return response.Error(c, err.Error(), fiber.StatusBadRequest)
 	}
-	if err := ensureAssignmentDestinationAvailable(classInfo, ""); err != nil {
+	if err := ensureAssignmentDestinationAvailableWithDB(database, classInfo, ""); err != nil {
 		return response.Error(c, err.Error(), fiber.StatusBadRequest)
 	}
-	if err := ensureAssignmentUnique(serviceDate, strings.TrimSpace(req.Subject), classInfo, ""); err != nil {
+	if err := ensureAssignmentUniqueWithDB(database, serviceDate, strings.TrimSpace(req.Subject), classInfo, ""); err != nil {
 		return response.Error(c, err.Error(), fiber.StatusBadRequest)
 	}
 
@@ -129,7 +131,7 @@ func Create(c *fiber.Ctx) error {
 		TeacherName: strings.TrimSpace(req.TeacherName),
 	}
 
-	if err := db.DB.Transaction(func(tx *gorm.DB) error {
+	if err := database.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(&assignment).Error; err != nil {
 			return err
 		}
@@ -154,13 +156,14 @@ func Create(c *fiber.Ctx) error {
 }
 
 func Update(c *fiber.Ctx) error {
+	database := db.FromFiber(c)
 	var req assignmentPayload
 	if err := c.BodyParser(&req); err != nil {
 		return response.Error(c, "参数不正确")
 	}
 
 	var assignment model.Assignment
-	if err := db.DB.First(&assignment, "id = ?", c.Params("id")).Error; err != nil {
+	if err := database.First(&assignment, "id = ?", c.Params("id")).Error; err != nil {
 		return response.Error(c, "每日作业不存在")
 	}
 	serviceDate := strings.TrimSpace(req.ServiceDate)
@@ -176,14 +179,14 @@ func Update(c *fiber.Ctx) error {
 	if err := contentsafety.CheckText(content + "\n" + req.Remark); err != nil {
 		return response.Error(c, err.Error())
 	}
-	classInfo, err := resolveAssignmentClass(req)
+	classInfo, err := resolveAssignmentClass(database, req)
 	if err != nil {
 		return response.Error(c, err.Error(), fiber.StatusBadRequest)
 	}
-	if err := ensureAssignmentDestinationAvailable(classInfo, assignment.ClassID); err != nil {
+	if err := ensureAssignmentDestinationAvailableWithDB(database, classInfo, assignment.ClassID); err != nil {
 		return response.Error(c, err.Error(), fiber.StatusBadRequest)
 	}
-	if err := ensureAssignmentUnique(serviceDate, strings.TrimSpace(req.Subject), classInfo, assignment.Id.String()); err != nil {
+	if err := ensureAssignmentUniqueWithDB(database, serviceDate, strings.TrimSpace(req.Subject), classInfo, assignment.Id.String()); err != nil {
 		return response.Error(c, err.Error(), fiber.StatusBadRequest)
 	}
 	assignment.CampusID = strings.TrimSpace(req.CampusID)
@@ -199,7 +202,7 @@ func Update(c *fiber.Ctx) error {
 	assignment.TeacherID = strings.TrimSpace(req.TeacherID)
 	assignment.TeacherName = strings.TrimSpace(req.TeacherName)
 
-	if err := db.DB.Transaction(func(tx *gorm.DB) error {
+	if err := database.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Save(&assignment).Error; err != nil {
 			return err
 		}
@@ -224,12 +227,13 @@ func Update(c *fiber.Ctx) error {
 }
 
 func Delete(c *fiber.Ctx) error {
+	database := db.FromFiber(c)
 	var assignment model.Assignment
-	if err := db.DB.First(&assignment, "id = ?", c.Params("id")).Error; err != nil {
+	if err := database.First(&assignment, "id = ?", c.Params("id")).Error; err != nil {
 		return response.Error(c, "每日作业不存在")
 	}
 
-	if err := db.DB.Transaction(func(tx *gorm.DB) error {
+	if err := database.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Where("assignment_id = ?", assignment.Id.String()).Delete(&model.Attachment{}).Error; err != nil {
 			return err
 		}
@@ -272,7 +276,7 @@ func validateAssignmentPayload(req assignmentPayload, serviceDate string, itemCo
 	return nil
 }
 
-func resolveAssignmentClass(req assignmentPayload) (assignmentClassInfo, error) {
+func resolveAssignmentClass(database *gorm.DB, req assignmentPayload) (assignmentClassInfo, error) {
 	classID := strings.TrimSpace(req.ClassID)
 	schoolID := strings.TrimSpace(req.SchoolID)
 	schoolName := strings.TrimSpace(req.SchoolName)
@@ -283,7 +287,7 @@ func resolveAssignmentClass(req assignmentPayload) (assignmentClassInfo, error) 
 	}
 
 	var classItem classgroupModel.Class
-	query := db.DB.Model(&classgroupModel.Class{})
+	query := database.Model(&classgroupModel.Class{})
 	if classID != "" {
 		if err := query.First(&classItem, "id = ?", classID).Error; err != nil {
 			return assignmentClassInfo{}, errors.New("班级不存在")
@@ -321,14 +325,18 @@ func resolveAssignmentClass(req assignmentPayload) (assignmentClassInfo, error) 
 	}, nil
 }
 
-func ensureAssignmentDestinationAvailable(classInfo assignmentClassInfo, currentClassID string) error {
+func ensureAssignmentDestinationAvailable(database *gorm.DB, classInfo assignmentClassInfo, currentClassID string) error {
+	return ensureAssignmentDestinationAvailableWithDB(database, classInfo, currentClassID)
+}
+
+func ensureAssignmentDestinationAvailableWithDB(database *gorm.DB, classInfo assignmentClassInfo, currentClassID string) error {
 	if strings.TrimSpace(currentClassID) != classInfo.ClassID {
 		if !service.IsActiveStatus(classInfo.Status) {
 			return errors.New("班级已禁用")
 		}
 
 		var school schoolModel.School
-		if err := db.DB.Select("id", "status").First(&school, "id = ?", classInfo.SchoolID).Error; err != nil {
+		if err := database.Select("id", "status").First(&school, "id = ?", classInfo.SchoolID).Error; err != nil {
 			return errors.New("学校不存在")
 		}
 		if !service.IsActiveStatus(school.Status) {
@@ -340,13 +348,17 @@ func ensureAssignmentDestinationAvailable(classInfo assignmentClassInfo, current
 }
 
 func ensureAssignmentUnique(serviceDate string, subject string, classInfo assignmentClassInfo, excludeID string) error {
+	return ensureAssignmentUniqueWithDB(db.DB, serviceDate, subject, classInfo, excludeID)
+}
+
+func ensureAssignmentUniqueWithDB(database *gorm.DB, serviceDate string, subject string, classInfo assignmentClassInfo, excludeID string) error {
 	if classInfo.ClassID == "" {
 		return errors.New("班级不存在")
 	}
 	subject = strings.TrimSpace(subject)
 
 	var items []model.Assignment
-	if err := db.DB.Where("service_date = ?", serviceDate).Find(&items).Error; err != nil {
+	if err := database.Where("service_date = ?", serviceDate).Find(&items).Error; err != nil {
 		return errors.New("校验每日作业失败")
 	}
 

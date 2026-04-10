@@ -22,9 +22,6 @@ Page({
   goFeature(e) {
     if (!this.data.loggedIn) {
       wx.showToast({ title: "请先登录", icon: "none" });
-      setTimeout(() => {
-        wx.navigateTo({ url: "/pages/login/index" });
-      }, 200);
       return;
     }
     const url = e.currentTarget.dataset.url;
@@ -34,9 +31,6 @@ Page({
   onQuickActionTap(e) {
     if (!this.data.loggedIn) {
       wx.showToast({ title: "请先登录", icon: "none" });
-      setTimeout(() => {
-        wx.navigateTo({ url: "/pages/login/index" });
-      }, 200);
       return;
     }
     const action = e.currentTarget.dataset.action || "";

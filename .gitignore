@@ -21,3 +21,4 @@ scripts/deploy-api.local.psd1
 !apps/weapp/miniprogram/assets/*.png
 .idea/
 docs/
+.codex-cache/

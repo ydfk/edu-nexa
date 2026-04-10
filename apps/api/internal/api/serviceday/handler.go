@@ -25,7 +25,8 @@ type dayPayload struct {
 
 func List(c *fiber.Ctx) error {
 	var days []model.Day
-	query := db.DB.Order("service_date desc, created_at desc")
+	database := db.FromFiber(c)
+	query := database.Order("service_date desc, created_at desc")
 
 	if serviceDate := strings.TrimSpace(c.Query("serviceDate")); serviceDate != "" {
 		query = query.Where("service_date = ?", serviceDate)
@@ -45,6 +46,7 @@ func List(c *fiber.Ctx) error {
 }
 
 func Create(c *fiber.Ctx) error {
+	database := db.FromFiber(c)
 	var req dayPayload
 	if err := c.BodyParser(&req); err != nil {
 		return response.Error(c, "参数不正确")
@@ -67,7 +69,7 @@ func Create(c *fiber.Ctx) error {
 		ServiceDate:               strings.TrimSpace(req.ServiceDate),
 	}
 
-	if err := db.DB.Create(&day).Error; err != nil {
+	if err := database.Create(&day).Error; err != nil {
 		return response.Error(c, "创建服务日历失败")
 	}
 
@@ -75,13 +77,14 @@ func Create(c *fiber.Ctx) error {
 }
 
 func Update(c *fiber.Ctx) error {
+	database := db.FromFiber(c)
 	var req dayPayload
 	if err := c.BodyParser(&req); err != nil {
 		return response.Error(c, "参数不正确")
 	}
 
 	var day model.Day
-	if err := db.DB.First(&day, "id = ?", c.Params("id")).Error; err != nil {
+	if err := database.First(&day, "id = ?", c.Params("id")).Error; err != nil {
 		return response.Error(c, "服务日历不存在")
 	}
 
@@ -96,7 +99,7 @@ func Update(c *fiber.Ctx) error {
 	day.Remark = strings.TrimSpace(req.Remark)
 	day.ServiceDate = strings.TrimSpace(req.ServiceDate)
 
-	if err := db.DB.Save(&day).Error; err != nil {
+	if err := database.Save(&day).Error; err != nil {
 		return response.Error(c, "更新服务日历失败")
 	}
 

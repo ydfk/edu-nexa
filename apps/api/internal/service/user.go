@@ -11,12 +11,18 @@ import (
 	model "github.com/ydfk/edu-nexa/apps/api/internal/model/user"
 	"github.com/ydfk/edu-nexa/apps/api/pkg/config"
 	"github.com/ydfk/edu-nexa/apps/api/pkg/db"
+	"gorm.io/gorm"
 )
 
 func GenerateJWT(user *model.User) (string, error) {
+	return GenerateJWTForDomain(user, false)
+}
+
+func GenerateJWTForDomain(user *model.User, isDemo bool) (string, error) {
 	claims := jwt.MapClaims{
 		"display_name": user.DisplayName,
 		"exp":          time.Now().Add(time.Duration(config.Current.Jwt.Expiration) * time.Second).Unix(),
+		"is_demo":      isDemo,
 		"phone":        user.Phone,
 		"roles":        user.Roles,
 		"user_id":      user.Id,
@@ -28,6 +34,9 @@ func GenerateJWT(user *model.User) (string, error) {
 
 func CurrentUser(c *fiber.Ctx) (user *model.User, err error) {
 	if cached, ok := c.Locals("current_user_model").(*model.User); ok && cached != nil {
+		if _, ok := c.Locals("request_db").(*gorm.DB); !ok {
+			db.SetRequestDB(c, db.ResolveDataDB(parseLocalDemoFlag(c)))
+		}
 		return cached, nil
 	}
 
@@ -53,8 +62,10 @@ func CurrentUser(c *fiber.Ctx) (user *model.User, err error) {
 	if err != nil {
 		return nil, err
 	}
+	isDemo := parseDemoClaim(claims)
 
-	dbUser, err := db.GetUserById(userID)
+	userDB := db.ResolveDataDB(isDemo)
+	dbUser, err := db.GetUserByIdFrom(userDB, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -63,8 +74,18 @@ func CurrentUser(c *fiber.Ctx) (user *model.User, err error) {
 	}
 
 	c.Locals("current_user_model", &dbUser)
+	c.Locals("current_user_is_demo", isDemo)
+	db.SetRequestDB(c, userDB)
 
 	return &dbUser, nil
+}
+
+func parseLocalDemoFlag(c *fiber.Ctx) bool {
+	value := c.Locals("current_user_is_demo")
+	if flag, ok := value.(bool); ok {
+		return flag
+	}
+	return false
 }
 
 func EnsureUserActive(user model.User) error {
@@ -101,5 +122,21 @@ func parseUserIDClaim(claims jwt.MapClaims) (string, error) {
 		return string(typed), nil
 	default:
 		return "", errors.New("user_id claim invalid")
+	}
+}
+
+func parseDemoClaim(claims jwt.MapClaims) bool {
+	value, ok := claims["is_demo"]
+	if !ok || value == nil {
+		return false
+	}
+
+	switch typed := value.(type) {
+	case bool:
+		return typed
+	case string:
+		return strings.EqualFold(strings.TrimSpace(typed), "true")
+	default:
+		return false
 	}
 }

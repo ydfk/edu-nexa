@@ -3,7 +3,7 @@ const { isLoggedIn, isAdmin, getUserRoles, canEdit } = require("../store/session
 /** 检查登录状态，未登录则跳转登录页 */
 function requireAuth() {
   if (!isLoggedIn()) {
-    wx.redirectTo({ url: "/pages/login/index" });
+    wx.showToast({ title: "请先登录", icon: "none" });
     return false;
   }
   return true;

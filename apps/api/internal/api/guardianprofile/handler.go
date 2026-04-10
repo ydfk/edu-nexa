@@ -27,7 +27,8 @@ type guardianPayload struct {
 
 func List(c *fiber.Ctx) error {
 	var items []model.Profile
-	query := db.DB.Order("created_at desc")
+	database := db.FromFiber(c)
+	query := database.Order("created_at desc")
 
 	if keyword := strings.TrimSpace(c.Query("keyword")); keyword != "" {
 		query = query.Where("name LIKE ? OR phone LIKE ?", "%"+keyword+"%", "%"+keyword+"%")
@@ -44,6 +45,7 @@ func List(c *fiber.Ctx) error {
 }
 
 func Create(c *fiber.Ctx) error {
+	database := db.FromFiber(c)
 	var req guardianPayload
 	if err := c.BodyParser(&req); err != nil {
 		return response.Error(c, "参数不正确")
@@ -51,7 +53,7 @@ func Create(c *fiber.Ctx) error {
 	if strings.TrimSpace(req.Name) == "" || strings.TrimSpace(req.Phone) == "" {
 		return response.Error(c, "家长姓名和手机号不能为空")
 	}
-	if exists, err := existsPhone(strings.TrimSpace(req.Phone), ""); err != nil {
+	if exists, err := existsPhone(database, strings.TrimSpace(req.Phone), ""); err != nil {
 		return response.Error(c, "校验家长手机号失败")
 	} else if exists {
 		return response.Error(c, "家长手机号已存在")
@@ -64,7 +66,7 @@ func Create(c *fiber.Ctx) error {
 		Remark:       strings.TrimSpace(req.Remark),
 		Status:       defaultGuardianStatus(req.Status),
 	}
-	if err := db.DB.Transaction(func(tx *gorm.DB) error {
+	if err := database.Transaction(func(tx *gorm.DB) error {
 		user, err := upsertGuardianUser(
 			tx,
 			item.UserID,
@@ -87,6 +89,7 @@ func Create(c *fiber.Ctx) error {
 }
 
 func Update(c *fiber.Ctx) error {
+	database := db.FromFiber(c)
 	var req guardianPayload
 	if err := c.BodyParser(&req); err != nil {
 		return response.Error(c, "参数不正确")
@@ -96,10 +99,10 @@ func Update(c *fiber.Ctx) error {
 	}
 
 	var item model.Profile
-	if err := db.DB.First(&item, "id = ?", c.Params("id")).Error; err != nil {
+	if err := database.First(&item, "id = ?", c.Params("id")).Error; err != nil {
 		return response.Error(c, "家长不存在")
 	}
-	if exists, err := existsPhone(strings.TrimSpace(req.Phone), c.Params("id")); err != nil {
+	if exists, err := existsPhone(database, strings.TrimSpace(req.Phone), c.Params("id")); err != nil {
 		return response.Error(c, "校验家长手机号失败")
 	} else if exists {
 		return response.Error(c, "家长手机号已存在")
@@ -110,7 +113,7 @@ func Update(c *fiber.Ctx) error {
 	item.Relationship = strings.TrimSpace(req.Relationship)
 	item.Remark = strings.TrimSpace(req.Remark)
 	item.Status = defaultGuardianStatus(req.Status)
-	if err := db.DB.Transaction(func(tx *gorm.DB) error {
+	if err := database.Transaction(func(tx *gorm.DB) error {
 		user, err := upsertGuardianUser(tx, item.UserID, item.Name, item.Phone, defaultPasswordForPhone(item.Phone), item.Status)
 		if err != nil {
 			return err
@@ -126,15 +129,16 @@ func Update(c *fiber.Ctx) error {
 }
 
 func Delete(c *fiber.Ctx) error {
+	database := db.FromFiber(c)
 	var item model.Profile
-	if err := db.DB.First(&item, "id = ?", c.Params("id")).Error; err != nil {
+	if err := database.First(&item, "id = ?", c.Params("id")).Error; err != nil {
 		return response.Error(c, "家长不存在")
 	}
-	if err := ensureGuardianDeletable(item); err != nil {
+	if err := ensureGuardianDeletable(database, item); err != nil {
 		return response.Error(c, err.Error())
 	}
 
-	if err := db.DB.Transaction(func(tx *gorm.DB) error {
+	if err := database.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Delete(&item).Error; err != nil {
 			return err
 		}
@@ -166,9 +170,9 @@ func defaultGuardianStatus(status string) string {
 	return strings.TrimSpace(status)
 }
 
-func existsPhone(phone string, currentID string) (bool, error) {
+func existsPhone(database *gorm.DB, phone string, currentID string) (bool, error) {
 	var count int64
-	query := db.DB.Model(&model.Profile{}).Where("phone = ?", phone)
+	query := database.Model(&model.Profile{}).Where("phone = ?", phone)
 	if currentID != "" {
 		query = query.Where("id <> ?", currentID)
 	}
@@ -271,16 +275,16 @@ func shouldDeleteGuardianUser(user userModel.User) bool {
 	return len(roles) == 0 || (len(roles) == 1 && roles[0] == "guardian")
 }
 
-func ensureGuardianDeletable(item model.Profile) error {
+func ensureGuardianDeletable(database *gorm.DB, item model.Profile) error {
 	var count int64
-	if err := db.DB.Model(&studentModel.Student{}).Where("guardian_id = ?", item.Id.String()).Count(&count).Error; err != nil {
+	if err := database.Model(&studentModel.Student{}).Where("guardian_id = ?", item.Id.String()).Count(&count).Error; err != nil {
 		return errors.New("校验家长关联学生失败")
 	}
 	if count > 0 {
 		return errors.New("家长已关联学生，不能删除")
 	}
 
-	query := db.DB.Model(&guardianbindingModel.Binding{}).Where("guardian_phone = ?", item.Phone)
+	query := database.Model(&guardianbindingModel.Binding{}).Where("guardian_phone = ?", item.Phone)
 	if strings.TrimSpace(item.UserID) != "" {
 		query = query.Or("guardian_user_id = ?", item.UserID)
 	}

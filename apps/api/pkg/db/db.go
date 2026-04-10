@@ -2,6 +2,7 @@ package db
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/ydfk/edu-nexa/apps/api/pkg/config"
@@ -15,32 +16,82 @@ import (
 )
 
 var DB *gorm.DB
+var DemoDB *gorm.DB
+
+const demoDatabasePath = "data/demo.sqlite"
 
 func Init() error {
-	dialector, err := buildDialector()
+	dialector, err := buildDialectorForConfig(config.Current.Database)
 	if err != nil {
 		return err
 	}
 
-	db, err := gorm.Open(dialector, &gorm.Config{
+	mainDB, err := gorm.Open(dialector, &gorm.Config{
 		Logger: zapgorm2.New(logger.Logger.Desugar()),
 	})
 	if err != nil {
 		return err
 	}
 
-	DB = db
-	if err := autoMigrate(); err != nil {
+	DB = mainDB
+	if err := autoMigrateFor(DB); err != nil {
 		return fmt.Errorf("数据库迁移失败: %v", err)
+	}
+
+	if err := initDemoDatabase(); err != nil {
+		return err
 	}
 
 	return nil
 }
 
+func initDemoDatabase() error {
+	dialector, err := buildDialectorForConfig(config.DatabaseConfig{
+		Driver: "sqlite",
+		Path:   demoDatabasePath,
+	})
+	if err != nil {
+		return err
+	}
+
+	database, err := gorm.Open(dialector, &gorm.Config{
+		Logger: zapgorm2.New(logger.Logger.Desugar()),
+	})
+	if err != nil {
+		return err
+	}
+	if err := autoMigrateFor(database); err != nil {
+		return fmt.Errorf("demo 数据库迁移失败: %v", err)
+	}
+
+	DemoDB = database
+
+	return nil
+}
+
+func ResetDemoDatabase() error {
+	if DemoDB != nil {
+		if sqlDB, err := DemoDB.DB(); err == nil {
+			_ = sqlDB.Close()
+		}
+		DemoDB = nil
+	}
+
+	if err := os.Remove(demoDatabasePath); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("重置 demo 数据库失败: %w", err)
+	}
+
+	return initDemoDatabase()
+}
+
 func buildDialector() (gorm.Dialector, error) {
-	driver := strings.TrimSpace(strings.ToLower(config.Current.Database.Driver))
+	return buildDialectorForConfig(config.Current.Database)
+}
+
+func buildDialectorForConfig(databaseConfig config.DatabaseConfig) (gorm.Dialector, error) {
+	driver := strings.TrimSpace(strings.ToLower(databaseConfig.Driver))
 	if driver == "" || driver == "sqlite" {
-		path := strings.TrimSpace(config.Current.Database.Path)
+		path := strings.TrimSpace(databaseConfig.Path)
 		if path == "" {
 			return nil, fmt.Errorf("sqlite 数据库路径不能为空")
 		}
@@ -52,7 +103,7 @@ func buildDialector() (gorm.Dialector, error) {
 	}
 
 	if driver == "postgres" || driver == "postgresql" || driver == "pgsql" {
-		dsn := strings.TrimSpace(config.Current.Database.DSN)
+		dsn := strings.TrimSpace(databaseConfig.DSN)
 		if dsn == "" {
 			return nil, fmt.Errorf("postgres 数据库 dsn 不能为空")
 		}

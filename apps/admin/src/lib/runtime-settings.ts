@@ -9,6 +9,12 @@ export type RuntimeSettings = {
   systemNamePrefix: string;
   textSecurityEnable: boolean;
   textSecurityStrict: boolean;
+  demoTeacherName: string;
+  demoTeacherPhone: string;
+  demoTeacherPassword: string;
+  demoGuardianName: string;
+  demoGuardianPhone: string;
+  demoGuardianPassword: string;
 };
 
 const defaultHomeworkSubjects = '["语文","数学","英语","其他"]';
@@ -23,6 +29,12 @@ const defaultSettings: RuntimeSettings = {
   systemNamePrefix: "",
   textSecurityEnable: false,
   textSecurityStrict: false,
+  demoTeacherName: "演示教师",
+  demoTeacherPhone: "18800000001",
+  demoTeacherPassword: "123456",
+  demoGuardianName: "演示家长",
+  demoGuardianPhone: "18800000002",
+  demoGuardianPassword: "123456",
 };
 
 let mockRuntimeSettings = cloneRuntimeSettings(defaultSettings);
@@ -82,6 +94,58 @@ export async function saveRuntimeSettings(settings: RuntimeSettings) {
   }
 }
 
+export async function fetchAdminRuntimeSettings() {
+  const session = getAdminSessionSnapshot();
+  const response = await fetch("/api/runtime-settings/admin", {
+    headers: {
+      Authorization: session.token ? `Bearer ${session.token}` : "",
+    },
+  });
+  const payload = await response.json();
+  if (!response.ok || payload?.flag !== true || !payload.data) {
+    throw new Error(payload?.msg || "读取系统设置失败");
+  }
+
+  mockRuntimeSettings = normalizeRuntimeSettings(payload.data);
+  return cloneRuntimeSettings(mockRuntimeSettings);
+}
+
+export async function saveAdminRuntimeSettings(settings: RuntimeSettings) {
+  const session = getAdminSessionSnapshot();
+  const normalized = normalizeRuntimeSettings(settings);
+  const response = await fetch("/api/runtime-settings", {
+    body: JSON.stringify(normalized),
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: session.token ? `Bearer ${session.token}` : "",
+    },
+    method: "PUT",
+  });
+  const payload = await response.json();
+  if (!response.ok || payload?.flag !== true || !payload.data) {
+    throw new Error(payload?.msg || "保存失败");
+  }
+
+  mockRuntimeSettings = normalizeRuntimeSettings(payload.data);
+  return cloneRuntimeSettings(mockRuntimeSettings);
+}
+
+export async function initializeDemoEnvironment() {
+  const session = getAdminSessionSnapshot();
+  const response = await fetch("/api/runtime-settings/demo/initialize", {
+    headers: {
+      Authorization: session.token ? `Bearer ${session.token}` : "",
+    },
+    method: "POST",
+  });
+  const payload = await response.json();
+  if (!response.ok || payload?.flag !== true || !payload.data) {
+    throw new Error(payload?.msg || "初始化 demo 数据失败");
+  }
+
+  return payload.data as RuntimeSettings;
+}
+
 function normalizeRuntimeSettings(
   value: Partial<RuntimeSettings> | undefined
 ): RuntimeSettings {
@@ -94,6 +158,12 @@ function normalizeRuntimeSettings(
     systemNamePrefix: (value?.systemNamePrefix || "").trim(),
     textSecurityEnable: !!value?.textSecurityEnable,
     textSecurityStrict: !!value?.textSecurityStrict,
+    demoTeacherName: (value?.demoTeacherName || defaultSettings.demoTeacherName).trim(),
+    demoTeacherPhone: (value?.demoTeacherPhone || defaultSettings.demoTeacherPhone).trim(),
+    demoTeacherPassword: (value?.demoTeacherPassword || defaultSettings.demoTeacherPassword).trim(),
+    demoGuardianName: (value?.demoGuardianName || defaultSettings.demoGuardianName).trim(),
+    demoGuardianPhone: (value?.demoGuardianPhone || defaultSettings.demoGuardianPhone).trim(),
+    demoGuardianPassword: (value?.demoGuardianPassword || defaultSettings.demoGuardianPassword).trim(),
   };
 }
 

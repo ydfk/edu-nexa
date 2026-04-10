@@ -48,7 +48,8 @@ func List(c *fiber.Ctx) error {
 	}
 
 	var users []model.User
-	query := db.DB.Order("created_at desc")
+	database := db.FromFiber(c)
+	query := database.Order("created_at desc")
 
 	if role := strings.TrimSpace(c.Query("role")); role != "" {
 		query = query.Where("roles LIKE ?", "%"+role+"%")
@@ -80,6 +81,7 @@ func Create(c *fiber.Ctx) error {
 	if !hasRole(currentUser.Roles, "admin") {
 		return response.Error(c, "没有权限")
 	}
+	database := db.FromFiber(c)
 
 	var req createUserPayload
 	if err := c.BodyParser(&req); err != nil {
@@ -106,7 +108,7 @@ func Create(c *fiber.Ctx) error {
 		Status:      defaultUserStatus(req.Status),
 	}
 
-	if err := db.DB.Create(&user).Error; err != nil {
+	if err := database.Create(&user).Error; err != nil {
 		return response.Error(c, "手机号已存在")
 	}
 
@@ -121,6 +123,7 @@ func ResetPassword(c *fiber.Ctx) error {
 	if !hasRole(currentUser.Roles, "admin") {
 		return response.Error(c, "没有权限")
 	}
+	database := db.FromFiber(c)
 
 	var req resetPasswordPayload
 	if err := c.BodyParser(&req); err != nil {
@@ -131,7 +134,7 @@ func ResetPassword(c *fiber.Ctx) error {
 	}
 
 	var user model.User
-	if err := db.DB.First(&user, "id = ?", c.Params("id")).Error; err != nil {
+	if err := database.First(&user, "id = ?", c.Params("id")).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return response.Error(c, "账号不存在")
 		}
@@ -144,7 +147,7 @@ func ResetPassword(c *fiber.Ctx) error {
 	}
 
 	user.Password = string(hash)
-	if err := db.DB.Save(&user).Error; err != nil {
+	if err := database.Save(&user).Error; err != nil {
 		return response.Error(c, "重置密码失败")
 	}
 
@@ -159,6 +162,7 @@ func Update(c *fiber.Ctx) error {
 	if !hasRole(currentUser.Roles, "admin") {
 		return response.Error(c, "没有权限")
 	}
+	database := db.FromFiber(c)
 
 	var req updateUserPayload
 	if err := c.BodyParser(&req); err != nil {
@@ -173,7 +177,7 @@ func Update(c *fiber.Ctx) error {
 	}
 
 	var user model.User
-	if err := db.DB.First(&user, "id = ?", c.Params("id")).Error; err != nil {
+	if err := database.First(&user, "id = ?", c.Params("id")).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return response.Error(c, "账号不存在")
 		}
@@ -188,7 +192,7 @@ func Update(c *fiber.Ctx) error {
 		}
 	}
 
-	if err := ensureUserPhoneUnique(req.Phone, user.Id.String()); err != nil {
+	if err := ensureUserPhoneUnique(database, req.Phone, user.Id.String()); err != nil {
 		return response.Error(c, err.Error())
 	}
 
@@ -196,7 +200,7 @@ func Update(c *fiber.Ctx) error {
 	user.Phone = req.Phone
 	user.Roles = joinRoles(req.Roles)
 	user.Status = defaultUserStatus(req.Status)
-	if err := db.DB.Save(&user).Error; err != nil {
+	if err := database.Save(&user).Error; err != nil {
 		return response.Error(c, "更新账号失败")
 	}
 
@@ -214,19 +218,20 @@ func Delete(c *fiber.Ctx) error {
 	if currentUser.Id.String() == c.Params("id") {
 		return response.Error(c, "不能删除当前登录账号")
 	}
+	database := db.FromFiber(c)
 
 	var user model.User
-	if err := db.DB.First(&user, "id = ?", c.Params("id")).Error; err != nil {
+	if err := database.First(&user, "id = ?", c.Params("id")).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return response.Error(c, "账号不存在")
 		}
 		return response.Error(c, "查询账号失败")
 	}
-	if err := ensureUserDeletable(user); err != nil {
+	if err := ensureUserDeletable(database, user); err != nil {
 		return response.Error(c, err.Error())
 	}
 
-	if err := db.DB.Delete(&user).Error; err != nil {
+	if err := database.Delete(&user).Error; err != nil {
 		return response.Error(c, "删除账号失败")
 	}
 
@@ -301,9 +306,9 @@ func defaultUserStatus(status string) string {
 	return strings.TrimSpace(status)
 }
 
-func ensureUserPhoneUnique(phone string, excludeID string) error {
+func ensureUserPhoneUnique(database *gorm.DB, phone string, excludeID string) error {
 	var count int64
-	query := db.DB.Model(&model.User{}).Where("phone = ?", phone)
+	query := database.Model(&model.User{}).Where("phone = ?", phone)
 	if excludeID != "" {
 		query = query.Where("id <> ?", excludeID)
 	}
@@ -318,37 +323,37 @@ func ensureUserPhoneUnique(phone string, excludeID string) error {
 	return nil
 }
 
-func ensureUserDeletable(user model.User) error {
+func ensureUserDeletable(database *gorm.DB, user model.User) error {
 	var count int64
-	if err := db.DB.Model(&guardianprofileModel.Profile{}).Where("user_id = ?", user.Id.String()).Count(&count).Error; err != nil {
+	if err := database.Model(&guardianprofileModel.Profile{}).Where("user_id = ?", user.Id.String()).Count(&count).Error; err != nil {
 		return errors.New("校验账号关联家长失败")
 	}
 	if count > 0 {
 		return errors.New("账号已关联家长信息，不能删除")
 	}
 
-	if err := db.DB.Model(&guardianbindingModel.Binding{}).Where("guardian_user_id = ?", user.Id.String()).Count(&count).Error; err != nil {
+	if err := database.Model(&guardianbindingModel.Binding{}).Where("guardian_user_id = ?", user.Id.String()).Count(&count).Error; err != nil {
 		return errors.New("校验账号关联学生关系失败")
 	}
 	if count > 0 {
 		return errors.New("账号已关联学生关系，不能删除")
 	}
 
-	if err := db.DB.Model(&homeworkassignmentModel.Assignment{}).Where("teacher_id = ?", user.Id.String()).Count(&count).Error; err != nil {
+	if err := database.Model(&homeworkassignmentModel.Assignment{}).Where("teacher_id = ?", user.Id.String()).Count(&count).Error; err != nil {
 		return errors.New("校验账号关联每日作业失败")
 	}
 	if count > 0 {
 		return errors.New("账号已关联每日作业，不能删除")
 	}
 
-	if err := db.DB.Model(&mealrecordModel.Record{}).Where("recorded_by_id = ?", user.Id.String()).Count(&count).Error; err != nil {
+	if err := database.Model(&mealrecordModel.Record{}).Where("recorded_by_id = ?", user.Id.String()).Count(&count).Error; err != nil {
 		return errors.New("校验账号关联用餐记录失败")
 	}
 	if count > 0 {
 		return errors.New("账号已关联用餐记录，不能删除")
 	}
 
-	if err := db.DB.Model(&homeworkrecordModel.Record{}).Where("recorded_by_id = ?", user.Id.String()).Count(&count).Error; err != nil {
+	if err := database.Model(&homeworkrecordModel.Record{}).Where("recorded_by_id = ?", user.Id.String()).Count(&count).Error; err != nil {
 		return errors.New("校验账号关联作业记录失败")
 	}
 	if count > 0 {

@@ -23,7 +23,8 @@ type schoolPayload struct {
 
 func List(c *fiber.Ctx) error {
 	var items []model.School
-	query := db.DB.Order("created_at desc")
+	database := db.FromFiber(c)
+	query := database.Order("created_at desc")
 
 	if keyword := strings.TrimSpace(c.Query("keyword")); keyword != "" {
 		query = query.Where("name LIKE ?", "%"+keyword+"%")
@@ -40,6 +41,7 @@ func List(c *fiber.Ctx) error {
 }
 
 func Create(c *fiber.Ctx) error {
+	database := db.FromFiber(c)
 	var req schoolPayload
 	if err := c.BodyParser(&req); err != nil {
 		return response.Error(c, "参数不正确")
@@ -47,7 +49,7 @@ func Create(c *fiber.Ctx) error {
 	if strings.TrimSpace(req.Name) == "" {
 		return response.Error(c, "学校名称不能为空")
 	}
-	if err := ensureSchoolNameUnique(strings.TrimSpace(req.Name), ""); err != nil {
+	if err := ensureSchoolNameUnique(database, strings.TrimSpace(req.Name), ""); err != nil {
 		return response.Error(c, err.Error())
 	}
 
@@ -55,7 +57,7 @@ func Create(c *fiber.Ctx) error {
 		Name:   strings.TrimSpace(req.Name),
 		Status: defaultStatus(req.Status),
 	}
-	if err := db.DB.Create(&item).Error; err != nil {
+	if err := database.Create(&item).Error; err != nil {
 		return response.Error(c, "创建学校失败")
 	}
 
@@ -63,25 +65,26 @@ func Create(c *fiber.Ctx) error {
 }
 
 func Update(c *fiber.Ctx) error {
+	database := db.FromFiber(c)
 	var req schoolPayload
 	if err := c.BodyParser(&req); err != nil {
 		return response.Error(c, "参数不正确")
 	}
 
 	var item model.School
-	if err := db.DB.First(&item, "id = ?", c.Params("id")).Error; err != nil {
+	if err := database.First(&item, "id = ?", c.Params("id")).Error; err != nil {
 		return response.Error(c, "学校不存在")
 	}
 	if strings.TrimSpace(req.Name) == "" {
 		return response.Error(c, "学校名称不能为空")
 	}
-	if err := ensureSchoolNameUnique(strings.TrimSpace(req.Name), item.Id.String()); err != nil {
+	if err := ensureSchoolNameUnique(database, strings.TrimSpace(req.Name), item.Id.String()); err != nil {
 		return response.Error(c, err.Error())
 	}
 
 	item.Name = strings.TrimSpace(req.Name)
 	item.Status = defaultStatus(req.Status)
-	if err := db.DB.Save(&item).Error; err != nil {
+	if err := database.Save(&item).Error; err != nil {
 		return response.Error(c, "更新学校失败")
 	}
 
@@ -89,15 +92,16 @@ func Update(c *fiber.Ctx) error {
 }
 
 func Delete(c *fiber.Ctx) error {
+	database := db.FromFiber(c)
 	var item model.School
-	if err := db.DB.First(&item, "id = ?", c.Params("id")).Error; err != nil {
+	if err := database.First(&item, "id = ?", c.Params("id")).Error; err != nil {
 		return response.Error(c, "学校不存在")
 	}
-	if err := ensureSchoolDeletable(item); err != nil {
+	if err := ensureSchoolDeletable(database, item); err != nil {
 		return response.Error(c, err.Error())
 	}
 
-	if err := db.DB.Delete(&item).Error; err != nil {
+	if err := database.Delete(&item).Error; err != nil {
 		return response.Error(c, "删除学校失败")
 	}
 
@@ -112,9 +116,9 @@ func defaultStatus(status string) string {
 	return strings.TrimSpace(status)
 }
 
-func ensureSchoolNameUnique(name string, excludeID string) error {
+func ensureSchoolNameUnique(database *gorm.DB, name string, excludeID string) error {
 	var item model.School
-	query := db.DB.Where("LOWER(name) = LOWER(?)", strings.TrimSpace(name))
+	query := database.Where("LOWER(name) = LOWER(?)", strings.TrimSpace(name))
 	if excludeID != "" {
 		query = query.Where("id <> ?", excludeID)
 	}
@@ -129,30 +133,30 @@ func ensureSchoolNameUnique(name string, excludeID string) error {
 	return errors.New("学校名称已存在")
 }
 
-func ensureSchoolDeletable(item model.School) error {
+func ensureSchoolDeletable(database *gorm.DB, item model.School) error {
 	var count int64
-	if err := db.DB.Model(&classgroupModel.Class{}).Where("school_id = ?", item.Id.String()).Count(&count).Error; err != nil {
+	if err := database.Model(&classgroupModel.Class{}).Where("school_id = ?", item.Id.String()).Count(&count).Error; err != nil {
 		return errors.New("校验学校关联班级失败")
 	}
 	if count > 0 {
 		return errors.New("学校下存在班级，不能删除")
 	}
 
-	if err := db.DB.Model(&studentModel.Student{}).Where("school_id = ?", item.Id.String()).Count(&count).Error; err != nil {
+	if err := database.Model(&studentModel.Student{}).Where("school_id = ?", item.Id.String()).Count(&count).Error; err != nil {
 		return errors.New("校验学校关联学生失败")
 	}
 	if count > 0 {
 		return errors.New("学校下存在学生，不能删除")
 	}
 
-	if err := db.DB.Model(&homeworkassignmentModel.Assignment{}).Where("school_name = ?", item.Name).Count(&count).Error; err != nil {
+	if err := database.Model(&homeworkassignmentModel.Assignment{}).Where("school_name = ?", item.Name).Count(&count).Error; err != nil {
 		return errors.New("校验学校关联每日作业失败")
 	}
 	if count > 0 {
 		return errors.New("学校已关联每日作业，不能删除")
 	}
 
-	if err := db.DB.Model(&homeworkrecordModel.Record{}).Where("school_name = ?", item.Name).Count(&count).Error; err != nil {
+	if err := database.Model(&homeworkrecordModel.Record{}).Where("school_name = ?", item.Name).Count(&count).Error; err != nil {
 		return errors.New("校验学校关联作业记录失败")
 	}
 	if count > 0 {

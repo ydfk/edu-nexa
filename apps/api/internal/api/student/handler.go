@@ -38,7 +38,8 @@ type studentPayload struct {
 
 func List(c *fiber.Ctx) error {
 	var students []model.Student
-	query := db.DB.Order("created_at desc")
+	database := db.FromFiber(c)
+	query := database.Order("created_at desc")
 
 	if keyword := strings.TrimSpace(c.Query("keyword")); keyword != "" {
 		query = query.Where(
@@ -81,7 +82,7 @@ func List(c *fiber.Ctx) error {
 	serviceMap := make(map[string]studentserviceModel.Plan)
 	if len(studentIDs) > 0 {
 		var plans []studentserviceModel.Plan
-		if err := db.DB.
+		if err := database.
 			Where("student_id IN ?", studentIDs).
 			Order("service_end_date desc, created_at desc").
 			Find(&plans).Error; err == nil {
@@ -131,6 +132,7 @@ func List(c *fiber.Ctx) error {
 }
 
 func Create(c *fiber.Ctx) error {
+	database := db.FromFiber(c)
 	var req studentPayload
 	if err := c.BodyParser(&req); err != nil {
 		return response.Error(c, "参数不正确")
@@ -139,10 +141,11 @@ func Create(c *fiber.Ctx) error {
 	if err := validateStudentPayload(req); err != nil {
 		return response.Error(c, err.Error())
 	}
-	if err := ensureStudentReferencesAvailable(req, nil); err != nil {
+	if err := ensureStudentReferencesAvailable(database, req, nil); err != nil {
 		return response.Error(c, err.Error())
 	}
 	if err := ensureStudentNameUnique(
+		database,
 		strings.TrimSpace(req.Name),
 		strings.TrimSpace(req.GuardianID),
 		strings.TrimSpace(req.GuardianPhone),
@@ -167,7 +170,7 @@ func Create(c *fiber.Ctx) error {
 		Status:        defaultStudentStatus(req.Status),
 	}
 
-	if err := db.DB.Create(&student).Error; err != nil {
+	if err := database.Create(&student).Error; err != nil {
 		return response.Error(c, "创建学生失败")
 	}
 
@@ -175,6 +178,7 @@ func Create(c *fiber.Ctx) error {
 }
 
 func Update(c *fiber.Ctx) error {
+	database := db.FromFiber(c)
 	var req studentPayload
 	if err := c.BodyParser(&req); err != nil {
 		return response.Error(c, "参数不正确")
@@ -184,13 +188,14 @@ func Update(c *fiber.Ctx) error {
 	}
 
 	var student model.Student
-	if err := db.DB.First(&student, "id = ?", c.Params("id")).Error; err != nil {
+	if err := database.First(&student, "id = ?", c.Params("id")).Error; err != nil {
 		return response.Error(c, "学生不存在")
 	}
-	if err := ensureStudentReferencesAvailable(req, &student); err != nil {
+	if err := ensureStudentReferencesAvailable(database, req, &student); err != nil {
 		return response.Error(c, err.Error())
 	}
 	if err := ensureStudentNameUnique(
+		database,
 		strings.TrimSpace(req.Name),
 		strings.TrimSpace(req.GuardianID),
 		strings.TrimSpace(req.GuardianPhone),
@@ -213,7 +218,7 @@ func Update(c *fiber.Ctx) error {
 	student.SchoolName = strings.TrimSpace(req.SchoolName)
 	student.Status = defaultStudentStatus(req.Status)
 
-	if err := db.DB.Save(&student).Error; err != nil {
+	if err := database.Save(&student).Error; err != nil {
 		return response.Error(c, "更新学生失败")
 	}
 
@@ -221,15 +226,16 @@ func Update(c *fiber.Ctx) error {
 }
 
 func Delete(c *fiber.Ctx) error {
+	database := db.FromFiber(c)
 	var student model.Student
-	if err := db.DB.First(&student, "id = ?", c.Params("id")).Error; err != nil {
+	if err := database.First(&student, "id = ?", c.Params("id")).Error; err != nil {
 		return response.Error(c, "学生不存在")
 	}
-	if err := ensureStudentDeletable(student); err != nil {
+	if err := ensureStudentDeletable(database, student); err != nil {
 		return response.Error(c, err.Error())
 	}
 
-	if err := db.DB.Delete(&student).Error; err != nil {
+	if err := database.Delete(&student).Error; err != nil {
 		return response.Error(c, "删除学生失败")
 	}
 
@@ -278,13 +284,13 @@ func normalizeStudentGender(gender string) string {
 	}
 }
 
-func ensureStudentNameUnique(name string, guardianID string, guardianPhone string, excludeID string) error {
+func ensureStudentNameUnique(database *gorm.DB, name string, guardianID string, guardianPhone string, excludeID string) error {
 	if guardianID == "" && guardianPhone == "" {
 		return errors.New("家长不能为空")
 	}
 
 	var item model.Student
-	query := db.DB.Where("LOWER(name) = LOWER(?)", name)
+	query := database.Where("LOWER(name) = LOWER(?)", name)
 	if guardianID != "" {
 		query = query.Where("guardian_id = ?", guardianID)
 	} else {
@@ -304,23 +310,23 @@ func ensureStudentNameUnique(name string, guardianID string, guardianPhone strin
 	return errors.New("同一家长下学生姓名不能重复")
 }
 
-func ensureStudentDeletable(student model.Student) error {
+func ensureStudentDeletable(database *gorm.DB, student model.Student) error {
 	var count int64
-	if err := db.DB.Model(&studentserviceModel.Plan{}).Where("student_id = ?", student.Id.String()).Count(&count).Error; err != nil {
+	if err := database.Model(&studentserviceModel.Plan{}).Where("student_id = ?", student.Id.String()).Count(&count).Error; err != nil {
 		return errors.New("校验学生关联服务计划失败")
 	}
 	if count > 0 {
 		return errors.New("学生已关联服务计划，不能删除")
 	}
 
-	if err := db.DB.Model(&mealrecordModel.Record{}).Where("student_id = ?", student.Id.String()).Count(&count).Error; err != nil {
+	if err := database.Model(&mealrecordModel.Record{}).Where("student_id = ?", student.Id.String()).Count(&count).Error; err != nil {
 		return errors.New("校验学生关联用餐记录失败")
 	}
 	if count > 0 {
 		return errors.New("学生已关联用餐记录，不能删除")
 	}
 
-	if err := db.DB.Model(&homeworkrecordModel.Record{}).Where("student_id = ?", student.Id.String()).Count(&count).Error; err != nil {
+	if err := database.Model(&homeworkrecordModel.Record{}).Where("student_id = ?", student.Id.String()).Count(&count).Error; err != nil {
 		return errors.New("校验学生关联作业记录失败")
 	}
 	if count > 0 {
@@ -330,10 +336,10 @@ func ensureStudentDeletable(student model.Student) error {
 	return nil
 }
 
-func ensureStudentReferencesAvailable(req studentPayload, current *model.Student) error {
+func ensureStudentReferencesAvailable(database *gorm.DB, req studentPayload, current *model.Student) error {
 	if shouldValidateReference(req.SchoolID, currentSchoolID(current)) {
 		var school schoolModel.School
-		if err := db.DB.Select("id", "status").First(&school, "id = ?", strings.TrimSpace(req.SchoolID)).Error; err != nil {
+	if err := database.Select("id", "status").First(&school, "id = ?", strings.TrimSpace(req.SchoolID)).Error; err != nil {
 			return errors.New("学校不存在")
 		}
 		if !service.IsActiveStatus(school.Status) {
@@ -343,7 +349,7 @@ func ensureStudentReferencesAvailable(req studentPayload, current *model.Student
 
 	if shouldValidateReference(req.GradeID, currentGradeID(current)) {
 		var grade gradelevelModel.Grade
-		if err := db.DB.Select("id", "status").First(&grade, "id = ?", strings.TrimSpace(req.GradeID)).Error; err != nil {
+	if err := database.Select("id", "status").First(&grade, "id = ?", strings.TrimSpace(req.GradeID)).Error; err != nil {
 			return errors.New("年级不存在")
 		}
 		if !service.IsActiveStatus(grade.Status) {
@@ -353,7 +359,7 @@ func ensureStudentReferencesAvailable(req studentPayload, current *model.Student
 
 	if shouldValidateReference(req.ClassID, currentClassID(current)) {
 		var classItem classgroupModel.Class
-		if err := db.DB.Select("id", "status").First(&classItem, "id = ?", strings.TrimSpace(req.ClassID)).Error; err != nil {
+	if err := database.Select("id", "status").First(&classItem, "id = ?", strings.TrimSpace(req.ClassID)).Error; err != nil {
 			return errors.New("班级不存在")
 		}
 		if !service.IsActiveStatus(classItem.Status) {
@@ -363,7 +369,7 @@ func ensureStudentReferencesAvailable(req studentPayload, current *model.Student
 
 	if shouldValidateReference(req.GuardianID, currentGuardianID(current)) {
 		var guardian guardianprofileModel.Profile
-		if err := db.DB.Select("id", "status").First(&guardian, "id = ?", strings.TrimSpace(req.GuardianID)).Error; err != nil {
+	if err := database.Select("id", "status").First(&guardian, "id = ?", strings.TrimSpace(req.GuardianID)).Error; err != nil {
 			return errors.New("家长不存在")
 		}
 		if !service.IsActiveStatus(guardian.Status) {

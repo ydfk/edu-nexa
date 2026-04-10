@@ -19,7 +19,8 @@ type teacherPayload struct {
 
 func List(c *fiber.Ctx) error {
 	var teachers []model.Profile
-	query := db.DB.Order("created_at desc")
+	database := db.FromFiber(c)
+	query := database.Order("created_at desc")
 
 	if phone := c.Query("phone"); phone != "" {
 		query = query.Where("phone = ?", phone)
@@ -36,6 +37,7 @@ func List(c *fiber.Ctx) error {
 }
 
 func Create(c *fiber.Ctx) error {
+	database := db.FromFiber(c)
 	var req teacherPayload
 	if err := c.BodyParser(&req); err != nil {
 		return response.Error(c, "参数不正确")
@@ -54,7 +56,7 @@ func Create(c *fiber.Ctx) error {
 		UserID:      req.UserID,
 	}
 
-	if err := db.DB.Create(&teacher).Error; err != nil {
+	if err := database.Create(&teacher).Error; err != nil {
 		return response.Error(c, "创建教师失败")
 	}
 
@@ -62,13 +64,14 @@ func Create(c *fiber.Ctx) error {
 }
 
 func Update(c *fiber.Ctx) error {
+	database := db.FromFiber(c)
 	var req teacherPayload
 	if err := c.BodyParser(&req); err != nil {
 		return response.Error(c, "参数不正确")
 	}
 
 	var teacher model.Profile
-	if err := db.DB.First(&teacher, "id = ?", c.Params("id")).Error; err != nil {
+	if err := database.First(&teacher, "id = ?", c.Params("id")).Error; err != nil {
 		return response.Error(c, "教师不存在")
 	}
 
@@ -79,7 +82,7 @@ func Update(c *fiber.Ctx) error {
 	teacher.Status = defaultTeacherStatus(req.Status)
 	teacher.UserID = req.UserID
 
-	if err := db.DB.Save(&teacher).Error; err != nil {
+	if err := database.Save(&teacher).Error; err != nil {
 		return response.Error(c, "更新教师失败")
 	}
 

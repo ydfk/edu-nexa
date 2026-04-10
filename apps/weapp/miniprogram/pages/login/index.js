@@ -1,4 +1,4 @@
-const { login, weappPhoneLogin } = require("../../services/auth");
+const { login } = require("../../services/auth");
 const { isLoggedIn, setSession } = require("../../store/session");
 
 Page({
@@ -59,33 +59,6 @@ Page({
       this.finishLogin(result);
     } catch (err) {
       console.error("密码登录失败", err);
-      wx.showToast({ title: err.message || "登录失败", icon: "none" });
-    } finally {
-      this.setData({ submitting: false });
-    }
-  },
-
-  async onGetPhoneNumber(e) {
-    if (e.detail.errMsg !== "getPhoneNumber:ok") {
-      wx.showToast({ title: "已取消授权", icon: "none" });
-      return;
-    }
-    if (!this.data.agreedPrivacy) {
-      wx.showToast({ title: "请先同意隐私协议", icon: "none" });
-      return;
-    }
-
-    this.setData({ submitting: true });
-
-    try {
-      const loginRes = await wx.login();
-      const result = await weappPhoneLogin({
-        wxCode: loginRes.code,
-        phoneCode: e.detail.code,
-      });
-      this.finishLogin(result);
-    } catch (err) {
-      console.error("快捷登录失败", err);
       wx.showToast({ title: err.message || "登录失败", icon: "none" });
     } finally {
       this.setData({ submitting: false });

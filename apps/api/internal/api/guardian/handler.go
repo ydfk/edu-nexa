@@ -20,7 +20,8 @@ type guardianPayload struct {
 
 func List(c *fiber.Ctx) error {
 	var bindings []model.Binding
-	query := db.DB.Order("created_at desc")
+	database := db.FromFiber(c)
+	query := database.Order("created_at desc")
 
 	if studentID := c.Query("studentId"); studentID != "" {
 		query = query.Where("student_id = ?", studentID)
@@ -40,6 +41,7 @@ func List(c *fiber.Ctx) error {
 }
 
 func Create(c *fiber.Ctx) error {
+	database := db.FromFiber(c)
 	var req guardianPayload
 	if err := c.BodyParser(&req); err != nil {
 		return response.Error(c, "参数不正确")
@@ -59,7 +61,7 @@ func Create(c *fiber.Ctx) error {
 		StudentID:      req.StudentID,
 	}
 
-	if err := db.DB.Create(&binding).Error; err != nil {
+	if err := database.Create(&binding).Error; err != nil {
 		return response.Error(c, "创建家长关系失败")
 	}
 
@@ -67,13 +69,14 @@ func Create(c *fiber.Ctx) error {
 }
 
 func Update(c *fiber.Ctx) error {
+	database := db.FromFiber(c)
 	var req guardianPayload
 	if err := c.BodyParser(&req); err != nil {
 		return response.Error(c, "参数不正确")
 	}
 
 	var binding model.Binding
-	if err := db.DB.First(&binding, "id = ?", c.Params("id")).Error; err != nil {
+	if err := database.First(&binding, "id = ?", c.Params("id")).Error; err != nil {
 		return response.Error(c, "家长关系不存在")
 	}
 
@@ -85,7 +88,7 @@ func Update(c *fiber.Ctx) error {
 	binding.Status = defaultGuardianStatus(req.Status)
 	binding.StudentID = req.StudentID
 
-	if err := db.DB.Save(&binding).Error; err != nil {
+	if err := database.Save(&binding).Error; err != nil {
 		return response.Error(c, "更新家长关系失败")
 	}
 

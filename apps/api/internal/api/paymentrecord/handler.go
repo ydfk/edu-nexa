@@ -10,6 +10,7 @@ import (
 	studentModel "github.com/ydfk/edu-nexa/apps/api/internal/model/student"
 	"github.com/ydfk/edu-nexa/apps/api/internal/service"
 	"github.com/ydfk/edu-nexa/apps/api/pkg/db"
+	"gorm.io/gorm"
 )
 
 type paymentPayload struct {
@@ -27,7 +28,8 @@ type paymentPayload struct {
 
 func List(c *fiber.Ctx) error {
 	var items []model.Record
-	query := db.DB.Order("paid_at desc, created_at desc")
+	database := db.FromFiber(c)
+	query := database.Order("paid_at desc, created_at desc")
 
 	if studentID := strings.TrimSpace(c.Query("studentId")); studentID != "" {
 		query = query.Where("student_id = ?", studentID)
@@ -53,6 +55,7 @@ func List(c *fiber.Ctx) error {
 }
 
 func Create(c *fiber.Ctx) error {
+	database := db.FromFiber(c)
 	var req paymentPayload
 	if err := c.BodyParser(&req); err != nil {
 		return response.Error(c, "参数不正确")
@@ -61,7 +64,7 @@ func Create(c *fiber.Ctx) error {
 		return response.Error(c, err.Error())
 	}
 
-	student, err := findStudent(req.StudentID, "")
+	student, err := findStudent(database, req.StudentID, "")
 	if err != nil {
 		return response.Error(c, err.Error())
 	}
@@ -90,7 +93,7 @@ func Create(c *fiber.Ctx) error {
 	}
 	item.Status = buildPaymentStatus(item.PaymentAmount, item.RefundAmount)
 
-	if err := db.DB.Create(&item).Error; err != nil {
+	if err := database.Create(&item).Error; err != nil {
 		return response.Error(c, "创建缴费记录失败")
 	}
 
@@ -98,6 +101,7 @@ func Create(c *fiber.Ctx) error {
 }
 
 func Update(c *fiber.Ctx) error {
+	database := db.FromFiber(c)
 	var req paymentPayload
 	if err := c.BodyParser(&req); err != nil {
 		return response.Error(c, "参数不正确")
@@ -107,11 +111,11 @@ func Update(c *fiber.Ctx) error {
 	}
 
 	var item model.Record
-	if err := db.DB.First(&item, "id = ?", c.Params("id")).Error; err != nil {
+	if err := database.First(&item, "id = ?", c.Params("id")).Error; err != nil {
 		return response.Error(c, "缴费记录不存在")
 	}
 
-	student, err := findStudent(req.StudentID, item.StudentID)
+	student, err := findStudent(database, req.StudentID, item.StudentID)
 	if err != nil {
 		return response.Error(c, err.Error())
 	}
@@ -138,7 +142,7 @@ func Update(c *fiber.Ctx) error {
 	item.RefundRemark = strings.TrimSpace(req.RefundRemark)
 	item.Status = buildPaymentStatus(item.PaymentAmount, item.RefundAmount)
 
-	if err := db.DB.Save(&item).Error; err != nil {
+	if err := database.Save(&item).Error; err != nil {
 		return response.Error(c, "更新缴费记录失败")
 	}
 
@@ -146,12 +150,13 @@ func Update(c *fiber.Ctx) error {
 }
 
 func Delete(c *fiber.Ctx) error {
+	database := db.FromFiber(c)
 	var item model.Record
-	if err := db.DB.First(&item, "id = ?", c.Params("id")).Error; err != nil {
+	if err := database.First(&item, "id = ?", c.Params("id")).Error; err != nil {
 		return response.Error(c, "缴费记录不存在")
 	}
 
-	if err := db.DB.Delete(&item).Error; err != nil {
+	if err := database.Delete(&item).Error; err != nil {
 		return response.Error(c, "删除缴费记录失败")
 	}
 
@@ -193,9 +198,9 @@ func validatePaymentPayload(req paymentPayload) error {
 	return nil
 }
 
-func findStudent(studentID string, currentStudentID string) (*studentModel.Student, error) {
+func findStudent(database *gorm.DB, studentID string, currentStudentID string) (*studentModel.Student, error) {
 	var item studentModel.Student
-	if err := db.DB.First(&item, "id = ?", strings.TrimSpace(studentID)).Error; err != nil {
+	if err := database.First(&item, "id = ?", strings.TrimSpace(studentID)).Error; err != nil {
 		return nil, errors.New("学生不存在")
 	}
 	if strings.TrimSpace(currentStudentID) != item.Id.String() && !service.IsActiveStatus(item.Status) {
