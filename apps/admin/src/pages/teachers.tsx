@@ -216,7 +216,6 @@ function TeacherFormDialog({
   const [form, setForm] = useState(initialForm);
   const [saving, setSaving] = useState(false);
   const isEdit = !!currentRow && open;
-  const defaultPassword = useMemo(() => getDefaultLoginPassword(form.phone), [form.phone]);
 
   useEffect(() => {
     if (!open) {
@@ -227,29 +226,15 @@ function TeacherFormDialog({
       setForm({
         displayName: currentRow.displayName || "",
         isAdmin: currentRow.roles.includes("admin"),
-        password: getDefaultLoginPassword(currentRow.phone),
+        password: "",
         phone: currentRow.phone,
         status: currentRow.status || "active",
       });
       return;
     }
 
-    setForm({ ...initialForm, password: getDefaultLoginPassword("") });
+    setForm(initialForm);
   }, [currentRow, open]);
-
-  useEffect(() => {
-    if (!open || currentRow) {
-      return;
-    }
-
-    setForm((current) => {
-      const nextPassword = getDefaultLoginPassword(current.phone);
-      if (current.password === nextPassword || !current.password.trim()) {
-        return { ...current, password: nextPassword };
-      }
-      return current;
-    });
-  }, [currentRow, open, form.phone]);
 
   const nameItems = useMemo(
     () =>
@@ -268,7 +253,7 @@ function TeacherFormDialog({
       return;
     }
     if (!currentRow && !form.password.trim()) {
-      toast.error("默认密码不能为空");
+      toast.error("密码不能为空");
       return;
     }
 
@@ -342,32 +327,21 @@ function TeacherFormDialog({
               }
             />
           </div>
-          {isEdit ? (
+          {!isEdit ? (
             <div className="grid grid-cols-4 items-center gap-x-4 gap-y-1">
-              <Label className="text-end">默认密码</Label>
-              <div className="col-span-3 space-y-1">
-                <Input readOnly value={defaultPassword} />
-                <p className="text-sm text-muted-foreground">
-                  编辑教师不会修改现有密码，重置密码时可手动调整默认密码。
-                </p>
-              </div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-4 items-center gap-x-4 gap-y-1">
-              <Label className="text-end">默认密码</Label>
-              <div className="col-span-3 space-y-1">
+              <Label className="text-end" required>密码</Label>
+              <div className="col-span-3">
                 <Input
+                  type="password"
                   value={form.password}
                   onChange={(event) =>
                     setForm((current) => ({ ...current, password: event.target.value }))
                   }
+                  placeholder="请输入密码"
                 />
-                <p className="text-sm text-muted-foreground">
-                  {getDefaultLoginPasswordHint(form.phone)}
-                </p>
               </div>
             </div>
-          )}
+          ) : null}
           <div className="grid grid-cols-4 items-center gap-x-4 gap-y-1">
             <Label className="text-end">管理员</Label>
             <div className="col-span-3 flex items-center gap-3">

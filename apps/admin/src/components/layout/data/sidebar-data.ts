@@ -16,12 +16,13 @@ import type { SidebarData } from "../types";
 
 export function buildSidebarData(
   roles: string[],
-  user: { displayName: string; phone: string },
+  user: { displayName: string; isDemo?: boolean; phone: string },
 ): SidebarData {
   const isAdmin = roles.includes("admin");
   const isTeacher = roles.includes("teacher");
   const isGuardian = roles.includes("guardian");
   const isAdminOrTeacher = isAdmin || isTeacher;
+  const canManageSystemSettings = isAdmin && !user.isDemo;
 
   return {
     user: {
@@ -71,7 +72,7 @@ export function buildSidebarData(
           ...(isAdminOrTeacher
             ? [{ title: "服务日历", url: "/service-calendar", icon: CalendarRange }]
             : []),
-          ...(isAdmin
+          ...(canManageSystemSettings
             ? [{ title: "系统设置", url: "/settings/system", icon: Settings }]
             : []),
         ],

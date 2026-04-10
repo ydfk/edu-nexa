@@ -53,6 +53,9 @@ func Create(c *fiber.Ctx) error {
 	if strings.TrimSpace(req.Name) == "" || strings.TrimSpace(req.Phone) == "" {
 		return response.Error(c, "家长姓名和手机号不能为空")
 	}
+	if strings.TrimSpace(req.Password) == "" {
+		return response.Error(c, "密码不能为空")
+	}
 	if exists, err := existsPhone(database, strings.TrimSpace(req.Phone), ""); err != nil {
 		return response.Error(c, "校验家长手机号失败")
 	} else if exists {
@@ -72,7 +75,7 @@ func Create(c *fiber.Ctx) error {
 			item.UserID,
 			item.Name,
 			item.Phone,
-			resolveGuardianPassword(item.Phone, req.Password),
+			strings.TrimSpace(req.Password),
 			item.Status,
 		)
 		if err != nil {

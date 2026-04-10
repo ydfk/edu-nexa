@@ -52,6 +52,7 @@ function setSession(roles: string[], phone = "13800000001") {
       user: {
         displayName: "测试用户",
         id: "user-1",
+        isDemo: false,
         phone,
         roles,
         status: "active",

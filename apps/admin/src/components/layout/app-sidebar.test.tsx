@@ -11,6 +11,7 @@ test("shows product navigation entries without statistics board", () => {
       user: {
         displayName: "管理员",
         id: "1",
+        isDemo: false,
         phone: "13800000001",
         roles: ["admin"],
         status: "active",

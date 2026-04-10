@@ -671,6 +671,10 @@ async function request<T>(
   }
 ) {
   const session = getAdminSessionSnapshot();
+  const requestMethod = options?.method || "GET";
+  if (session.user?.isDemo && requestMethod !== "GET") {
+    throw new Error("demo 环境仅支持查看数据，不能修改管理数据");
+  }
   const url = buildURL(path, options?.query);
   const response = await fetch(url, {
     body: options?.body ? JSON.stringify(options.body) : undefined,
@@ -678,7 +682,7 @@ async function request<T>(
       Authorization: session.token ? `Bearer ${session.token}` : "",
       "Content-Type": options?.body ? "application/json" : "",
     },
-    method: options?.method || "GET",
+    method: requestMethod,
   });
 
   let payload: ApiEnvelope<T> | null = null;

@@ -237,23 +237,9 @@ function GuardianFormDialog({
         status: currentItem.status,
       });
     } else if (open === "create") {
-      setForm({ ...initialForm, password: getDefaultLoginPassword("") });
+      setForm(initialForm);
     }
   }, [open, currentItem, isEdit]);
-
-  useEffect(() => {
-    if (isEdit || open !== "create") {
-      return;
-    }
-
-    setForm((current) => {
-      const nextPassword = getDefaultLoginPassword(current.phone);
-      if (current.password === nextPassword || !current.password.trim()) {
-        return { ...current, password: nextPassword };
-      }
-      return current;
-    });
-  }, [form.phone, isEdit, open]);
 
   const exactDuplicate = hasExactName(items, form.name, form.id);
   const similarItems = findSimilarNames(items, form.name, form.id);
@@ -267,7 +253,7 @@ function GuardianFormDialog({
       return;
     }
     if (!isEdit && !form.password.trim()) {
-      toast.error("默认密码不能为空");
+      toast.error("密码不能为空");
       return;
     }
     if (phoneExists) {
@@ -326,16 +312,15 @@ function GuardianFormDialog({
           </div>
           {!isEdit ? (
             <div className="grid gap-2">
-              <Label>默认密码</Label>
+              <Label required>密码</Label>
               <Input
+                type="password"
                 value={form.password}
                 onChange={(event) =>
                   setForm((current) => ({ ...current, password: event.target.value }))
                 }
+                placeholder="请输入密码"
               />
-              <p className="text-sm text-muted-foreground">
-                {getDefaultLoginPasswordHint(form.phone)}
-              </p>
             </div>
           ) : null}
           {phoneExists ? (

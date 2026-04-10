@@ -12,7 +12,7 @@ type ApiEnvelope<T> = {
 };
 
 type LoginResponse = {
-  loginType: "admin_password";
+  loginType: "admin_password" | "demo_password";
   token: string;
   user: AdminSessionUser;
 };

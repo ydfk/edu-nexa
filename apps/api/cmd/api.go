@@ -78,6 +78,17 @@ func api() {
 
 		return c.Next()
 	})
+	protectedAPI.Use(func(c *fiber.Ctx) error {
+		if service.IsDemoUser(c) && !service.CanDemoMutate(c) {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+				"code": fiber.StatusForbidden,
+				"flag": false,
+				"msg":  "demo 环境仅支持查看数据，不能修改管理数据",
+			})
+		}
+
+		return c.Next()
+	})
 
 	auth.RegisterRoutes(protectedAPI)
 	overview.RegisterRoutes(protectedAPI)

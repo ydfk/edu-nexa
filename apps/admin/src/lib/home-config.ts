@@ -55,6 +55,9 @@ export async function fetchHomeConfig() {
 
 export async function saveHomeConfig(config: HomeConfig) {
   const session = getAdminSessionSnapshot();
+  if (session.user?.isDemo) {
+    throw new Error("demo 环境仅支持查看数据，不能修改管理数据");
+  }
   const normalized = normalizeHomeConfig(config);
 
   try {

@@ -4,6 +4,7 @@ import {
   hasAnySessionRole,
   hasBackofficeAccess,
   hasUnauthorizedSessionMarker,
+  isDemoSession,
   useAdminSession,
 } from "@/lib/auth/session";
 
@@ -71,4 +72,18 @@ export function RedirectAuthenticatedUser() {
   }
 
   return <Outlet />;
+}
+
+export function RequireNonDemo({
+  children,
+}: {
+  children: ReactElement;
+}) {
+  const session = useAdminSession();
+
+  if (isDemoSession(session)) {
+    return <Navigate to="/403" replace />;
+  }
+
+  return children;
 }

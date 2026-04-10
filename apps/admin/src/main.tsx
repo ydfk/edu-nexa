@@ -4,6 +4,7 @@ import { RouterProvider, createBrowserRouter } from "react-router-dom";
 import {
   RedirectAuthenticatedUser,
   RequireBackofficeAuth,
+  RequireNonDemo,
   RequireRoles,
 } from "@/components/auth/route-guards";
 import { Toaster } from "@/components/ui/sonner";
@@ -131,7 +132,9 @@ const router = createBrowserRouter([
             path: "settings/system",
             element: withSuspense(
               <RequireRoles allowedRoles={["admin"]}>
-                <SettingsSystemPage />
+                <RequireNonDemo>
+                  <SettingsSystemPage />
+                </RequireNonDemo>
               </RequireRoles>
             ),
           },

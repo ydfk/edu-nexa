@@ -63,7 +63,7 @@ func Register(c *fiber.Ctx) error {
 		return response.Error(c, "手机号已存在")
 	}
 
-	return response.Success(c, buildUserPayload(user))
+	return response.Success(c, buildUserPayload(user, false))
 }
 
 // @Summary 用户登录
@@ -125,7 +125,7 @@ func Login(c *fiber.Ctx) error {
 		loginType = "demo_password"
 	}
 
-	return response.Success(c, buildLoginPayload(user, token, loginType))
+	return response.Success(c, buildLoginPayload(user, token, loginType, isDemoLogin))
 }
 
 func Profile(c *fiber.Ctx) error {
@@ -134,7 +134,7 @@ func Profile(c *fiber.Ctx) error {
 		return response.Error(c, err.Error())
 	}
 
-	return response.Success(c, buildUserPayload(*user))
+	return response.Success(c, buildUserPayload(*user, service.IsDemoUser(c)))
 }
 
 func UpdateProfile(c *fiber.Ctx) error {
@@ -158,7 +158,7 @@ func UpdateProfile(c *fiber.Ctx) error {
 		return response.Error(c, "保存个人设置失败")
 	}
 
-	return response.Success(c, buildUserPayload(*user))
+	return response.Success(c, buildUserPayload(*user, service.IsDemoUser(c)))
 }
 
 func ChangePassword(c *fiber.Ctx) error {
@@ -230,13 +230,14 @@ func WeappPhoneLogin(c *fiber.Ctx) error {
 		return response.Error(c, "token 生成失败")
 	}
 
-	return response.Success(c, buildLoginPayload(*user, token, "weapp_phone"))
+	return response.Success(c, buildLoginPayload(*user, token, "weapp_phone", false))
 }
 
-func buildUserPayload(user model.User) fiber.Map {
+func buildUserPayload(user model.User, isDemo bool) fiber.Map {
 	return fiber.Map{
 		"displayName": user.DisplayName,
 		"id":          user.Id,
+		"isDemo":      isDemo,
 		"phone":       user.Phone,
 		"roles":       splitRoles(user.Roles),
 		"status":      defaultUserStatus(user.Status),
@@ -261,11 +262,11 @@ func splitRoles(raw string) []string {
 	return roles
 }
 
-func buildLoginPayload(user model.User, token string, loginType string) fiber.Map {
+func buildLoginPayload(user model.User, token string, loginType string, isDemo bool) fiber.Map {
 	return fiber.Map{
 		"loginType": loginType,
 		"token":     token,
-		"user":      buildUserPayload(user),
+		"user":      buildUserPayload(user, isDemo),
 	}
 }
 

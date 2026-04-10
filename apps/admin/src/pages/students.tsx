@@ -54,10 +54,6 @@ import { Textarea } from "@/components/ui/textarea";
 import useDialogState from "@/hooks/use-dialog-state";
 import { findSimilarNames, hasExactName } from "@/lib/name-check";
 import {
-  getDefaultLoginPassword,
-  getDefaultLoginPasswordHint,
-} from "@/lib/password-rules";
-import {
   emptyRelationshipValue,
   parentRelationshipOptions,
 } from "@/lib/parent-relationships";
@@ -408,20 +404,6 @@ function StudentFormDialog() {
     previousDialogRef.current = open;
   }, [open, currentItem, isEdit]);
 
-  useEffect(() => {
-    if (open !== "quick-guardian") {
-      return;
-    }
-
-    setGuardianForm((current) => {
-      const nextPassword = getDefaultLoginPassword(current.phone);
-      if (current.password === nextPassword || !current.password.trim()) {
-        return { ...current, password: nextPassword };
-      }
-      return current;
-    });
-  }, [guardianForm.phone, open]);
-
   async function handleSave() {
     const school = schools.find((item) => item.id === form.schoolId);
     const grade = grades.find((item) => item.id === form.gradeId);
@@ -476,7 +458,7 @@ function StudentFormDialog() {
       });
     }
     if (type === "quick-guardian") {
-      setGuardianForm({ ...initialGuardianForm, password: getDefaultLoginPassword("") });
+      setGuardianForm(initialGuardianForm);
     }
     setOpen(type);
   }
@@ -539,7 +521,7 @@ function StudentFormDialog() {
         if (!guardianForm.name.trim() || !guardianForm.phone.trim())
           throw new Error("家长姓名和手机号不能为空");
         if (!guardianForm.password.trim()) {
-          throw new Error("默认密码不能为空");
+          throw new Error("密码不能为空");
         }
         if (quickGuardianPhoneExists) {
           throw new Error("家长手机号已存在");
@@ -862,16 +844,15 @@ function StudentFormDialog() {
                 />
               </div>
               <div className="grid gap-2">
-                <Label>默认密码</Label>
+                <Label required>密码</Label>
                 <Input
+                  type="password"
                   value={guardianForm.password}
                   onChange={(e) =>
                     setGuardianForm((c) => ({ ...c, password: e.target.value }))
                   }
+                  placeholder="请输入密码"
                 />
-                <p className="text-sm text-muted-foreground">
-                  {getDefaultLoginPasswordHint(guardianForm.phone)}
-                </p>
               </div>
               {quickGuardianPhoneExists ? (
                 <Alert variant="destructive">

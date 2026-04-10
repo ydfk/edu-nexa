@@ -26,6 +26,7 @@ export function AppSidebar() {
   const systemBrand = getSystemBrandParts(systemName.replace(" 学栖·EduNexa", ""));
   const sidebarData = buildSidebarData(session.user?.roles || [], {
     displayName: session.user?.displayName || "未登录",
+    isDemo: session.user?.isDemo || false,
     phone: session.user?.phone || "",
   });
 

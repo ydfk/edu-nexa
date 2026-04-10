@@ -60,7 +60,7 @@ Page({
       return;
     }
     if (!this.data.isEdit && !this.data.password) {
-      wx.showToast({ title: "请设置初始密码", icon: "none" });
+      wx.showToast({ title: "请输入密码", icon: "none" });
       return;
     }
     this.setData({ submitting: true });

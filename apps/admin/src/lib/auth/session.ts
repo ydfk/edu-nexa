@@ -8,6 +8,7 @@ const backofficeRoles = new Set(["admin", "teacher", "guardian"]);
 export type AdminSessionUser = {
   id: string;
   displayName: string;
+  isDemo: boolean;
   phone: string;
   roles: string[];
   status: string;
@@ -54,7 +55,7 @@ export function getAdminSessionSnapshot(): AdminSession {
     cachedRawSession = raw;
     cachedSessionSnapshot = {
       token: typeof parsed.token === "string" ? parsed.token : "",
-      user: isSessionUser(parsed.user) ? parsed.user : null,
+      user: normalizeSessionUser(parsed.user),
     };
     return cachedSessionSnapshot;
   } catch {
@@ -126,6 +127,10 @@ export function hasAnySessionRole(session: AdminSession, roles: string[]) {
   return session.user.roles.some((role) => roles.includes(role));
 }
 
+export function isDemoSession(session: AdminSession) {
+  return !!session.token && !!session.user?.isDemo;
+}
+
 function subscribeSession(onStoreChange: () => void) {
   if (typeof window === "undefined") {
     return () => undefined;
@@ -161,4 +166,20 @@ function isSessionUser(value: unknown): value is AdminSessionUser {
     Array.isArray(user.roles) &&
     typeof user.status === "string"
   );
+}
+
+function normalizeSessionUser(value: unknown): AdminSessionUser | null {
+  if (!isSessionUser(value)) {
+    return null;
+  }
+
+  const user = value as Record<string, unknown>;
+  return {
+    id: user.id as string,
+    displayName: user.displayName as string,
+    isDemo: user.isDemo === true,
+    phone: user.phone as string,
+    roles: user.roles as string[],
+    status: user.status as string,
+  };
 }

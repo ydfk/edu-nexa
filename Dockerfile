@@ -1,14 +1,14 @@
 FROM golang:1.24-alpine AS api-builder
 
 ARG APP_VERSION=dev
-ARG GOPROXY=https://goproxy.cn|https://goproxy.io|https://mirrors.aliyun.com/goproxy/|direct
-ARG GOSUMDB=sum.golang.google.cn
+# ARG GOPROXY=https://goproxy.cn|https://goproxy.io|https://mirrors.aliyun.com/goproxy/|direct
+# ARG GOSUMDB=sum.golang.google.cn
 
 WORKDIR /workspace/apps/api
 
 ENV APP_VERSION=$APP_VERSION
-ENV GOPROXY=$GOPROXY
-ENV GOSUMDB=$GOSUMDB
+# ENV GOPROXY=$GOPROXY
+# ENV GOSUMDB=$GOSUMDB
 
 RUN apk add --no-cache git
 

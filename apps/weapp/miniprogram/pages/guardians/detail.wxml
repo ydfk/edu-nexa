@@ -34,8 +34,8 @@
 
     <!-- 密码（新增模式） -->
     <view class="form-group" wx:if="{{!isEdit}}">
-      <view class="form-label form-label--required">初始密码</view>
-      <input class="form-input" value="{{password}}" bindinput="onInput" data-field="password" placeholder="请设置初始密码" password="{{true}}" />
+      <view class="form-label form-label--required">密码</view>
+      <input class="form-input" value="{{password}}" bindinput="onInput" data-field="password" placeholder="请输入密码" password="{{true}}" />
     </view>
 
     <!-- 备注 -->
