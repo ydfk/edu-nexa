@@ -2,7 +2,7 @@ const { hydrateSession } = require("./store/session");
 
 App({
   globalData: {
-    systemName: "壹一小屋 学栖·EduNexa",
+    systemName: "作业用餐小记",
   },
   onLaunch() {
     hydrateSession();

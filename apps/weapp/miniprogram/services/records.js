@@ -1,3 +1,4 @@
+const { env } = require("../config/env");
 const { request } = require("./request");
 
 function getOverview() {
@@ -170,13 +171,13 @@ function uploadAttachment(options) {
 }
 
 function getAttachmentAccessURL(options) {
-  return request({
-    method: "GET",
-    url: buildURL("/uploads/access-url", {
-      disposition: options.disposition || "",
-      fileName: options.fileName || "",
-      url: options.url || "",
-    }),
+  const targetURL = String((options && options.url) || "").trim();
+  if (!targetURL) {
+    return Promise.reject(new Error("附件地址不能为空"));
+  }
+
+  return Promise.resolve({
+    url: buildPreviewURL(targetURL),
   });
 }
 
@@ -307,6 +308,30 @@ function buildURL(path, params) {
 
   const query = segments.join("&");
   return query ? `${path}?${query}` : path;
+}
+
+function buildPreviewURL(rawURL) {
+  return buildAbsoluteURL("/uploads/preview", {
+    url: rawURL,
+  });
+}
+
+function buildAbsoluteURL(path, params) {
+  const baseURL = String(env.baseURL || "").replace(/\/$/, "");
+  const query = buildQuery(params);
+  return query ? `${baseURL}${path}?${query}` : `${baseURL}${path}`;
+}
+
+function buildQuery(params) {
+  const segments = [];
+  Object.keys(params || {}).forEach((key) => {
+    const value = params[key];
+    if (value === undefined || value === null || value === "") {
+      return;
+    }
+    segments.push(`${encodeURIComponent(key)}=${encodeURIComponent(value)}`);
+  });
+  return segments.join("&");
 }
 
 module.exports = {

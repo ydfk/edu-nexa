@@ -11,6 +11,7 @@ Page({
     showCalendar: false,
     calendarDate: null,
     canEdit: false,
+    allowRecordTap: false,
     mealGroups: [],
     homeworkGroups: [],
     mealStudentIndex: 0,
@@ -28,7 +29,8 @@ Page({
     this.setData({
       currentDate,
       dateDisplay: formatDateCN(currentDate),
-      canEdit: isLoggedIn() ? canEdit() : false,
+      canEdit: canEdit(),
+      allowRecordTap: true,
     });
     this.loadRecords();
   },
@@ -96,7 +98,7 @@ Page({
         currentGroup: null,
         currentRecords: [],
         currentStudentIndex: 0,
-        currentEmptyText: this.data.activeTab === 0 ? "登录后查看学生用餐记录" : "登录后查看学生作业记录",
+        currentEmptyText: this.data.activeTab === 0 ? "登录后查看用餐记录" : "登录后查看作业记录",
         currentPlaceholder: null,
       });
       return;
@@ -120,14 +122,13 @@ Page({
       ]);
 
       const studentList = students.items || students || [];
-      const studentMetaMap = buildStudentMetaMap(studentList);
       const mealList = buildMealCards(meals.items || meals || []);
       const homeworkList = buildHomeworkRecordList(homework.items || homework || []);
       const assignmentList = assignments.items || assignments || [];
 
       this.setData({
-        mealGroups: buildMealGroups(studentList, mealList, studentMetaMap, currentDate),
-        homeworkGroups: buildHomeworkGroups(studentList, assignmentList, homeworkList, studentMetaMap, currentDate),
+        mealGroups: buildMealGroups(studentList, mealList, currentDate),
+        homeworkGroups: buildHomeworkGroups(studentList, assignmentList, homeworkList, currentDate),
       });
       this.updateCurrentPanel();
     } catch (error) {
@@ -185,38 +186,46 @@ Page({
       return;
     }
 
-    const recordId = e.currentTarget.dataset.recordId || "";
-    const studentId = e.currentTarget.dataset.studentId || "";
-    const subject = e.currentTarget.dataset.subject || "";
-    const assignmentId = e.currentTarget.dataset.assignmentId || "";
+    const recordId = String(e.currentTarget.dataset.recordId || "");
+    const studentId = String(e.currentTarget.dataset.studentId || "");
+    const subject = String(e.currentTarget.dataset.subject || "");
+    const assignmentId = String(e.currentTarget.dataset.assignmentId || "");
+    const editor = canEdit();
+    const mode = editor ? "" : "&mode=view";
 
     if (this.data.activeTab === 0) {
       if (recordId) {
-        wx.navigateTo({ url: this.data.canEdit ? `/pages/meal-record/edit?id=${recordId}` : `/pages/meal-record/edit?id=${recordId}&mode=view` });
+        wx.navigateTo({
+          url: `/pages/meal-record/edit?id=${encodeURIComponent(recordId)}${mode}`,
+        });
         return;
       }
-      if (!this.data.canEdit || !studentId) {
-        return;
+
+      if (editor && studentId) {
+        wx.navigateTo({
+          url: `/pages/meal-record/edit?studentId=${encodeURIComponent(studentId)}&date=${encodeURIComponent(this.data.currentDate)}`,
+        });
       }
-      wx.navigateTo({ url: `/pages/meal-record/edit?date=${this.data.currentDate}&studentId=${studentId}` });
       return;
     }
 
     if (recordId) {
       wx.navigateTo({
-        url: this.data.canEdit ? `/pages/homework-record/edit?id=${recordId}` : `/pages/homework-record/edit?id=${recordId}&mode=view`,
+        url: `/pages/homework-record/edit?id=${encodeURIComponent(recordId)}${mode}`,
       });
       return;
     }
-    if (!this.data.canEdit || !studentId || !subject) {
+
+    if (editor && studentId && assignmentId) {
+      wx.navigateTo({
+        url: `/pages/homework-record/edit?studentId=${encodeURIComponent(studentId)}&assignmentId=${encodeURIComponent(assignmentId)}&subject=${encodeURIComponent(subject)}&date=${encodeURIComponent(this.data.currentDate)}`,
+      });
       return;
     }
 
-    const encodedSubject = encodeURIComponent(subject);
-    const assignmentQuery = assignmentId ? `&assignmentId=${assignmentId}` : "";
-    wx.navigateTo({
-      url: `/pages/homework-record/edit?date=${this.data.currentDate}&studentId=${studentId}&subject=${encodedSubject}${assignmentQuery}`,
-    });
+    if (editor) {
+      wx.showToast({ title: "当天暂无可登记作业", icon: "none" });
+    }
   },
 
   previewRecordImages(e) {
@@ -255,7 +264,7 @@ function buildHomeworkRecordList(records) {
   }));
 }
 
-function buildMealGroups(students, records, studentMetaMap, serviceDate) {
+function buildMealGroups(students, records, serviceDate) {
   const recordMap = {};
   records.forEach((item) => {
     const key = normalizeKey(item.studentId || item.studentName);
@@ -269,13 +278,13 @@ function buildMealGroups(students, records, studentMetaMap, serviceDate) {
     key: student.id || student.name,
     placeholder: buildMealPlaceholder(serviceDate),
     studentId: student.id || "",
-    studentName: student.name || "未命名学生",
-    meta: buildStudentMeta(student, studentMetaMap),
+    studentName: buildStudentName(student),
+    meta: buildStudentMeta(student),
     items: recordMap[normalizeKey(student.id)] || [],
   }));
 }
 
-function buildHomeworkGroups(students, assignments, records, studentMetaMap, serviceDate) {
+function buildHomeworkGroups(students, assignments, records, serviceDate) {
   const recordMap = {};
   (records || []).forEach((item) => {
     recordMap[buildHomeworkRecordKey(item.studentId, item.subject)] = item;
@@ -287,8 +296,8 @@ function buildHomeworkGroups(students, assignments, records, studentMetaMap, ser
       key: student.id || student.name,
       placeholder: buildHomeworkPlaceholder(serviceDate),
       studentId: student.id || "",
-      studentName: student.name || "未命名学生",
-      meta: buildStudentMeta(student, studentMetaMap),
+      studentName: buildStudentName(student),
+      meta: buildStudentMeta(student),
       items: studentAssignments.map((assignment) => buildHomeworkCard(student, assignment, recordMap)),
     };
   });
@@ -317,7 +326,6 @@ function buildHomeworkCard(student, assignment, recordMap) {
 function buildHomeworkMetaText(assignment) {
   const parts = [];
   if (assignment.serviceDate) parts.push(assignment.serviceDate);
-  if (assignment.teacherName) parts.push(`教师：${assignment.teacherName}`);
   return parts.join(" · ");
 }
 
@@ -349,37 +357,26 @@ function buildHomeworkRecordKey(studentId, subject) {
   return `${normalizeKey(studentId)}::${normalizeKey(subject)}`;
 }
 
-function buildStudentMetaMap(students) {
-  const map = {};
-  (students || []).forEach((item) => {
-    if (!item || !item.id) return;
-    map[item.id] = {
-      grade: item.grade || "",
-      className: item.className || "",
-      schoolName: item.schoolName || "",
-    };
-  });
-  return map;
+function buildStudentName(student) {
+  return String(student?.name || student?.studentName || student?.id || "--");
 }
 
-function buildStudentMeta(item, studentMetaMap) {
-  const studentMeta = (studentMetaMap && studentMetaMap[item.studentId || item.id]) || {};
-  const parts = [];
-  if (studentMeta.grade) parts.push(studentMeta.grade);
-  else if (item.gradeName || item.grade) parts.push(item.gradeName || item.grade);
-  if (studentMeta.className) parts.push(studentMeta.className);
-  else if (item.className) parts.push(item.className);
-  if (!parts.length) {
-    if (studentMeta.schoolName) parts.push(studentMeta.schoolName);
-    else if (item.schoolName) parts.push(item.schoolName);
-  }
+function buildStudentMeta(student) {
+  const parts = [
+    student?.schoolName,
+    student?.gradeName || student?.grade,
+    student?.className,
+  ]
+    .map((item) => String(item || "").trim())
+    .filter(Boolean);
+
   return parts.join(" ");
 }
 
 function buildMealPlaceholder(serviceDate) {
   return {
     metaText: serviceDate,
-    remark: "当天还没有记录这位学生的用餐情况。",
+    remark: "当天还没有记录用餐情况。",
     title: "未记录用餐",
   };
 }
@@ -387,8 +384,8 @@ function buildMealPlaceholder(serviceDate) {
 function buildHomeworkPlaceholder(serviceDate) {
   return {
     metaText: serviceDate,
-    remark: "当天还没有布置到这位学生的作业内容。",
-    title: "暂无作业安排",
+    remark: "当天还没有记录作业内容。",
+    title: "暂无作业记录",
   };
 }
 

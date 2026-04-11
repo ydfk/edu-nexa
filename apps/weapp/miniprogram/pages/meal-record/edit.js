@@ -142,10 +142,42 @@ Page({
     this.setData({ remark: e.detail.value });
   },
 
+  async chooseImages() {
+    if (this.data.readOnly) return;
+
+    const remainCount = 9 - this.data.fileList.length;
+    if (remainCount <= 0) {
+      wx.showToast({ title: "最多上传9张", icon: "none" });
+      return;
+    }
+
+    try {
+      await ensurePrivacyAuthorization();
+      const files = await chooseImageFiles(Math.min(remainCount, 9));
+
+      if (files.length === 0) {
+        return;
+      }
+
+      await this.uploadSelectedFiles(files);
+    } catch (error) {
+      if (error && String(error.errMsg || "").includes("cancel")) {
+        return;
+      }
+      console.warn("选择图片失败", error);
+      const message = String((error && (error.errMsg || error.message)) || "选择图片失败");
+      wx.showToast({ title: message.slice(0, 20), icon: "none" });
+    }
+  },
+
   async afterRead(e) {
     if (this.data.readOnly) return;
     const { file } = e.detail;
     const files = Array.isArray(file) ? file : [file];
+    await this.uploadSelectedFiles(files);
+  },
+
+  async uploadSelectedFiles(files) {
     for (const f of files) {
       try {
         wx.showLoading({ title: "上传中..." });
@@ -170,7 +202,9 @@ Page({
 
   onDeleteImage(e) {
     if (this.data.readOnly) return;
-    const idx = e.detail.index;
+    const idx = e.detail && e.detail.index !== undefined
+      ? Number(e.detail.index)
+      : Number(e.currentTarget.dataset.index || 0);
     const urls = [...this.data.imageUrls];
     const fl = [...this.data.fileList];
     urls.splice(idx, 1);
@@ -318,4 +352,68 @@ function extractPickerValue(detail) {
     }
   }
   return value;
+}
+
+async function chooseImageFiles(count) {
+  const maxCount = Math.min(Number(count || 1), 9);
+
+  try {
+    const result = await new Promise((resolve, reject) => {
+      wx.chooseImage({
+        count: maxCount,
+        sourceType: ["album", "camera"],
+        sizeType: ["compressed"],
+        success: resolve,
+        fail: reject,
+      });
+    });
+    return normalizeChosenFiles(result);
+  } catch (error) {
+    const fallback = await chooseMessageImages(maxCount).catch(() => {
+      throw error;
+    });
+    return normalizeChosenFiles(fallback);
+  }
+}
+
+function chooseMessageImages(count) {
+  return new Promise((resolve, reject) => {
+    wx.chooseMessageFile({
+      count,
+      type: "image",
+      success: resolve,
+      fail: reject,
+    });
+  });
+}
+
+function normalizeChosenFiles(result) {
+  const tempFiles = Array.isArray(result && result.tempFiles) ? result.tempFiles : [];
+  const tempFilePaths = Array.isArray(result && result.tempFilePaths) ? result.tempFilePaths : [];
+
+  return (tempFiles.length > 0 ? tempFiles : tempFilePaths.map((path) => ({ path })))
+    .map((item) => {
+      const filePath = item.tempFilePath || item.path || "";
+      return {
+        name: getImageName(filePath),
+        path: filePath,
+        size: item.size,
+        type: "image",
+        url: filePath,
+      };
+    })
+    .filter((item) => item.path);
+}
+
+function ensurePrivacyAuthorization() {
+  if (typeof wx.requirePrivacyAuthorize !== "function") {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve, reject) => {
+    wx.requirePrivacyAuthorize({
+      success: resolve,
+      fail: reject,
+    });
+  });
 }

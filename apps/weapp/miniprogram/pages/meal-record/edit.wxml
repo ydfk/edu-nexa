@@ -20,7 +20,20 @@
     </view>
     <view class="form-group">
       <view class="form-label">照片记录</view>
-      <van-uploader wx:if="{{!readOnly}}" file-list="{{fileList}}" bind:after-read="afterRead" bind:delete="onDeleteImage" max-count="9" accept="image" upload-text="拍照/选图" />
+      <van-uploader
+        wx:if="{{!readOnly}}"
+        file-list="{{fileList}}"
+        bind:delete="onDeleteImage"
+        max-count="9"
+        accept="image"
+        show-upload="{{false}}"
+        preview-size="72"
+      >
+        <view class="meal-upload-slot" bindtap="chooseImages">
+          <van-icon name="photograph" class="meal-upload-slot__icon" />
+          <text class="meal-upload-slot__text">拍照/选图</text>
+        </view>
+      </van-uploader>
       <view wx:elif="{{fileList.length > 0}}" class="detail-images">
         <image wx:for="{{fileList}}" wx:key="url" src="{{item.url}}" mode="aspectFill" class="detail-image" />
       </view>

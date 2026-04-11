@@ -2,28 +2,18 @@
   "pages": [
     "pages/home/index",
     "pages/records/index",
-    "pages/features/index",
-    "pages/mine/index",
-    "pages/login/index",
-    "pages/students/index",
-    "pages/students/detail",
-    "pages/guardians/index",
-    "pages/guardians/detail",
-    "pages/teachers/index",
-    "pages/teachers/detail",
-    "pages/schools/index",
     "pages/meal-record/edit",
     "pages/homework-record/edit",
     "pages/daily-homework/index",
     "pages/daily-homework/detail",
-    "pages/payments/index",
-    "pages/payments/detail",
+    "pages/mine/index",
+    "pages/login/index",
     "pages/settings/profile",
     "pages/settings/password",
     "pages/settings/about"
   ],
   "window": {
-    "navigationBarTitleText": "壹一小屋 学栖·EduNexa",
+    "navigationBarTitleText": "作业用餐小记",
     "navigationBarBackgroundColor": "#FFFFFF",
     "navigationBarTextStyle": "black",
     "backgroundColor": "#F7F8FA",
@@ -43,16 +33,16 @@
         "selectedIconPath": "assets/tab-home-active.png"
       },
       {
+        "pagePath": "pages/daily-homework/index",
+        "text": "作业",
+        "iconPath": "assets/tab-features.png",
+        "selectedIconPath": "assets/tab-features-active.png"
+      },
+      {
         "pagePath": "pages/records/index",
         "text": "记录",
         "iconPath": "assets/tab-records.png",
         "selectedIconPath": "assets/tab-records-active.png"
-      },
-      {
-        "pagePath": "pages/features/index",
-        "text": "功能",
-        "iconPath": "assets/tab-features.png",
-        "selectedIconPath": "assets/tab-features-active.png"
       },
       {
         "pagePath": "pages/mine/index",
@@ -65,5 +55,10 @@
   "style": "v2",
   "sitemapLocation": "sitemap.json",
   "lazyCodeLoading": "requiredComponents",
+  "requiredPrivateInfos": [
+    "chooseImage",
+    "chooseMedia",
+    "chooseMessageFile"
+  ],
   "__usePrivacyCheck__": true
 }

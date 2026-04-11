@@ -1,0 +1,39 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="iconBg" x1="212" y1="164" x2="812" y2="860" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ECFDF5" />
+      <stop offset="0.58" stop-color="#D1FAE5" />
+      <stop offset="1" stop-color="#99F6E4" />
+    </linearGradient>
+    <linearGradient id="accent" x1="360" y1="328" x2="692" y2="712" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#22C55E" />
+      <stop offset="1" stop-color="#0F766E" />
+    </linearGradient>
+    <filter id="softShadow" x="122" y="122" width="780" height="780" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="BackgroundImageFix" />
+      <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha" />
+      <feOffset dy="18" />
+      <feGaussianBlur stdDeviation="28" />
+      <feColorMatrix type="matrix" values="0 0 0 0 0.0313726 0 0 0 0 0.333333 0 0 0 0 0.262745 0 0 0 0.16 0" />
+      <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_1_1" />
+      <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_1_1" result="shape" />
+    </filter>
+  </defs>
+
+  <g filter="url(#softShadow)">
+    <rect x="178" y="160" width="668" height="668" rx="188" fill="url(#iconBg)" />
+
+    <rect x="308" y="282" width="408" height="430" rx="84" fill="white" />
+    <rect x="340" y="330" width="58" height="334" rx="29" fill="#DCFCE7" />
+    <rect x="363" y="376" width="12" height="36" rx="6" fill="#86EFAC" />
+    <rect x="363" y="448" width="12" height="36" rx="6" fill="#86EFAC" />
+    <rect x="363" y="520" width="12" height="36" rx="6" fill="#86EFAC" />
+    <rect x="436" y="372" width="210" height="34" rx="17" fill="#D1FAE5" />
+    <rect x="436" y="432" width="162" height="22" rx="11" fill="#A7F3D0" />
+    <rect x="436" y="474" width="184" height="22" rx="11" fill="#A7F3D0" />
+
+    <circle cx="586" cy="586" r="104" fill="url(#accent)" />
+    <path d="M540 586L573 619L634 558" stroke="white" stroke-width="30" stroke-linecap="round" stroke-linejoin="round" />
+    <path d="M447 592C460.333 579.333 475.667 573 493 573C510.333 573 525 577.667 537 587" stroke="#34D399" stroke-width="20" stroke-linecap="round" />
+  </g>
+</svg>

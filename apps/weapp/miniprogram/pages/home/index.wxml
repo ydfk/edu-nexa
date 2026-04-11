@@ -1,29 +1,48 @@
-<view class="page page--no-pad safe-bottom">
-  <view class="home-hero">
-    <view class="home-hero__head">
-      <view class="home-hero__left">
-        <view class="home-hero__eyebrow">{{heroBadge}}</view>
-        <view class="home-hero__title">{{heroTitle}}</view>
+<view class="page safe-bottom home-page">
+  <view class="home-panel">
+    <view class="home-panel__header">
+      <view class="home-panel__body">
+        <view class="home-panel__title">作业用餐小记</view>
+        <view class="home-panel__meta" wx:if="{{loggedIn}}">{{displayName}} · {{roleName}}</view>
+        <view class="home-panel__meta" wx:else>未登录</view>
       </view>
-      <image class="home-hero__art" src="{{heroImage}}" mode="aspectFit" />
+      <image class="home-panel__logo" src="/assets/logo-study-record-mini.png" mode="aspectFit" />
     </view>
-    <view class="home-hero__desc">{{heroDesc}}</view>
-    <view class="home-intro-list">
-      <view class="home-intro-item" wx:for="{{introPoints}}" wx:key="id">
-        <view class="home-intro-item__dot" />
-        <view class="home-intro-item__body">
-          <text class="home-intro-item__title">{{item.title}}</text>
-          <text class="home-intro-item__desc">{{item.desc}}</text>
-        </view>
-      </view>
-    </view>
+    <view class="home-panel__date">{{currentDate}}</view>
   </view>
-  <view class="section mx-lg">
+
+  <view class="section">
     <view class="section-header">
-      <text class="section-title">最近动态</text>
+      <text class="section-title">概览</text>
     </view>
-    <view class="list" wx:if="{{recentItems.length > 0}}">
-      <view class="list-item" wx:for="{{recentItems}}" wx:key="id">
+    <view class="home-metric-grid" wx:if="{{metrics.length > 0}}">
+      <view class="kpi-card kpi-card--{{item.tone}}" wx:for="{{metrics}}" wx:key="id">
+        <view class="kpi-label">{{item.label}}</view>
+        <view class="kpi-value">{{item.value}}</view>
+      </view>
+    </view>
+    <van-empty wx:else description="{{loggedIn ? '暂无数据' : '未登录'}}" image="search" />
+  </view>
+
+  <view class="section">
+    <view class="section-header">
+      <text class="section-title">今日统计</text>
+    </view>
+    <view class="home-summary-grid" wx:if="{{summaryCards.length > 0}}">
+      <view class="home-summary-card" wx:for="{{summaryCards}}" wx:key="id">
+        <view class="home-summary-card__label">{{item.label}}</view>
+        <view class="home-summary-card__value">{{item.value}}</view>
+      </view>
+    </view>
+    <van-empty wx:else description="{{loggedIn ? '暂无数据' : '未登录'}}" image="search" />
+  </view>
+
+  <view class="section">
+    <view class="section-header">
+      <text class="section-title">最新状态</text>
+    </view>
+    <view class="list" wx:if="{{latestItems.length > 0}}">
+      <view class="list-item" wx:for="{{latestItems}}" wx:key="id">
         <view class="list-content">
           <view class="list-title">{{item.title}}</view>
           <view class="list-desc">{{item.desc}}</view>
@@ -31,6 +50,6 @@
         <view class="tag tag--{{item.tagType}}">{{item.tagText}}</view>
       </view>
     </view>
-    <van-empty wx:else description="暂无动态" image="search" />
+    <van-empty wx:else description="{{loggedIn ? '暂无数据' : '未登录'}}" image="search" />
   </view>
 </view>
