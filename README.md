@@ -1,191 +1,267 @@
-# 学栖 · EduNexa
+# EduNexa
 
-EduNexa 是一套面向托管机构的运营产品，当前聚焦两条核心业务链路：
+EduNexa 是一套面向托管机构的运营系统，当前围绕两条核心业务链路展开：
 
-- 晚辅用餐登记
-- 作业完成与反馈记录
+- 用餐登记与反馈
+- 每日作业下发、完成记录与回看
 
-当前仓库同时包含：
+仓库目前同时维护 3 个应用：
 
-- 管理端：React + Vite + TypeScript
-- 后端接口：Go + Fiber + GORM
-- 小程序：微信原生小程序骨架
+- `apps/admin`：React + Vite + TypeScript 管理端
+- `apps/api`：Go + Fiber + GORM 后端接口
+- `apps/weapp`：微信小程序
+
+## 项目概览
+
+### 当前能力
+
+- 管理端已覆盖学校、年级、班级、学生、教师、家长、每日作业、用餐记录、作业记录、缴费等管理能力
+- 小程序已具备工作台、每日作业、用餐记录、作业记录、我的等业务页面
+- 后端已提供认证、基础台账、记录管理、打印、文件上传与附件访问等接口
+- 附件链路已经统一为“只存 `bucket/objectKey`，预览时动态生成访问地址”
+
+### 技术栈
+
+- Admin：React 19、TypeScript、Vite、shadcn/ui
+- API：Go、Fiber、GORM
+- WeApp：微信原生小程序、Vant Weapp
+- Storage：本地存储 / 阿里云 OSS / 又拍云
 
 ## 仓库结构
 
 ```text
 apps/
-  admin/   React 管理后台
-  api/     Go 后端接口
-  weapp/   微信小程序
+  admin/                   管理端
+  api/                     后端接口
+  weapp/                   微信小程序
+    miniprogram/           小程序源码
+    project.config.json    小程序工程配置
+    release.json           小程序版本号
+scripts/
+  verify-weapp.mjs         小程序校验脚本
+  weapp-env.mjs            小程序环境地址切换脚本
+  weapp-version.mjs        小程序版本管理脚本
+  weapp-upload.mjs         小程序上传脚本
 docs/
   foundation-roadmap.md
   product-structure.md
   release-guide.md
   weapp-review-checklist.md
-scripts/
-  build-api-image.ps1
-  push-api-image.ps1
-  buildpush-api-image.ps1
-  deploy-api.ps1
-  pushdeploy-api-image.ps1
-  deploy-admin.ps1
-  dev-api.ps1
-  dev-weapp.ps1
-Dockerfile
-docker-compose.yml
 ```
-
-## 当前能力
-
-- 管理端支持账号 + 密码登录
-- 小程序支持微信登录态 + 手机号授权链路
-- 后端已提供 `auth`、`overview`、`campuses`、`students`、`guardians`、`teachers`、`student-services`、`service-days`、`daily-homework`、`meal-records`、`homework-records` 等接口
-- 管理端已覆盖学生台账、每日作业、服务日历、用餐记录、作业记录等业务页面
-- 小程序已具备工作台、用餐、作业、我的四个页面及基础状态管理
 
 ## 环境要求
 
-推荐本地环境：
+建议本地准备以下环境：
 
 - Node.js 22+
 - pnpm 10+
 - Go 1.24+
-- Docker
+- 微信开发者工具
 - Windows PowerShell 5.1+ 或 PowerShell 7+
 
-## 本地开发
+## 快速开始
 
-### 1. 管理端
-
-安装依赖：
+### 安装依赖
 
 ```bash
-pnpm install --dir apps/admin
+pnpm install
 ```
 
-启动开发服务：
+### 启动管理端
 
 ```bash
 pnpm dev:admin
 ```
 
-常用命令：
-
-```bash
-pnpm build:admin
-pnpm lint:admin
-pnpm test:admin
-```
-
-### 2. 后端
-
-直接启动：
-
-```bash
-cd apps/api
-go run ./cmd
-```
-
-Windows 下推荐用热更新脚本：
+### 启动后端
 
 ```bash
 pnpm dev:api
 ```
 
-这条脚本会：
-
-- 自动检查并安装 `air`
-- 读取配置中的端口
-- 清理残留的 `api-dev.exe`
-- 通过 [apps/api/.air.toml](/F:/github-my/edu-nexa/apps/api/.air.toml) 启动热更新
-
-运行测试：
-
-```bash
-cd apps/api
-go test ./...
-```
-
-### 3. 小程序
-
-打开微信开发者工具前，可先执行：
+### 打开小程序工程
 
 ```bash
 pnpm dev:weapp
 ```
 
-这条命令会尽量帮你打开 `apps/weapp` 工程，并读取 `.vscode/settings.json` 中的微信开发者工具路径配置。
-
-需要真机联调时，请在本地修改 [apps/weapp/project.config.json](/F:/github-my/edu-nexa/apps/weapp/project.config.json) 的 `appid`，不要提交该改动。
-
-小程序检查命令：
+### 小程序校验
 
 ```bash
 pnpm check:weapp
 ```
 
-## 配置说明
+## 常用开发命令
 
-默认后端配置文件在 [apps/api/config/config.yaml](/F:/github-my/edu-nexa/apps/api/config/config.yaml)。
+| 命令 | 说明 |
+| --- | --- |
+| `pnpm dev:admin` | 启动管理端开发服务 |
+| `pnpm build:admin` | 构建管理端 |
+| `pnpm lint:admin` | 管理端 lint |
+| `pnpm test:admin` | 管理端测试 |
+| `pnpm dev:api` | 启动后端热更新 |
+| `pnpm dev:weapp` | 尝试打开微信开发者工具 |
+| `pnpm check:weapp` | 校验小程序工程 |
+| `pnpm version:print` | 打印当前仓库发布版本 |
 
-当前数据库支持两种模式：
+## 小程序版本管理与上传
 
-### SQLite
+这是当前仓库里最重要的一套小程序发布约定。
 
-```yaml
-database:
-  driver: "sqlite"
-  path: "data/edunexa.sqlite"
-  dsn: ""
+### 设计目标
+
+- 版本号使用固定语义化格式，例如 `1.0.0`
+- 小程序代码上传只保留一条脚本链路，不区分开发版、体验版
+- 小程序源码中的 `env.js` 只维护一个当前地址
+- 上传前自动切换为线上地址，上传后自动恢复为开发地址
+- 上传密钥、开发地址、正式地址统一存放在本地未提交配置文件中
+
+### 相关文件
+
+| 文件 | 是否提交 | 作用 |
+| --- | --- | --- |
+| `apps/weapp/release.json` | 是 | 小程序版本号与默认上传说明 |
+| `apps/weapp/release.local.example.json` | 是 | 本地发布配置模板 |
+| `apps/weapp/.release.local.json` | 否 | 本地私有发布配置 |
+| `apps/weapp/miniprogram/config/env.js` | 是 | 小程序当前实际使用的接口地址 |
+
+### 第一次使用
+
+1. 复制本地配置模板
+
+```powershell
+Copy-Item .\apps\weapp\release.local.example.json .\apps\weapp\.release.local.json
 ```
 
-### PostgreSQL
+2. 编辑 `apps/weapp/.release.local.json`
 
-```yaml
-database:
-  driver: "postgres"
-  path: ""
-  dsn: "host=127.0.0.1 port=5432 user=postgres password=your-password dbname=edu_nexa sslmode=disable TimeZone=Asia/Shanghai"
+示例：
+
+```json
+{
+  "privateKeyPath": "C:/wechat/keys/edunexa.private.key",
+  "devBaseURL": "http://127.0.0.1:33001/api",
+  "prodBaseURL": "https://yyxw-api.ydfk.site/api",
+  "robot": 1
+}
 ```
 
-`wechat` 配置仍然保留，原因是：
+字段说明：
 
-- `app_id` / `app_secret` 用于微信相关接口能力
-- `dev_phone` 用于开发环境下的小程序手机号登录兜底
+- `privateKeyPath`：微信小程序代码上传密钥路径
+- `devBaseURL`：本地开发接口地址
+- `prodBaseURL`：正式接口地址
+- `robot`：默认上传机器人编号，通常保留为 `1`
 
-## 版本机制
+3. 确认微信后台已完成以下准备
 
-当前版本号在前后端都会在构建时写入产物：
+- 已下载代码上传密钥
+- 上传机器 IP 已加入小程序后台白名单
 
-- 管理端：打包时通过 Vite 注入到前端代码中
-- 后端：编译镜像时通过 Go `ldflags` 写入二进制
+### 版本管理命令
 
-版本规则：
+查看当前版本：
 
-1. 优先使用手动传入的 `-Version`
-2. 否则如果当前提交刚好命中 Git tag，则使用该 tag
-3. 否则使用当前时间戳，例如 `20260410213045`
+```bash
+pnpm weapp:version -- show
+```
 
-查看版本：
+直接设置版本：
 
-- 管理端：登录页和页面头部会显示版本号
-- 管理端服务器：固定部署目录下会生成 `version.txt`
-- 后端接口：访问 `/api/health` 可查看返回中的 `version`
+```bash
+pnpm weapp:version -- set 1.0.0
+```
 
-## 发布与部署
+递增补丁版本：
 
-当前仓库只保留两条发布链路：
+```bash
+pnpm weapp:version -- bump patch
+```
 
-- 后端：单独打包为 Docker 镜像，并可推送到 `hub.ydfk.site`，也可在推送后主动远程更新服务器
-- 管理端：在 Windows 本地打包，再上传到远端 Debian 固定目录
+递增次版本：
+
+```bash
+pnpm weapp:version -- bump minor
+```
+
+递增主版本：
+
+```bash
+pnpm weapp:version -- bump major
+```
+
+修改默认上传说明：
+
+```bash
+pnpm weapp:version -- desc 修复附件预览与版本管理脚本
+```
+
+### 环境地址命令
+
+查看当前小程序接口地址：
+
+```bash
+pnpm weapp:env -- show
+```
+
+切回开发地址：
+
+```bash
+pnpm weapp:env -- dev
+```
+
+手动切到正式地址：
+
+```bash
+pnpm weapp:env -- prod
+```
+
+### 上传命令
+
+使用 `release.json` 中的版本号上传：
+
+```bash
+pnpm weapp:upload
+```
+
+上传时直接指定版本号：
+
+```bash
+pnpm weapp:upload -- --version 1.0.1
+```
+
+上传时临时指定说明：
+
+```bash
+pnpm weapp:upload -- --desc 修复每日作业附件预览
+```
+
+同时指定版本号和说明：
+
+```bash
+pnpm weapp:upload -- --version 1.0.2 --desc 修复记录附件链路
+```
+
+### 上传脚本实际做了什么
+
+`pnpm weapp:upload` 的流程如下：
+
+1. 读取 `apps/weapp/release.json`
+2. 读取 `apps/weapp/.release.local.json`
+3. 将 `env.js` 临时切换为正式地址
+4. 自动执行 `pnpm check:weapp`
+5. 调用 `miniprogram-ci` 上传小程序代码
+6. 无论上传成功还是失败，都会将 `env.js` 恢复为开发地址
+
+### 注意事项
+
+- `apps/weapp/.release.local.json` 已加入 `.gitignore`，不会提交到仓库
+- `env.js` 已经简化为单地址模式，旧的 `env.local.js` 不再参与版本切换
+- 如果上传时传入 `--version`，脚本会同步更新 `apps/weapp/release.json`
+
+## 后端与管理端发布
 
 ### 后端镜像
-
-相关文件：
-
-- [Dockerfile](/F:/github-my/edu-nexa/Dockerfile)
-- [docker-compose.yml](/F:/github-my/edu-nexa/docker-compose.yml)
 
 常用命令：
 
@@ -198,114 +274,78 @@ pnpm deploy:api -- -Version 20260410213045
 pnpm pushdeploy:api-image -- -Version 20260410213045
 ```
 
-说明：
-
-- `build:api-image`：只构建镜像
-- `push:api-image`：只推送已经存在的本地镜像
-- `buildpush:api-image`：先构建，再推送
-- `deploy:api`：通过 SSH 登录远端服务器，执行镜像更新命令
-- `pushdeploy:api-image`：先推送镜像，再立即触发远端服务器更新
-
-默认镜像仓库：
-
-```text
-hub.ydfk.site/edu-nexa/api
-```
-
-默认 Go 代理链：
-
-```text
-https://goproxy.cn|https://goproxy.io|https://mirrors.aliyun.com/goproxy/|direct
-```
-
-服务端部署示例：
-
-```bash
-docker login hub.ydfk.site
-APP_VERSION=20260410213045 docker compose pull
-APP_VERSION=20260410213045 docker compose up -d
-```
-
-如果你希望在 Windows 上推送完成后直接更新服务器：
-
-```powershell
-Copy-Item .\scripts\deploy-api.config.example.psd1 .\scripts\deploy-api.local.psd1
-pnpm pushdeploy:api-image -- -Version 20260410213045
-```
-
-`deploy-api.local.psd1` 示例：
-
-```powershell
-@{
-  Host = "your.server.ip"
-  User = "deploy"
-  Port = 22
-  SshKeyPath = "C:\\Users\\you\\.ssh\\id_rsa"
-  RemoteWorkingDirectory = "/opt/edunexa-api"
-  PullCommand = "docker compose pull"
-  UpCommand = "docker compose up -d"
-  ReloadCommand = ""
-}
-```
-
 ### 管理端部署
 
-相关脚本：
-
-- [scripts/deploy-admin.ps1](/F:/github-my/edu-nexa/scripts/deploy-admin.ps1)
-- [scripts/deploy-admin.config.example.psd1](/F:/github-my/edu-nexa/scripts/deploy-admin.config.example.psd1)
-
-首次使用先复制本地配置模板：
+首次使用先复制本地部署配置：
 
 ```powershell
 Copy-Item .\scripts\deploy-admin.config.example.psd1 .\scripts\deploy-admin.local.psd1
 ```
 
-这个 `deploy-admin.local.psd1` 不会提交到 Git。
-
-示例配置：
-
-```powershell
-@{
-  Host = "your.server.ip"
-  User = "deploy"
-  Port = 22
-  SshKeyPath = "C:\\Users\\you\\.ssh\\id_rsa"
-  RemoteDeployPath = "/var/www/edunexa-admin/dist"
-  ReloadCommand = "systemctl reload caddy"
-}
-```
-
 部署命令：
 
-```powershell
+```bash
 pnpm deploy:admin -- -Version 20260410213045
 ```
 
-当前管理端部署流程是：
+## 配置说明
 
-1. 本地执行 `pnpm build:admin`
-2. 打包为 `dist/admin-<version>.tar.gz`
-3. 上传到远端服务器
-4. 清空固定部署目录
-5. 解压到固定目录
-6. 写入 `version.txt`
-7. 可选执行 `ReloadCommand`
+### 后端配置
 
-## 推荐发布顺序
+后端主配置文件位于 `apps/api/config/config.yaml`。
 
-```powershell
-$version = pnpm version:print
-pnpm buildpush:api-image -- -Version $version
-pnpm deploy:api -- -Version $version
-pnpm deploy:admin -- -Version $version
+数据库当前支持：
+
+- SQLite
+- PostgreSQL
+
+`wechat` 相关配置仍然保留，用于微信接口能力和开发兜底登录。
+
+### 小程序配置
+
+小程序发布相关配置分为两层：
+
+- 可提交配置：`apps/weapp/release.json`
+- 本地私有配置：`apps/weapp/.release.local.json`
+
+这样的拆分可以保证：
+
+- 版本号进入仓库，方便团队回看
+- 上传密钥和环境地址不进入仓库
+
+## 验证与检查
+
+### 管理端
+
+```bash
+pnpm build:admin
+pnpm lint:admin
+pnpm test:admin
 ```
 
-更完整的发布说明见 [docs/release-guide.md](/F:/github-my/edu-nexa/docs/release-guide.md)。
+### 后端
+
+```bash
+cd apps/api
+go test ./...
+```
+
+### 小程序
+
+```bash
+pnpm check:weapp
+```
 
 ## 相关文档
 
-- [docs/product-structure.md](/F:/github-my/edu-nexa/docs/product-structure.md)
-- [docs/foundation-roadmap.md](/F:/github-my/edu-nexa/docs/foundation-roadmap.md)
-- [docs/weapp-review-checklist.md](/F:/github-my/edu-nexa/docs/weapp-review-checklist.md)
-- [docs/release-guide.md](/F:/github-my/edu-nexa/docs/release-guide.md)
+- [产品结构](./docs/product-structure.md)
+- [基础路线图](./docs/foundation-roadmap.md)
+- [发布说明](./docs/release-guide.md)
+- [小程序提审检查清单](./docs/weapp-review-checklist.md)
+
+## 维护建议
+
+- 小程序每次上传前，先明确版本号，再执行上传脚本
+- 不要手动长期把 `env.js` 留在正式地址
+- 小程序上传密钥只保存在本地，不要放进仓库
+- 如果后续要接 CI/CD，可以直接复用当前 `release.json + .release.local.json + weapp-upload.mjs` 这套结构

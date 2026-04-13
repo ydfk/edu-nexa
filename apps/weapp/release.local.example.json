@@ -1,0 +1,6 @@
+{
+  "privateKeyPath": "C:/wechat/keys/edunexa.private.key",
+  "devBaseURL": "http://127.0.0.1:33001/api",
+  "prodBaseURL": "https://aaa.bbb.site/api",
+  "robot": 1
+}

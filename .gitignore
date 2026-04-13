@@ -17,6 +17,7 @@ apps/api/log/
 .deploy/
 scripts/deploy-admin.local.psd1
 scripts/deploy-api.local.psd1
+apps/weapp/.release.local.json
 apps/weapp/miniprogram/config/env.local.js
 *.png
 !apps/weapp/miniprogram/assets/*.png
