@@ -3,7 +3,7 @@ import { addDays, format, subDays } from "date-fns";
 import { AlertTriangle, CalendarDays, Check, ChevronLeft, ChevronRight, Clock, ImageIcon, X } from "lucide-react";
 import { toast } from "sonner";
 import { AttachmentPreviewList } from "@/components/domain/attachment-preview";
-import { FileUpload, createFileItemsFromUrls, type FileItem } from "@/components/domain/file-upload";
+import { FileUpload, createFileItemsFromUrls, serializeAttachments, type FileItem } from "@/components/domain/file-upload";
 import { MealStatusBadge } from "@/components/domain/meal-status-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -81,7 +81,7 @@ function RecordEditDialog({ open, onOpenChange, student, record, defaultStatus, 
     try {
       await saveMealRecord({
         id: record?.id || undefined,
-        imageUrls: images.map((img) => img.url),
+        imageUrls: serializeAttachments(images),
         recordedBy: session.user?.displayName || "",
         recordedById: session.user?.id || "",
         remark: remark.trim(),

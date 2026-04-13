@@ -21,13 +21,14 @@ type classPayload struct {
 	Name       string `json:"name"`
 	SchoolID   string `json:"schoolId"`
 	SchoolName string `json:"schoolName"`
+	Sort       int    `json:"sort"`
 	Status     string `json:"status"`
 }
 
 func List(c *fiber.Ctx) error {
 	var items []model.Class
 	database := db.FromFiber(c)
-	query := database.Order("created_at desc")
+	query := database.Order("sort asc, created_at desc")
 
 	if keyword := strings.TrimSpace(c.Query("keyword")); keyword != "" {
 		query = query.Where("name LIKE ? OR school_name LIKE ? OR grade_name LIKE ?", "%"+keyword+"%", "%"+keyword+"%", "%"+keyword+"%")
@@ -68,6 +69,7 @@ func Create(c *fiber.Ctx) error {
 		Name:       strings.TrimSpace(req.Name),
 		SchoolID:   strings.TrimSpace(req.SchoolID),
 		SchoolName: strings.TrimSpace(req.SchoolName),
+		Sort:       req.Sort,
 		Status:     defaultClassStatus(req.Status),
 	}
 	if err := database.Create(&item).Error; err != nil {
@@ -100,6 +102,7 @@ func Update(c *fiber.Ctx) error {
 	item.Name = strings.TrimSpace(req.Name)
 	item.SchoolID = strings.TrimSpace(req.SchoolID)
 	item.SchoolName = strings.TrimSpace(req.SchoolName)
+	item.Sort = req.Sort
 	item.Status = defaultClassStatus(req.Status)
 	if err := database.Save(&item).Error; err != nil {
 		return response.Error(c, "更新班级失败")

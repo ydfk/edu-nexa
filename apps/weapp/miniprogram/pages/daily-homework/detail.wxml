@@ -1,36 +1,16 @@
 <view class="page safe-bottom">
   <view class="card">
-    <!-- 学校 -->
+    <!-- 班级范围 -->
     <view class="form-group">
-      <view class="form-label form-label--required">学校</view>
-      <van-cell
-        title="{{selectedSchool.name || '请选择学校'}}"
-        is-link
-        bindtap="openSchoolPicker"
-        title-class="{{selectedSchool.name ? '' : 'text-secondary'}}"
-      />
-    </view>
-
-    <!-- 年级 -->
-    <view class="form-group">
-      <view class="form-label form-label--required">年级</view>
-      <van-cell
-        title="{{selectedGrade.name || '请选择年级'}}"
-        is-link
-        bindtap="openGradePicker"
-        title-class="{{selectedGrade.name ? '' : 'text-secondary'}}"
-      />
-    </view>
-
-    <!-- 班级 -->
-    <view class="form-group">
-      <view class="form-label form-label--required">班级</view>
-      <van-cell
-        title="{{selectedClass.name || '请选择班级'}}"
-        is-link
-        bindtap="openClassPicker"
-        title-class="{{selectedClass.name ? '' : 'text-secondary'}}"
-      />
+      <view class="form-label form-label--required">学校/年级/班级</view>
+      <picker mode="selector" range="{{scopeOptions}}" range-key="label" value="{{selectedScopeIndex}}" bindchange="onScopeChange">
+        <view class="quick-selector">
+          <view class="quick-selector__value {{selectedClass.id ? '' : 'text-secondary'}}">
+            {{selectedClass.id ? (selectedSchool.name + '/' + selectedGrade.name + '/' + selectedClass.name) : '请选择学校/年级/班级'}}
+          </view>
+          <view class="quick-selector__action">下拉选择</view>
+        </view>
+      </picker>
     </view>
 
     <!-- 日期 -->
@@ -42,12 +22,12 @@
     <!-- 科目 -->
     <view class="form-group">
       <view class="form-label form-label--required">科目</view>
-      <van-cell
-        title="{{subject || '请选择科目'}}"
-        is-link
-        bindtap="openSubjectPicker"
-        title-class="{{subject ? '' : 'text-secondary'}}"
-      />
+      <van-radio-group wx:if="{{subjectColumns.length > 0}}" value="{{subject}}" bind:change="onSubjectChange" direction="horizontal" custom-class="subject-radio-group">
+        <van-radio wx:for="{{subjectColumns}}" wx:key="value" name="{{item.value}}" icon-size="34rpx">
+          {{item.text}}
+        </van-radio>
+      </van-radio-group>
+      <view wx:else class="scope-picker__empty">暂无科目，请先配置常用科目</view>
     </view>
 
     <!-- 内容 -->
@@ -59,21 +39,40 @@
     <!-- 附件 -->
     <view class="form-group">
       <view class="form-label">附件</view>
-      <van-uploader
-        file-list="{{fileList}}"
-        bind:after-read="afterRead"
-        bind:delete="onDeleteImage"
-        max-count="9"
-        accept="file"
-        upload-text="上传附件"
-      />
+      <view class="detail-attachments">
+        <view
+          wx:for="{{fileList}}"
+          wx:key="name"
+          class="detail-attachment"
+          bindtap="onPreviewAttachment"
+          data-index="{{index}}"
+        >
+          <view
+            class="detail-attachment__delete"
+            catchtap="onDeleteAttachment"
+            data-index="{{index}}"
+          >
+            <van-icon name="cross" size="24rpx" color="#5f6d63" />
+          </view>
+          <van-icon name="{{item.type === 'image' ? 'photo-o' : 'description'}}" size="36rpx" color="{{item.type === 'image' ? '#34845f' : '#c43d33'}}" />
+          <text class="detail-attachment__name">{{item.name}}</text>
+        </view>
+        <van-uploader
+          wx:if="{{fileList.length < 9}}"
+          class="detail-attachment-uploader"
+          file-list="{{[]}}"
+          bind:after-read="afterRead"
+          max-count="{{9 - fileList.length}}"
+          accept="file"
+        >
+          <view class="detail-attachment detail-attachment--upload">
+            <van-icon name="photograph" size="40rpx" color="#b9c3bc" />
+            <text class="detail-attachment__upload-text">上传附件</text>
+          </view>
+        </van-uploader>
+      </view>
     </view>
 
-    <!-- 备注 -->
-    <view class="form-group">
-      <view class="form-label">备注</view>
-      <textarea class="form-textarea" value="{{remark}}" bindinput="onRemarkInput" placeholder="选填备注信息" maxlength="200" />
-    </view>
   </view>
 
   <view class="mt-lg">
@@ -84,26 +83,6 @@
   <view class="mt-sm" wx:if="{{isEdit}}">
     <button class="btn btn--ghost btn--block btn--round" bindtap="onDelete">删除作业</button>
   </view>
-
-  <!-- 学校选择器 -->
-  <van-popup show="{{showSchoolPicker}}" position="bottom" round bind:close="closeSchoolPicker">
-    <van-picker columns="{{schoolColumns}}" bind:confirm="onSchoolConfirm" bind:cancel="closeSchoolPicker" show-toolbar title="选择学校" />
-  </van-popup>
-
-  <!-- 年级选择器 -->
-  <van-popup show="{{showGradePicker}}" position="bottom" round bind:close="closeGradePicker">
-    <van-picker columns="{{gradeColumns}}" bind:confirm="onGradeConfirm" bind:cancel="closeGradePicker" show-toolbar title="选择年级" />
-  </van-popup>
-
-  <!-- 班级选择器 -->
-  <van-popup show="{{showClassPicker}}" position="bottom" round bind:close="closeClassPicker">
-    <van-picker columns="{{classColumns}}" bind:confirm="onClassConfirm" bind:cancel="closeClassPicker" show-toolbar title="选择班级" />
-  </van-popup>
-
-  <!-- 科目选择器 -->
-  <van-popup show="{{showSubjectPicker}}" position="bottom" round bind:close="closeSubjectPicker">
-    <van-picker columns="{{subjectColumns}}" bind:confirm="onSubjectConfirm" bind:cancel="closeSubjectPicker" show-toolbar title="选择科目" />
-  </van-popup>
 
   <!-- 日期选择 -->
   <van-calendar

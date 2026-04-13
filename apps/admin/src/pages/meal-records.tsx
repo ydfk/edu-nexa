@@ -17,7 +17,7 @@ import { CircleCheck, CircleX, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { DataTableColumnHeader, DataTablePagination, DataTableToolbar } from "@/components/data-table";
 import { AttachmentPreviewList } from "@/components/domain/attachment-preview";
-import { FileUpload, createFileItemsFromUrls, type FileItem } from "@/components/domain/file-upload";
+import { FileUpload, createFileItemsFromUrls, serializeAttachments, type FileItem } from "@/components/domain/file-upload";
 import { MealStatusBadge } from "@/components/domain/meal-status-badge";
 import { PageContent } from "@/components/page-content";
 import { Badge } from "@/components/ui/badge";
@@ -31,6 +31,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { LongText } from "@/components/long-text";
 import useDialogState from "@/hooks/use-dialog-state";
+import { useAutoSelectSingleID } from "@/hooks/use-auto-select-single-id";
 import { useAdminSession } from "@/lib/auth/session";
 import { deleteMealRecord, fetchMealRecords, fetchStudents, saveMealRecord, type MealRecordItem, type StudentItem } from "@/lib/server-data";
 import MealRecordBoard from "./meal-record-board";
@@ -204,6 +205,18 @@ function MealRecordFormDialog() {
     return currentStudent ? [...activeItems, currentStudent] : activeItems;
   }, [form.studentId, students]);
 
+  useAutoSelectSingleID(
+    selectableStudents,
+    form.studentId,
+    (student) =>
+      setForm((current) =>
+        current.studentId === student.id
+          ? current
+          : { ...current, studentId: student.id },
+      ),
+    isOpen,
+  );
+
   useEffect(() => {
     if (isEdit && currentItem) {
       setForm({
@@ -230,7 +243,7 @@ function MealRecordFormDialog() {
     try {
       await saveMealRecord({
         id: form.id || undefined,
-        imageUrls: form.imageUrls.map((item) => item.url),
+        imageUrls: serializeAttachments(form.imageUrls),
         recordedBy: session.user?.displayName || "",
         recordedById: session.user?.id || "",
         remark: form.remark.trim(),

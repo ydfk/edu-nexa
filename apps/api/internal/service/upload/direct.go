@@ -110,7 +110,7 @@ func ResolveAccessURL(rawURL string, bucket string, objectKey string, dispositio
 }
 
 func signAliyunAccessURL(bucketName string, objectKey string, disposition string, fileName string) (*AccessURLResult, error) {
-	bucket, ossConfig, err := getAliyunOSSBucketWithName(bucketName)
+	bucket, ossConfig, err := getAliyunOSSAccessBucketWithName(bucketName)
 	if err != nil {
 		return nil, err
 	}
@@ -130,6 +130,47 @@ func signAliyunAccessURL(bucketName string, objectKey string, disposition string
 		Provider:  "aliyun_oss",
 		URL:       accessURL,
 	}, nil
+}
+
+func getAliyunOSSAccessBucketWithName(bucketName string) (*oss.Bucket, config.AliyunOSSConfig, error) {
+	ossConfig := config.Current.Storage.AliyunOSS
+	targetBucket := strings.TrimSpace(bucketName)
+	if targetBucket == "" {
+		targetBucket = strings.TrimSpace(ossConfig.Bucket)
+	}
+	if targetBucket == "" || ossConfig.AccessKeyID == "" || ossConfig.AccessKeySecret == "" {
+		return nil, ossConfig, fmt.Errorf("阿里云 OSS 配置不完整")
+	}
+
+	endpoint := strings.TrimSpace(ossConfig.BaseURL)
+	options := []oss.ClientOption{}
+	if endpoint != "" {
+		if !strings.Contains(endpoint, "://") {
+			endpoint = "https://" + endpoint
+		}
+		options = append(options, oss.UseCname(true))
+	} else {
+		endpoint = strings.TrimSpace(ossConfig.Endpoint)
+	}
+	if endpoint == "" {
+		return nil, ossConfig, fmt.Errorf("阿里云 OSS 配置不完整")
+	}
+	if ossConfig.Region != "" {
+		options = append(options, oss.Region(ossConfig.Region), oss.AuthVersion(oss.AuthV4))
+	}
+
+	client, err := oss.New(endpoint, ossConfig.AccessKeyID, ossConfig.AccessKeySecret, options...)
+	if err != nil {
+		return nil, ossConfig, fmt.Errorf("初始化阿里云 OSS 失败")
+	}
+
+	bucket, err := client.Bucket(targetBucket)
+	if err != nil {
+		return nil, ossConfig, fmt.Errorf("连接阿里云 OSS Bucket 失败")
+	}
+
+	ossConfig.Bucket = targetBucket
+	return bucket, ossConfig, nil
 }
 
 func detectDirectUploadMeta(fileName string, rawContentType string) (string, string, error) {
@@ -192,9 +233,6 @@ func buildDirectUploadSignOptions(headers map[string]string) []oss.Option {
 
 func buildAccessSignOptions(objectKey string, disposition string, fileName string) []oss.Option {
 	options := []oss.Option{}
-	if contentType := mime.TypeByExtension(strings.ToLower(path.Ext(objectKey))); contentType != "" {
-		options = append(options, oss.ResponseContentType(contentType))
-	}
 
 	resolvedDisposition := normalizeDisposition(disposition)
 	if resolvedDisposition == "attachment" {

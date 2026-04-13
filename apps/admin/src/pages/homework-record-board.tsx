@@ -19,6 +19,7 @@ import {
 import {
   FileUpload,
   createFileItemsFromUrls,
+  serializeAttachments,
   type FileItem,
 } from "@/components/domain/file-upload";
 import { HomeworkStatusBadge } from "@/components/domain/homework-status-badge";
@@ -121,7 +122,7 @@ function HomeworkRecordEditDialog({
         assignmentId: assignment.id,
         className: student.className,
         id: record?.id || undefined,
-        imageUrls: images.map((item) => item.url),
+        imageUrls: serializeAttachments(images),
         recordedBy: session.user?.displayName || "",
         recordedById: session.user?.id || "",
         remark: remark.trim(),

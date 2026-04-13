@@ -127,7 +127,7 @@ const columns: ColumnDef<GuardianProfileItem>[] = [
   },
   {
     accessorKey: "phone",
-    header: ({ column }) => <DataTableColumnHeader column={column} title="手机号" />,
+    header: ({ column }) => <DataTableColumnHeader column={column} title="账号" />,
     cell: ({ row }) => <LongText className="max-w-[120px]">{row.getValue("phone")}</LongText>,
   },
   {
@@ -249,7 +249,7 @@ function GuardianFormDialog({
 
   async function handleSave() {
     if (!form.name.trim() || !form.phone.trim()) {
-      toast.error("家长姓名和手机号不能为空");
+      toast.error("家长姓名和账号不能为空");
       return;
     }
     if (!isEdit && !form.password.trim()) {
@@ -257,7 +257,7 @@ function GuardianFormDialog({
       return;
     }
     if (phoneExists) {
-      toast.error("家长手机号已存在");
+      toast.error("家长账号已存在");
       return;
     }
 
@@ -301,7 +301,7 @@ function GuardianFormDialog({
           </div>
           <NameReminderAlert exact={exactDuplicate} label="家长" similarItems={similarItems} />
           <div className="grid gap-2">
-            <Label htmlFor="guardian-phone" required>手机号</Label>
+            <Label htmlFor="guardian-phone" required>账号</Label>
             <Input
               id="guardian-phone"
               value={form.phone}
@@ -326,8 +326,8 @@ function GuardianFormDialog({
           {phoneExists ? (
             <Alert variant="destructive">
               <AlertTriangle className="size-4" />
-              <AlertTitle>手机号已存在</AlertTitle>
-              <AlertDescription>当前手机号已被其他家长使用。</AlertDescription>
+                  <AlertTitle>账号已存在</AlertTitle>
+                  <AlertDescription>当前账号已被其他家长使用。</AlertDescription>
             </Alert>
           ) : null}
           <div className="grid gap-2">
@@ -449,7 +449,7 @@ function ResetPasswordDialog({
             <Input disabled value={currentItem.name || currentItem.phone} />
           </div>
           <div className="grid gap-2">
-            <Label>手机号</Label>
+            <Label>账号</Label>
             <Input disabled value={currentItem.phone} />
           </div>
           <div className="grid gap-2">
@@ -544,7 +544,7 @@ export default function GuardiansPage() {
             <div className="space-y-4">
               <DataTableToolbar
                 table={table}
-                searchPlaceholder="搜索姓名 / 手机号 / 关系…"
+                searchPlaceholder="搜索姓名 / 账号 / 关系…"
                 filters={[
                   {
                     columnId: "status",

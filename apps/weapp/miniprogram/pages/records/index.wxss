@@ -192,9 +192,41 @@
 
 .record-card__thumb {
   width: 104rpx;
-  height: 104rpx;
+  min-height: 104rpx;
   border-radius: 12rpx;
-  background: var(--color-bg-secondary);
+  padding: 10rpx 8rpx;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+}
+
+.record-card__thumb--image {
+  background: #edf7f1;
+  border: 1rpx solid rgba(52, 132, 95, 0.14);
+}
+
+.record-card__thumb--pdf {
+  background: #fff7f6;
+  border: 1rpx solid rgba(196, 61, 51, 0.12);
+}
+
+.record-card__thumb--file {
+  background: #fff7f6;
+  border: 1rpx solid rgba(196, 61, 51, 0.12);
+}
+
+.record-card__thumb-name {
+  width: 100%;
+  font-size: 18rpx;
+  line-height: 1.35;
+  color: var(--color-text-secondary);
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .records-empty {

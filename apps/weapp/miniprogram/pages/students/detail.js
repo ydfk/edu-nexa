@@ -68,36 +68,83 @@ Page({
     try {
       const res = await getSchools();
       const list = res.items || res || [];
-      this.setData({
+      const nextData = {
         schools: list,
         schoolColumns: list.map((s) => ({ text: s.name, value: s.id })),
-      });
+      };
+      if (!this.data.isEdit && !this.data.selectedSchool.id && list.length === 1) {
+        const [school] = list;
+        nextData.selectedSchool = { id: school.id, name: school.name };
+      }
+      this.setData(nextData);
+      if (!this.data.isEdit && !this.data.selectedSchool.id && list.length === 1) {
+        this.loadGrades(list[0].id);
+      }
     } catch (e) {
       console.warn("加载学校失败", e);
     }
   },
 
   async loadGrades(schoolId) {
+    if (!schoolId) {
+      this.setData({
+        grades: [],
+        classes: [],
+        gradeColumns: [],
+        classColumns: [],
+        selectedGrade: {},
+        selectedClass: {},
+      });
+      return;
+    }
+
     try {
       const res = await getGrades({ schoolId });
       const list = res.items || res || [];
-      this.setData({
+      const nextData = {
         grades: list,
         gradeColumns: list.map((g) => ({ text: g.name, value: g.id })),
-      });
+      };
+      if (!this.data.selectedGrade.id && list.length === 1) {
+        const [grade] = list;
+        nextData.selectedGrade = { id: grade.id, name: grade.name };
+        nextData.selectedClass = {};
+        nextData.classColumns = [];
+      }
+      this.setData(nextData);
+      if (!this.data.selectedGrade.id && list.length === 1) {
+        this.loadClasses(list[0].id);
+      }
     } catch (e) {
       console.warn("加载年级失败", e);
     }
   },
 
   async loadClasses(gradeId) {
+    if (!gradeId) {
+      this.setData({
+        classes: [],
+        classColumns: [],
+        selectedClass: {},
+      });
+      return;
+    }
+
     try {
       const res = await getClasses({ gradeId });
       const list = res.items || res || [];
-      this.setData({
+      const nextData = {
         classes: list,
         classColumns: list.map((c) => ({ text: buildClassLabel(this.data.selectedGrade.name, c.name), value: c.id })),
-      });
+      };
+      if (!this.data.selectedClass.id && list.length === 1) {
+        const [cls] = list;
+        nextData.selectedClass = {
+          id: cls.id,
+          name: buildClassLabel(this.data.selectedGrade.name, cls.name),
+        };
+      }
+      this.setData(nextData);
     } catch (e) {
       console.warn("加载班级失败", e);
     }
@@ -107,10 +154,15 @@ Page({
     try {
       const res = await getGuardians();
       const list = res.items || res || [];
-      this.setData({
+      const nextData = {
         guardians: list,
         guardianColumns: list.map((g) => ({ text: `${g.name}（${g.phone || ""})`, value: g.id })),
-      });
+      };
+      if (!this.data.selectedGuardian.id && list.length === 1) {
+        const [guardian] = list;
+        nextData.selectedGuardian = { id: guardian.id, name: guardian.name };
+      }
+      this.setData(nextData);
     } catch (e) {
       console.warn("加载家长失败", e);
     }
@@ -139,6 +191,8 @@ Page({
         selectedSchool: { id: school.id, name: school.name },
         selectedGrade: {},
         selectedClass: {},
+        grades: [],
+        classes: [],
         gradeColumns: [],
         classColumns: [],
       });
@@ -162,6 +216,7 @@ Page({
       this.setData({
         selectedGrade: { id: grade.id, name: grade.name },
         selectedClass: {},
+        classes: [],
         classColumns: [],
       });
       this.loadClasses(grade.id);
@@ -204,6 +259,18 @@ Page({
     }
     if (!this.data.gender) {
       wx.showToast({ title: "请选择性别", icon: "none" });
+      return;
+    }
+    if (!this.data.selectedSchool.id) {
+      wx.showToast({ title: "请选择学校", icon: "none" });
+      return;
+    }
+    if (!this.data.selectedGrade.id) {
+      wx.showToast({ title: "请选择年级", icon: "none" });
+      return;
+    }
+    if (!this.data.selectedClass.id) {
+      wx.showToast({ title: "请选择班级", icon: "none" });
       return;
     }
     this.setData({ submitting: true });

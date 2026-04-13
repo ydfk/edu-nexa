@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Check, ChevronRight, ChevronsUpDown, School2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -89,13 +89,25 @@ export function SchoolClassCascader({
     (selectedClassId: string) => {
       const cls = classes.find((c) => c.id === selectedClassId);
       if (cls) {
-        const school = schools.find((s) => s.name === cls.schoolName);
-        onSelect(school?.id || "", selectedClassId);
+        onSelect(cls.schoolId, selectedClassId);
       }
       setOpen(false);
     },
-    [classes, schools, onSelect],
+    [classes, onSelect],
   );
+
+  useEffect(() => {
+    if (classes.length !== 1) {
+      return;
+    }
+
+    const [onlyClass] = classes;
+    if (!onlyClass || classId === onlyClass.id) {
+      return;
+    }
+
+    onSelect(onlyClass.schoolId, onlyClass.id);
+  }, [classId, classes, onSelect]);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>

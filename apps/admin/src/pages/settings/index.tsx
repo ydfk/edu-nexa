@@ -118,7 +118,7 @@ export default function SettingsProfilePage() {
                 <span className="text-sm font-medium">{user?.id || "-"}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">手机号</span>
+                <span className="text-sm text-muted-foreground">账号</span>
                 <span className="text-sm font-medium">{user?.phone || "-"}</span>
               </div>
               <div className="flex items-center justify-between">
@@ -149,7 +149,7 @@ export default function SettingsProfilePage() {
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="profile-phone">手机号</Label>
+                  <Label htmlFor="profile-phone">账号</Label>
                 <Input id="profile-phone" disabled value={user?.phone || ""} />
               </div>
               <div className="flex justify-end">

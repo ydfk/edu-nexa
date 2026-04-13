@@ -26,6 +26,7 @@ import {
 import {
   FileUpload,
   createFileItemsFromUrls,
+  serializeAttachments,
   type FileItem,
 } from "@/components/domain/file-upload";
 import { HomeworkStatusBadge } from "@/components/domain/homework-status-badge";
@@ -65,6 +66,7 @@ import {
 } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import useDialogState from "@/hooks/use-dialog-state";
+import { useAutoSelectSingleID } from "@/hooks/use-auto-select-single-id";
 import { useAdminSession } from "@/lib/auth/session";
 import {
   deleteHomeworkRecord,
@@ -298,6 +300,36 @@ function HomeworkRecordFormDialog() {
     [form.assignmentId, selectableAssignments],
   );
 
+  useAutoSelectSingleID(
+    selectableStudents,
+    form.studentId,
+    (student) =>
+      setForm((current) =>
+        current.studentId === student.id
+          ? current
+          : {
+              ...current,
+              assignmentId: "",
+              studentId: student.id,
+              subject: "",
+              subjectSummary: "",
+            },
+      ),
+    isOpen,
+  );
+
+  useAutoSelectSingleID(
+    selectableAssignments,
+    form.assignmentId,
+    (assignment) =>
+      setForm((current) =>
+        current.assignmentId === assignment.id
+          ? current
+          : { ...current, assignmentId: assignment.id },
+      ),
+    isOpen && !!form.studentId && !!form.serviceDate.trim() && !loadingAssignments,
+  );
+
   useEffect(() => {
     if (isEdit && currentItem) {
       setForm({
@@ -377,7 +409,7 @@ function HomeworkRecordFormDialog() {
         assignmentId: selectedAssignment.id,
         className: selectedStudent.className,
         id: form.id || undefined,
-        imageUrls: form.imageUrls.map((item) => item.url),
+        imageUrls: serializeAttachments(form.imageUrls),
         recordedBy: session.user?.displayName || "",
         recordedById: session.user?.id || "",
         remark: form.remark.trim(),

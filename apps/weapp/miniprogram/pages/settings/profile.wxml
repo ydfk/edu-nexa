@@ -1,7 +1,7 @@
 <view class="page safe-bottom">
   <view class="card">
     <van-cell-group>
-      <van-cell title="手机号" value="{{phone}}" />
+  <van-cell title="账号" value="{{phone}}" />
       <van-cell title="角色" value="{{roleName}}" />
     </van-cell-group>
   </view>

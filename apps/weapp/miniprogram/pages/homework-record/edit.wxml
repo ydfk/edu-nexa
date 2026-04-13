@@ -32,11 +32,40 @@
     </view>
     <view class="form-group">
       <view class="form-label">照片记录</view>
-      <van-uploader wx:if="{{!readOnly}}" file-list="{{fileList}}" bind:after-read="afterRead" bind:delete="onDeleteImage" max-count="9" accept="image" upload-text="拍照/选图" />
-      <view wx:elif="{{fileList.length > 0}}" class="detail-images">
-        <image wx:for="{{fileList}}" wx:key="url" src="{{item.url}}" mode="aspectFill" class="detail-image" />
+      <view wx:if="{{fileList.length > 0 || !readOnly}}" class="detail-attachments">
+        <view
+          wx:for="{{fileList}}"
+          wx:key="name"
+          class="detail-attachment"
+          bindtap="onPreviewAttachment"
+          data-index="{{index}}"
+        >
+          <view
+            wx:if="{{!readOnly}}"
+            class="detail-attachment__delete"
+            catchtap="onDeleteAttachment"
+            data-index="{{index}}"
+          >
+            <van-icon name="cross" size="24rpx" color="#5f6d63" />
+          </view>
+          <van-icon name="photo-o" size="34rpx" color="#34845f" />
+          <text class="detail-attachment__name">{{item.name}}</text>
+        </view>
+        <van-uploader
+          wx:if="{{!readOnly && fileList.length < 9}}"
+          class="detail-attachment-uploader"
+          file-list="{{[]}}"
+          bind:after-read="afterRead"
+          max-count="{{9 - fileList.length}}"
+          accept="image"
+        >
+          <view class="detail-attachment detail-attachment--upload">
+            <van-icon name="photograph" size="40rpx" color="#b9c3bc" />
+            <text class="detail-attachment__upload-text">拍照/选图</text>
+          </view>
+        </van-uploader>
       </view>
-      <view wx:else class="detail-value detail-value--muted">暂无照片</view>
+      <view wx:if="{{fileList.length === 0 && readOnly}}" class="detail-value detail-value--muted">暂无照片</view>
     </view>
     <view class="form-group">
       <view class="form-label">备注</view>

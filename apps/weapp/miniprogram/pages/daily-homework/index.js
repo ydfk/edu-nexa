@@ -1,5 +1,11 @@
 const { getAttachmentAccessURL, getDailyHomework, getDailyHomeworkPrintPDF } = require("../../services/records");
 const { getSession, isGuardian, canEdit } = require("../../store/session");
+const {
+  buildAttachmentCardItems,
+  extractAttachmentName,
+  normalizeAttachmentList,
+  openAttachment: openStoredAttachment,
+} = require("../../utils/attachment");
 const { requireAuth } = require("../../utils/permission");
 const { getToday, shiftDate, formatDateCN, formatDate } = require("../../utils/date");
 
@@ -89,48 +95,16 @@ Page({
   },
 
   async openAttachment(e) {
-    const url = e.currentTarget.dataset.url || "";
-    const type = e.currentTarget.dataset.type || "";
-    const imageUrls = e.currentTarget.dataset.imageUrls || [];
-
-    if (!url || !type) {
+    const itemIndex = Number(e.currentTarget.dataset.index || 0);
+    const attachments = normalizeAttachmentList(e.currentTarget.dataset.attachments || []);
+    const attachment = attachments[itemIndex];
+    if (!attachment) {
       return;
     }
 
-    if (type === "image") {
-      try {
-        const urls = Array.isArray(imageUrls) && imageUrls.length > 0 ? imageUrls : [url];
-        const accessURLs = await Promise.all(
-          urls.map((item) =>
-            getAttachmentAccessURL({ disposition: "inline", url: item })
-              .then((result) => result.url || item)
-              .catch(() => item),
-          ),
-        );
-        const currentURL = accessURLs[urls.findIndex((item) => item === url)] || accessURLs[0] || url;
-        wx.previewImage({ current: currentURL, urls: accessURLs });
-      } catch (error) {
-        wx.showToast({ title: "打开失败", icon: "none" });
-      }
-      return;
-    }
-
-    if (type === "pdf") {
-      wx.showLoading({ title: "打开中..." });
-      getAttachmentAccessURL({
-        disposition: "inline",
-        fileName: getAttachmentName(url),
-        url,
-      })
-        .then((result) => downloadAndOpenPDF(result.url || url))
-        .catch(() => {
-          wx.hideLoading();
-          wx.showToast({ title: "打开失败", icon: "none" });
-        });
-      return;
-    }
-
-    wx.showToast({ title: "仅支持预览图片或PDF", icon: "none" });
+    openStoredAttachment(attachment, attachments).catch(() => {
+      wx.showToast({ title: "打开失败", icon: "none" });
+    });
   },
 
   onAdd() {
@@ -143,7 +117,9 @@ Page({
       .then((res) =>
         getAttachmentAccessURL({
           disposition: "inline",
-          fileName: getAttachmentName(res.url || ""),
+          bucket: res.bucket,
+          fileName: extractAttachmentName(res.objectKey || res.url || ""),
+          objectKey: res.objectKey,
           url: res.url,
         }).then((result) => downloadAndOpenHomeworkPrintPDF(result.url || res.url)),
       )
@@ -167,32 +143,6 @@ Page({
   },
 });
 
-function downloadAndOpenPDF(url) {
-  return new Promise((resolve, reject) => {
-    wx.downloadFile({
-      url,
-      success: (res) => {
-        wx.hideLoading();
-        if (res.statusCode !== 200 || !res.tempFilePath) {
-          reject(new Error("打开失败"));
-          return;
-        }
-        wx.openDocument({
-          filePath: res.tempFilePath,
-          fileType: "pdf",
-          showMenu: true,
-          success: resolve,
-          fail: () => reject(new Error("无法预览 PDF")),
-        });
-      },
-      fail: () => {
-        wx.hideLoading();
-        reject(new Error("打开失败"));
-      },
-    });
-  });
-}
-
 function buildHomeworkGroups(items) {
   const groupMap = {};
 
@@ -210,8 +160,8 @@ function buildHomeworkGroups(items) {
 
     groupMap[groupKey].items.push({
       ...item,
-      attachmentItems: buildAttachmentItems(item.attachments),
-      imageAttachmentUrls: buildImageAttachmentUrls(item.attachments),
+      attachmentItems: buildAttachmentCardItems(item.attachments),
+      attachments: normalizeAttachmentList(item.attachments),
       contentText: buildHomeworkContentText(item),
     });
   });
@@ -228,61 +178,6 @@ function buildHomeworkContentText(item) {
     return contents.join("；");
   }
   return item.content || "";
-}
-
-function parseAttachments(raw) {
-  if (!raw) return [];
-  if (Array.isArray(raw)) return raw.map(extractAttachmentURL).filter(Boolean);
-  try {
-    const items = JSON.parse(String(raw));
-    if (Array.isArray(items)) {
-      return items.map(extractAttachmentURL).filter(Boolean);
-    }
-  } catch (error) {
-    // 兼容旧的逗号分隔格式
-  }
-  return String(raw)
-    .split(",")
-    .map((item) => item.trim().replace(/^\[/, "").replace(/\]$/, "").replace(/^"/, "").replace(/"$/, ""))
-    .filter(Boolean);
-}
-
-// 从字符串或 {name, url} 对象中提取 URL
-function extractAttachmentURL(item) {
-  if (typeof item === "string") return item.trim();
-  if (item && typeof item === "object" && typeof item.url === "string") return item.url.trim();
-  return null;
-}
-
-function buildAttachmentItems(raw) {
-  return parseAttachments(raw).map((url) => ({
-    name: getAttachmentName(url),
-    type: getAttachmentType(url),
-    url,
-  }));
-}
-
-function buildImageAttachmentUrls(raw) {
-  return parseAttachments(raw).filter((url) => getAttachmentType(url) === "image");
-}
-
-function getAttachmentType(url) {
-  const lower = stripAttachmentQuery(url).toLowerCase();
-  if (lower.endsWith(".pdf")) {
-    return "pdf";
-  }
-  return "image";
-}
-
-function getAttachmentName(url) {
-  const parts = stripAttachmentQuery(url).split("/");
-  return parts[parts.length - 1] || "附件";
-}
-
-function stripAttachmentQuery(url) {
-  return String(url || "")
-    .split("#")[0]
-    .split("?")[0];
 }
 
 function downloadAndOpenHomeworkPrintPDF(url) {

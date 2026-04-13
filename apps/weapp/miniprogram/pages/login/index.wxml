@@ -7,8 +7,8 @@
 
   <view class="login-panel">
     <view class="form-group">
-      <view class="form-label">手机号</view>
-      <input class="form-input login-input" type="number" maxlength="11" value="{{phone}}" placeholder="请输入手机号" bindinput="onPhoneInput" />
+      <view class="form-label">账号</view>
+      <input class="form-input login-input" type="number" maxlength="11" value="{{phone}}" placeholder="请输入账号" bindinput="onPhoneInput" />
     </view>
     <view class="form-group">
       <view class="form-label">密码</view>

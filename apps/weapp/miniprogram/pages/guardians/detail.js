@@ -70,7 +70,7 @@ Page({
       return;
     }
     if (!this.data.phone.trim()) {
-      wx.showToast({ title: "请输入手机号", icon: "none" });
+      wx.showToast({ title: "请输入账号", icon: "none" });
       return;
     }
     if (!this.data.isEdit && !this.data.password) {

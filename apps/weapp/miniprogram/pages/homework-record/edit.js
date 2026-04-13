@@ -1,7 +1,14 @@
-const { getAttachmentAccessURL, getStudents, getHomeworkRecords, saveHomeworkRecord, uploadAttachment } = require("../../services/records");
+const { getStudents, getHomeworkRecords, saveHomeworkRecord, uploadAttachment } = require("../../services/records");
 const { getRuntimeSettings } = require("../../services/common");
 const { getSession, isGuardian } = require("../../store/session");
 const { requireAuth, requireEditor } = require("../../utils/permission");
+const {
+  buildAttachmentFileList,
+  createAttachmentRefFromUploadResult,
+  normalizeAttachmentList,
+  openAttachment,
+  serializeAttachmentList,
+} = require("../../utils/attachment");
 const { getToday, formatDate } = require("../../utils/date");
 const Dialog = require("@vant/weapp/dialog/dialog").default;
 
@@ -20,7 +27,7 @@ Page({
     homeworkContent: "",
     remark: "",
     fileList: [],
-    imageUrls: [],
+    attachments: [],
     selectedStudent: {},
     showStudentPicker: false,
     showSubjectPicker: false,
@@ -77,6 +84,8 @@ Page({
         if (selectedStudent) {
           nextData.selectedStudent = { id: selectedStudent.id, name: buildStudentLabel(selectedStudent) };
         }
+      } else if (!this.data.isEdit && !this.data.selectedStudent.id && list.length === 1) {
+        nextData.selectedStudent = { id: list[0].id, name: buildStudentLabel(list[0]) };
       }
       this.setData(nextData);
     } catch (e) {
@@ -87,14 +96,25 @@ Page({
   async loadSubjects() {
     try {
       const settings = await getRuntimeSettings();
-      const subjects = settings.homeworkSubjects || ["语文", "数学", "英语"];
-      const nextData = { subjectColumns: subjects.map((s) => toPickerOption(s)) };
+      const subjects = parseRuntimeOptionList(
+        settings.homeworkSubjects,
+        ["语文", "数学", "英语", "其他"],
+      );
+      const subjectColumns = subjects.map((s) => toPickerOption(s));
+      const nextData = {
+        subject: !this.data.subject && subjectColumns.length === 1 ? String(subjectColumns[0].value || "") : this.data.subject,
+        subjectColumns,
+      };
       if (!this.data.isEdit && this.data.pendingSubject) {
         nextData.subject = this.data.pendingSubject;
       }
       this.setData(nextData);
     } catch (e) {
-      const nextData = { subjectColumns: ["语文", "数学", "英语"].map((s) => ({ text: s, value: s })) };
+      const subjectColumns = ["语文", "数学", "英语"].map((s) => ({ text: s, value: s }));
+      const nextData = {
+        subject: !this.data.subject && subjectColumns.length === 1 ? String(subjectColumns[0].value || "") : this.data.subject,
+        subjectColumns,
+      };
       if (!this.data.isEdit && this.data.pendingSubject) {
         nextData.subject = this.data.pendingSubject;
       }
@@ -115,8 +135,8 @@ Page({
         wx.showToast({ title: "记录不存在或无权限", icon: "none" });
         return;
       }
-      const imageUrls = normalizeImageURLs(record.imageUrls);
-      const fileList = await buildImageFileList(imageUrls);
+      const attachments = normalizeAttachmentList(record.imageUrls);
+      const fileList = buildAttachmentFileList(attachments);
       this.setData({
         assignmentId: String(record.assignmentId || ""),
         status: String(record.status || "completed"),
@@ -126,7 +146,7 @@ Page({
         remark: String(record.remark || ""),
         serviceDate: String(record.serviceDate || getToday()),
         selectedStudent: { id: String(record.studentId || ""), name: buildRecordStudentLabel(record) },
-        imageUrls,
+        attachments,
         fileList,
       });
     } catch (e) {
@@ -191,11 +211,10 @@ Page({
           filePath: f.url || f.path,
           fileSize: f.size,
         });
-        const rawURL = res.url || res;
-        const previewURL = await resolveImagePreviewURL(rawURL);
-        const urls = [...this.data.imageUrls, rawURL];
-        const fl = [...this.data.fileList, { isImage: true, name: f.name || `img${urls.length}`, url: previewURL }];
-        this.setData({ imageUrls: urls, fileList: fl });
+        const attachment = createAttachmentRefFromUploadResult(res, f.name);
+        const attachments = [...this.data.attachments, attachment];
+        const fileList = [...this.data.fileList, ...buildAttachmentFileList([attachment])];
+        this.setData({ attachments, fileList });
       } catch (err) {
         wx.showToast({ title: "上传失败", icon: "none" });
       } finally {
@@ -207,11 +226,35 @@ Page({
   onDeleteImage(e) {
     if (this.data.readOnly) return;
     const idx = e.detail.index;
-    const urls = [...this.data.imageUrls];
-    const fl = [...this.data.fileList];
-    urls.splice(idx, 1);
-    fl.splice(idx, 1);
-    this.setData({ imageUrls: urls, fileList: fl });
+    const attachments = [...this.data.attachments];
+    const fileList = [...this.data.fileList];
+    attachments.splice(idx, 1);
+    fileList.splice(idx, 1);
+    this.setData({ attachments, fileList });
+  },
+
+  onDeleteAttachment(e) {
+    if (this.data.readOnly) return;
+    const idx = Number((e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.index) || 0);
+    const attachments = [...this.data.attachments];
+    const fileList = [...this.data.fileList];
+    attachments.splice(idx, 1);
+    fileList.splice(idx, 1);
+    this.setData({ attachments, fileList });
+  },
+
+  onPreviewAttachment(e) {
+    const idx = e.detail && e.detail.index !== undefined
+      ? Number(e.detail.index)
+      : Number((e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.index) || 0);
+    const attachment = this.data.attachments[idx];
+    if (!attachment) {
+      return;
+    }
+
+    openAttachment(attachment, this.data.attachments).catch((error) => {
+      wx.showToast({ title: (error && error.message) || "打开失败", icon: "none" });
+    });
   },
 
   async onSubmit() {
@@ -230,7 +273,7 @@ Page({
         subject: this.data.subject,
         subjectSummary: this.data.homeworkContent,
         remark: this.data.remark,
-        imageUrls: this.data.imageUrls,
+        imageUrls: serializeAttachmentList(this.data.attachments),
       };
       if (this.data.isEdit) payload.id = this.data.recordId;
       await saveHomeworkRecord(payload);
@@ -267,6 +310,30 @@ function buildStudentLabel(student) {
   return suffix ? `${student.name}（${suffix}）` : student.name;
 }
 
+function parseRuntimeOptionList(raw, fallback = []) {
+  if (Array.isArray(raw)) {
+    return raw.filter(Boolean);
+  }
+
+  const text = String(raw || "").trim();
+  if (!text) {
+    return fallback;
+  }
+
+  try {
+    const parsed = JSON.parse(text);
+    if (Array.isArray(parsed)) {
+      return parsed.filter(Boolean);
+    }
+  } catch (error) {
+  }
+
+  return text
+    .split(/[\n,，]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
 function buildRecordStudentLabel(record) {
   const gradeName = String(record.gradeName || record.grade || "");
   const className = String(record.className || "");
@@ -284,46 +351,6 @@ function getHomeworkStatusText(status) {
   return map[status] || status;
 }
 
-async function buildImageFileList(urls) {
-  const fileItems = [];
-
-  for (const url of urls || []) {
-    const previewURL = await resolveImagePreviewURL(url);
-    fileItems.push({
-      isImage: true,
-      name: getImageName(url),
-      url: previewURL,
-    });
-  }
-
-  return fileItems;
-}
-
-async function resolveImagePreviewURL(rawURL) {
-  if (!rawURL) {
-    return "";
-  }
-
-  try {
-    const result = await getAttachmentAccessURL({
-      disposition: "inline",
-      fileName: getImageName(rawURL),
-      url: rawURL,
-    });
-    return result.url || rawURL;
-  } catch (error) {
-    return rawURL;
-  }
-}
-
-function getImageName(url) {
-  const parts = String(url || "")
-    .split("#")[0]
-    .split("?")[0]
-    .split("/");
-  return parts[parts.length - 1] || "图片";
-}
-
 function toPickerOption(item) {
   if (typeof item === "string") {
     return { text: item, value: item };
@@ -335,25 +362,6 @@ function toPickerOption(item) {
   }
   const value = String(item || "");
   return { text: value, value };
-}
-
-function normalizeImageURLs(raw) {
-  if (!raw) return [];
-  if (Array.isArray(raw)) {
-    return raw.map((item) => String(item || "").trim()).filter(Boolean);
-  }
-  try {
-    const parsed = JSON.parse(String(raw));
-    if (Array.isArray(parsed)) {
-      return parsed.map((item) => String(item || "").trim()).filter(Boolean);
-    }
-  } catch (error) {
-    // 兼容历史逗号分隔字段
-  }
-  return String(raw)
-    .split(",")
-    .map((item) => item.trim().replace(/^\[/, "").replace(/\]$/, "").replace(/^"/, "").replace(/"$/, ""))
-    .filter(Boolean);
 }
 
 function extractPickerValue(detail) {

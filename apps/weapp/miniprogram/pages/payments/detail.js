@@ -55,10 +55,14 @@ Page({
       params.status = "active";
       const res = await getStudents(params);
       const list = res.items || res || [];
-      this.setData({
+      const nextData = {
         students: list,
         studentColumns: list.map((s) => ({ text: buildStudentLabel(s), value: s.id })),
-      });
+      };
+      if (!this.data.isEdit && !this.data.selectedStudent.id && list.length === 1) {
+        nextData.selectedStudent = { id: list[0].id, name: buildStudentLabel(list[0]) };
+      }
+      this.setData(nextData);
     } catch (e) {
       console.warn("加载学生失败", e);
     }
@@ -67,9 +71,11 @@ Page({
   async loadSettings() {
     try {
       const settings = await getRuntimeSettings();
-      const types = settings.paymentTypes || [];
+      const types = parseRuntimeOptionList(settings.paymentTypes, []);
+      const typeColumns = types.map((t) => typeof t === "string" ? { text: t, value: t } : { text: t.name || t.label, value: t.name || t.value });
       this.setData({
-        typeColumns: types.map((t) => typeof t === "string" ? { text: t, value: t } : { text: t.name || t.label, value: t.name || t.value }),
+        paymentType: !this.data.paymentType && typeColumns.length === 1 ? String(typeColumns[0].value || "") : this.data.paymentType,
+        typeColumns,
       });
     } catch (e) {
       console.warn("加载设置失败", e);
@@ -198,6 +204,30 @@ function buildStudentLabel(student) {
   const className = student.className || "";
   const suffix = [gradeName, className].filter(Boolean).join(" ");
   return suffix ? `${student.name}（${suffix}）` : student.name;
+}
+
+function parseRuntimeOptionList(raw, fallback = []) {
+  if (Array.isArray(raw)) {
+    return raw.filter(Boolean);
+  }
+
+  const text = String(raw || "").trim();
+  if (!text) {
+    return fallback;
+  }
+
+  try {
+    const parsed = JSON.parse(text);
+    if (Array.isArray(parsed)) {
+      return parsed.filter(Boolean);
+    }
+  } catch (error) {
+  }
+
+  return text
+    .split(/[\n,，]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
 function buildRecordStudentLabel(record) {

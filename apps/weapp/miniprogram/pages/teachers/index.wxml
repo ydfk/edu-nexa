@@ -2,7 +2,7 @@
   <view class="search-bar">
     <van-search
       value="{{keyword}}"
-      placeholder="搜索教师姓名或手机号"
+      placeholder="搜索教师姓名或账号"
       bind:change="onSearchChange"
       bind:search="onSearch"
       shape="round"

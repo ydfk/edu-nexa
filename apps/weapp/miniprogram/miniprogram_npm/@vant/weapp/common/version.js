@@ -4,7 +4,15 @@ exports.canIUseGetUserProfile = exports.canIUseCanvas2d = exports.canIUseNextTic
 var systemInfo;
 function getSystemInfoSync() {
     if (systemInfo == null) {
-        systemInfo = wx.getSystemInfoSync();
+        if (typeof wx.getAppBaseInfo === 'function') {
+            var appBaseInfo = wx.getAppBaseInfo() || {};
+            systemInfo = {
+                SDKVersion: appBaseInfo.SDKVersion || '',
+            };
+        }
+        else {
+            systemInfo = wx.getSystemInfoSync();
+        }
     }
     return systemInfo;
 }

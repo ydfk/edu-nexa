@@ -1,7 +1,14 @@
-const { getAttachmentAccessURL, getDailyHomework, saveDailyHomework, uploadAttachment } = require("../../services/records");
+const { getDailyHomework, saveDailyHomework, uploadAttachment } = require("../../services/records");
 const { getSchools, getGrades, getClasses } = require("../../services/schools");
 const { getRuntimeSettings } = require("../../services/common");
 const { requireEditor } = require("../../utils/permission");
+const {
+  buildAttachmentFileList,
+  createAttachmentRefFromUploadResult,
+  normalizeAttachmentList,
+  openAttachment,
+  serializeAttachmentList,
+} = require("../../utils/attachment");
 const { getToday, formatDate } = require("../../utils/date");
 const Dialog = require("@vant/weapp/dialog/dialog").default;
 
@@ -12,9 +19,8 @@ Page({
     serviceDate: "",
     subject: "",
     content: "",
-    remark: "",
     fileList: [],
-    imageUrls: [],
+    attachments: [],
     submitting: false,
 
     selectedSchool: {},
@@ -25,15 +31,10 @@ Page({
     grades: [],
     classes: [],
 
-    schoolColumns: [],
-    gradeColumns: [],
-    classColumns: [],
+    scopeOptions: [],
+    selectedScopeIndex: 0,
     subjectColumns: [],
 
-    showSchoolPicker: false,
-    showGradePicker: false,
-    showClassPicker: false,
-    showSubjectPicker: false,
     showDatePicker: false,
   },
 
@@ -44,7 +45,7 @@ Page({
       homeworkId: options.id || "",
       serviceDate: options.date || getToday(),
     });
-    this.loadSchools();
+    this.loadScopeOptions();
     this.loadSettings();
     if (options.id) this.loadHomework(options.id);
   },
@@ -52,9 +53,23 @@ Page({
   async loadSettings() {
     try {
       const settings = await getRuntimeSettings();
-      const subjects = settings.subjects || settings.homeworkSubjects || [];
+      const subjects = parseRuntimeOptionList(
+        settings.homeworkSubjects,
+        ["语文", "数学", "英语", "其他"],
+      );
+      const subjectColumns = subjects
+        .map((item) =>
+          typeof item === "string"
+            ? { text: item, value: item }
+            : { text: item.name || item.label, value: item.name || item.value },
+        )
+        .filter((item) => item.text && item.value);
+
       this.setData({
-        subjectColumns: subjects.map((s) => (typeof s === "string" ? { text: s, value: s } : { text: s.name || s.label, value: s.name || s.value })),
+        subject: !this.data.subject && subjectColumns.length === 1
+          ? String(subjectColumns[0].value || "")
+          : this.data.subject,
+        subjectColumns,
       });
     } catch (e) {
       console.warn("加载设置失败", e);
@@ -65,177 +80,112 @@ Page({
     try {
       const res = await getDailyHomework({ id });
       const list = res.items || res || [];
-      const hw = Array.isArray(list) ? list.find((h) => String(h.id) === String(id)) : list;
+      const hw = Array.isArray(list) ? list.find((item) => String(item.id) === String(id)) : list;
       if (!hw) return;
-      const attachmentUrls = parseAttachments(hw.attachments);
-      const fileList = await buildAttachmentFileList(attachmentUrls);
+
+      const attachments = normalizeAttachmentList(hw.attachments);
+      const fileList = buildAttachmentFileList(attachments);
+
       this.setData({
         serviceDate: hw.serviceDate || getToday(),
         subject: hw.subject || "",
         content: hw.content || "",
-        remark: hw.remark || "",
-        imageUrls: attachmentUrls,
+        attachments,
         fileList,
         selectedSchool: { id: hw.schoolId, name: hw.schoolName },
-        selectedGrade: { id: hw.gradeId, name: hw.gradeName || hw.grade },
-        selectedClass: { id: hw.classId, name: buildClassLabel(hw.gradeName || hw.grade, hw.className) },
+        selectedGrade: { id: hw.gradeId || "", name: hw.gradeName || hw.grade },
+        selectedClass: { id: hw.classId, name: hw.className || "" },
       });
-      if (hw.schoolId) this.loadGrades(hw.schoolId);
-      if (hw.gradeId) this.loadClasses(hw.gradeId);
+      this.syncSelectedScopeIndex();
     } catch (e) {
       console.warn("加载作业详情失败", e);
     }
   },
 
-  async loadSchools() {
+  async loadScopeOptions() {
     try {
-      const res = await getSchools();
-      const list = res.items || res || [];
-      this.setData({
-        schools: list,
-        schoolColumns: list.map((s) => ({ text: s.name, value: s.id })),
-      });
-    } catch (e) {
-      console.warn("加载学校失败", e);
-    }
-  },
+      const [schoolsRes, gradesRes, classesRes] = await Promise.all([
+        getSchools().catch(() => []),
+        getGrades().catch(() => []),
+        getClasses().catch(() => []),
+      ]);
+      const schools = sortSchoolItems(schoolsRes.items || schoolsRes || []);
+      const grades = sortGradeItems(gradesRes.items || gradesRes || []);
+      const classes = sortClassItems(classesRes.items || classesRes || []);
+      const scopeOptions = buildScopeOptions(schools, grades, classes);
 
-  async loadGrades(schoolId) {
-    try {
-      const res = await getGrades({ schoolId });
-      const list = res.items || res || [];
       this.setData({
-        grades: list,
-        gradeColumns: list.map((g) => ({ text: g.name, value: g.id })),
+        schools,
+        grades,
+        classes,
+        scopeOptions,
       });
+      this.syncSelectedScopeIndex({ scopeOptions });
     } catch (e) {
-      console.warn("加载年级失败", e);
-    }
-  },
-
-  async loadClasses(gradeId) {
-    try {
-      const res = await getClasses({ gradeId });
-      const list = res.items || res || [];
+      console.warn("加载班级范围失败", e);
       this.setData({
-        classes: list,
-        classColumns: list.map((c) => ({ text: buildClassLabel(this.data.selectedGrade.name, c.name), value: c.id })),
+        schools: [],
+        grades: [],
+        classes: [],
+        scopeOptions: [],
+        selectedScopeIndex: 0,
       });
-    } catch (e) {
-      console.warn("加载班级失败", e);
     }
   },
 
   onContentInput(e) {
     this.setData({ content: e.detail.value });
   },
-  onRemarkInput(e) {
-    this.setData({ remark: e.detail.value });
+
+  onSubjectChange(e) {
+    this.setData({ subject: String(e.detail || "") });
   },
 
-  openSchoolPicker() {
-    this.setData({ showSchoolPicker: true });
-  },
-  closeSchoolPicker() {
-    this.setData({ showSchoolPicker: false });
-  },
-  onSchoolConfirm(e) {
-    const val = extractPickerValue(e.detail);
-    const school = this.data.schools.find((s) => String(s.id) === String(val));
-    if (school) {
-      this.setData({
-        selectedSchool: { id: school.id, name: school.name },
-        selectedGrade: {},
-        selectedClass: {},
-        gradeColumns: [],
-        classColumns: [],
-      });
-      this.loadGrades(school.id);
-    }
-    this.closeSchoolPicker();
-  },
-
-  openGradePicker() {
-    if (!this.data.selectedSchool.id) {
-      wx.showToast({ title: "请先选择学校", icon: "none" });
-      return;
-    }
-    this.setData({ showGradePicker: true });
-  },
-  closeGradePicker() {
-    this.setData({ showGradePicker: false });
-  },
-  onGradeConfirm(e) {
-    const val = extractPickerValue(e.detail);
-    const grade = this.data.grades.find((g) => String(g.id) === String(val));
-    if (grade) {
-      this.setData({
-        selectedGrade: { id: grade.id, name: grade.name },
-        selectedClass: {},
-        classColumns: [],
-      });
-      this.loadClasses(grade.id);
-    }
-    this.closeGradePicker();
-  },
-
-  openClassPicker() {
-    if (!this.data.selectedGrade.id) {
-      wx.showToast({ title: "请先选择年级", icon: "none" });
-      return;
-    }
-    this.setData({ showClassPicker: true });
-  },
-  closeClassPicker() {
-    this.setData({ showClassPicker: false });
-  },
-  onClassConfirm(e) {
-    const val = extractPickerValue(e.detail);
-    const cls = this.data.classes.find((c) => String(c.id) === String(val));
-    if (cls) {
-      this.setData({ selectedClass: { id: cls.id, name: buildClassLabel(this.data.selectedGrade.name, cls.name) } });
-    }
-    this.closeClassPicker();
-  },
-
-  openSubjectPicker() {
-    this.setData({ showSubjectPicker: true });
-  },
-  closeSubjectPicker() {
-    this.setData({ showSubjectPicker: false });
-  },
-  onSubjectConfirm(e) {
-    this.setData({ subject: String(extractPickerValue(e.detail) || ""), showSubjectPicker: false });
+  onScopeChange(e) {
+    const selectedScopeIndex = Number(e.detail.value);
+    const option = this.data.scopeOptions[selectedScopeIndex] || null;
+    this.applyScopeOption(option, selectedScopeIndex);
   },
 
   openDatePicker() {
     this.setData({ showDatePicker: true });
   },
+
   closeDatePicker() {
     this.setData({ showDatePicker: false });
   },
+
   onDateConfirm(e) {
-    this.setData({ showDatePicker: false, serviceDate: formatDate(new Date(e.detail)) });
+    this.setData({
+      showDatePicker: false,
+      serviceDate: formatDate(new Date(e.detail)),
+    });
   },
 
   async afterRead(e) {
     const { file } = e.detail;
     const files = Array.isArray(file) ? file : [file];
-    for (const f of files) {
+
+    for (const item of files) {
       try {
         wx.showLoading({ title: "上传中..." });
         const res = await uploadAttachment({
-          contentType: f.type,
-          fileName: f.name,
-          filePath: f.url || f.path,
-          fileSize: f.size,
+          contentType: item.type,
+          fileName: item.name,
+          filePath: item.url || item.path,
+          fileSize: item.size,
           purpose: "daily-homework",
         });
-        const rawURL = res.url || res;
-        const previewURL = await resolveAttachmentPreviewURL(rawURL, f.name);
-        const urls = [...this.data.imageUrls, rawURL];
-        const fl = [...this.data.fileList, buildAttachmentFileItem(rawURL, previewURL, f.name)];
-        this.setData({ imageUrls: urls, fileList: fl });
+        const attachment = createAttachmentRefFromUploadResult(res, item.name);
+        const nextAttachments = [...this.data.attachments, attachment];
+        const nextFileList = [
+          ...this.data.fileList,
+          ...buildAttachmentFileList([attachment]),
+        ];
+        this.setData({
+          attachments: nextAttachments,
+          fileList: nextFileList,
+        });
       } catch (err) {
         wx.showToast({ title: "上传失败", icon: "none" });
       } finally {
@@ -245,20 +195,65 @@ Page({
   },
 
   onDeleteImage(e) {
-    const idx = e.detail.index;
-    const urls = [...this.data.imageUrls];
-    const fl = [...this.data.fileList];
-    urls.splice(idx, 1);
-    fl.splice(idx, 1);
-    this.setData({ imageUrls: urls, fileList: fl });
+    const idx = Number(e.detail.index || 0);
+    const nextAttachments = [...this.data.attachments];
+    const nextFileList = [...this.data.fileList];
+    nextAttachments.splice(idx, 1);
+    nextFileList.splice(idx, 1);
+    this.setData({
+      attachments: nextAttachments,
+      fileList: nextFileList,
+    });
+  },
+
+  onDeleteAttachment(e) {
+    const idx = Number((e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.index) || 0);
+    const nextAttachments = [...this.data.attachments];
+    const nextFileList = [...this.data.fileList];
+    nextAttachments.splice(idx, 1);
+    nextFileList.splice(idx, 1);
+    this.setData({
+      attachments: nextAttachments,
+      fileList: nextFileList,
+    });
+  },
+
+  onPreviewAttachment(e) {
+    const idx = Number(
+      (e.detail && e.detail.index) ||
+      (e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.index) ||
+      0,
+    );
+    const attachment = this.data.attachments[idx];
+    if (!attachment) {
+      return;
+    }
+
+    openAttachment(attachment, this.data.attachments).catch((error) => {
+      wx.showToast({ title: (error && error.message) || "打开失败", icon: "none" });
+    });
   },
 
   async onSubmit() {
-    if (!this.data.selectedClass.id) {
+    const selectedScope = resolveSelectedScopeOption(this.data);
+    const selectedSchool = {
+      id: String(this.data.selectedSchool.id || selectedScope.schoolId || "").trim(),
+      name: String(this.data.selectedSchool.name || selectedScope.schoolName || "").trim(),
+    };
+    const selectedGrade = {
+      id: String(this.data.selectedGrade.id || selectedScope.gradeId || "").trim(),
+      name: String(this.data.selectedGrade.name || selectedScope.gradeName || "").trim(),
+    };
+    const selectedClass = {
+      id: String(this.data.selectedClass.id || selectedScope.classId || "").trim(),
+      name: String(this.data.selectedClass.name || selectedScope.className || "").trim(),
+    };
+
+    if (!selectedClass.id && !(selectedSchool.name && selectedGrade.name && selectedClass.name)) {
       wx.showToast({ title: "请选择班级", icon: "none" });
       return;
     }
-    if (!this.data.subject) {
+    if (!String(this.data.subject || "").trim()) {
       wx.showToast({ title: "请选择科目", icon: "none" });
       return;
     }
@@ -266,17 +261,20 @@ Page({
       wx.showToast({ title: "请输入作业内容", icon: "none" });
       return;
     }
+
     this.setData({ submitting: true });
+
     try {
       const payload = {
-        schoolId: this.data.selectedSchool.id,
-        gradeId: this.data.selectedGrade.id,
-        classId: this.data.selectedClass.id,
+        schoolId: selectedSchool.id,
+        schoolName: selectedSchool.name,
+        gradeName: selectedGrade.name,
+        classId: selectedClass.id,
+        className: selectedClass.name,
         serviceDate: this.data.serviceDate,
-        subject: this.data.subject,
+        subject: String(this.data.subject || "").trim(),
         content: this.data.content.trim(),
-        remark: this.data.remark,
-        attachments: serializeAttachments(this.data.imageUrls),
+        attachments: serializeAttachmentList(this.data.attachments),
       };
       if (this.data.isEdit) payload.id = this.data.homeworkId;
       await saveDailyHomework(payload);
@@ -294,7 +292,10 @@ Page({
       .then(async () => {
         try {
           const { request } = require("../../services/request");
-          await request({ method: "DELETE", url: `/daily-homework/${this.data.homeworkId}` });
+          await request({
+            method: "DELETE",
+            url: `/daily-homework/${this.data.homeworkId}`,
+          });
           wx.showToast({ title: "已删除", icon: "success" });
           setTimeout(() => wx.navigateBack(), 800);
         } catch (e) {
@@ -303,109 +304,214 @@ Page({
       })
       .catch(() => {});
   },
+
+  applyScopeOption(option, selectedScopeIndex) {
+    if (!option) {
+      this.setData({
+        selectedScopeIndex: 0,
+        selectedSchool: {},
+        selectedGrade: {},
+        selectedClass: {},
+      });
+      return;
+    }
+
+    this.setData({
+      selectedScopeIndex,
+      selectedSchool: { id: option.schoolId, name: option.schoolName },
+      selectedGrade: { id: option.gradeId, name: option.gradeName },
+      selectedClass: { id: option.classId, name: option.className },
+    });
+  },
+
+  syncSelectedScopeIndex(patch = {}) {
+    const scopeOptions = patch.scopeOptions || this.data.scopeOptions || [];
+    const selectedSchool = patch.selectedSchool || this.data.selectedSchool || {};
+    const selectedGrade = patch.selectedGrade || this.data.selectedGrade || {};
+    const selectedClass = patch.selectedClass || this.data.selectedClass || {};
+
+    if (scopeOptions.length === 0) {
+      this.setData({ selectedScopeIndex: 0 });
+      return;
+    }
+
+    const selectedIndex = findScopeIndex(scopeOptions, selectedClass.id);
+    if (selectedIndex >= 0) {
+      this.applyScopeOption(scopeOptions[selectedIndex], selectedIndex);
+      return;
+    }
+
+    if (
+      !this.data.isEdit &&
+      !selectedSchool.id &&
+      !selectedGrade.id &&
+      !selectedClass.id &&
+      scopeOptions.length === 1
+    ) {
+      this.applyScopeOption(scopeOptions[0], 0);
+      return;
+    }
+
+    this.setData({ selectedScopeIndex: 0 });
+  },
 });
 
-function buildClassLabel(gradeName, className) {
-  return [gradeName, className].filter(Boolean).join(" ");
-}
+function buildScopeOptions(schools, grades, classes) {
+  const schoolMap = buildIdMap(schools);
+  const gradeMap = buildIdMap(grades);
 
-function parseAttachments(raw) {
-  if (!raw) return [];
-  if (Array.isArray(raw)) return raw.map(extractAttachmentURL).filter(Boolean);
-  try {
-    const items = JSON.parse(String(raw));
-    if (Array.isArray(items)) {
-      return items.map(extractAttachmentURL).filter(Boolean);
-    }
-  } catch (error) {
-    // 兼容旧的逗号分隔格式
-  }
-  return String(raw)
-    .split(",")
-    .map((item) => item.trim().replace(/^\[/, "").replace(/\]$/, "").replace(/^"/, "").replace(/"$/, ""))
-    .filter(Boolean);
-}
+  return [...(classes || [])]
+    .map((item) => {
+      const school = schoolMap[String(item.schoolId || "")] || {};
+      const grade = gradeMap[String(item.gradeId || "")] || {};
+      const schoolName = String(item.schoolName || school.name || "").trim();
+      const gradeName = String(item.gradeName || grade.name || "").trim();
+      const className = String(item.name || "").trim();
 
-// 从字符串或 {name, url} 对象中提取 URL
-function extractAttachmentURL(item) {
-  if (typeof item === "string") return item.trim();
-  if (item && typeof item === "object" && typeof item.url === "string") return item.url.trim();
-  return null;
-}
+      return {
+        label: buildScopeLabel(schoolName, gradeName, className),
+        schoolId: item.schoolId || school.id || "",
+        schoolName,
+        schoolSort: resolveSortValue(school),
+        gradeId: item.gradeId || grade.id || "",
+        gradeName,
+        gradeSort: resolveSortValue(grade),
+        classId: item.id || "",
+        className,
+        classSort: resolveSortValue(item),
+      };
+    })
+    .filter((item) => item.label && item.schoolId && item.gradeId && item.classId)
+    .sort((a, b) => {
+      const schoolSortDiff = a.schoolSort - b.schoolSort;
+      if (schoolSortDiff !== 0) {
+        return schoolSortDiff;
+      }
 
-function serializeAttachments(items) {
-  return JSON.stringify((items || []).filter(Boolean));
-}
+      const schoolNameDiff = String(a.schoolName || "").localeCompare(String(b.schoolName || ""), "zh-CN");
+      if (schoolNameDiff !== 0) {
+        return schoolNameDiff;
+      }
 
-async function buildAttachmentFileList(urls) {
-  const fileItems = [];
+      const gradeSortDiff = a.gradeSort - b.gradeSort;
+      if (gradeSortDiff !== 0) {
+        return gradeSortDiff;
+      }
 
-  for (const url of urls || []) {
-    const previewURL = await resolveAttachmentPreviewURL(url, getAttachmentName(url));
-    fileItems.push(buildAttachmentFileItem(url, previewURL, getAttachmentName(url)));
-  }
+      const gradeNameDiff = String(a.gradeName || "").localeCompare(String(b.gradeName || ""), "zh-CN");
+      if (gradeNameDiff !== 0) {
+        return gradeNameDiff;
+      }
 
-  return fileItems;
-}
+      const classSortDiff = a.classSort - b.classSort;
+      if (classSortDiff !== 0) {
+        return classSortDiff;
+      }
 
-function buildAttachmentFileItem(rawURL, previewURL, fileName) {
-  const type = getAttachmentType(rawURL);
-  return {
-    isImage: type === "image",
-    name: fileName || getAttachmentName(rawURL),
-    url: previewURL || "",
-  };
-}
-
-function getAttachmentType(url) {
-  const lower = String(url || "")
-    .split("#")[0]
-    .split("?")[0]
-    .toLowerCase();
-  if (lower.endsWith(".pdf")) {
-    return "pdf";
-  }
-  return "image";
-}
-
-function extractPickerValue(detail) {
-  if (!detail) return "";
-  let value = detail.value;
-  if (Array.isArray(value)) {
-    value = value[0];
-  }
-  if (value && typeof value === "object") {
-    if (Object.prototype.hasOwnProperty.call(value, "value")) {
-      return value.value;
-    }
-    if (Object.prototype.hasOwnProperty.call(value, "text")) {
-      return value.text;
-    }
-  }
-  return value;
-}
-
-function getAttachmentName(url) {
-  const parts = String(url || "")
-    .split("#")[0]
-    .split("?")[0]
-    .split("/");
-  return parts[parts.length - 1] || "附件";
-}
-
-async function resolveAttachmentPreviewURL(rawURL, fileName) {
-  if (!rawURL) {
-    return "";
-  }
-
-  try {
-    const result = await getAttachmentAccessURL({
-      disposition: "inline",
-      fileName: fileName || getAttachmentName(rawURL),
-      url: rawURL,
+      return String(a.className || "").localeCompare(String(b.className || ""), "zh-CN");
     });
-    return result.url || rawURL;
-  } catch (error) {
-    return rawURL;
+}
+
+function buildIdMap(items) {
+  return (items || []).reduce((map, item) => {
+    if (!item || !item.id) {
+      return map;
+    }
+    map[String(item.id)] = item;
+    return map;
+  }, {});
+}
+
+function buildScopeLabel(schoolName, gradeName, className) {
+  return [schoolName, gradeName, className].filter(Boolean).join("/");
+}
+
+function findScopeIndex(items, classId) {
+  if (!Array.isArray(items) || items.length === 0) {
+    return -1;
   }
+  if (classId) {
+    return items.findIndex((item) => String(item.classId) === String(classId));
+  }
+  return -1;
+}
+
+function resolveSelectedScopeOption(data) {
+  const scopeOptions = Array.isArray(data.scopeOptions) ? data.scopeOptions : [];
+  const selectedScopeIndex = Number(data.selectedScopeIndex || 0);
+  const directOption = scopeOptions[selectedScopeIndex];
+  const selectedClassId = String((data.selectedClass && data.selectedClass.id) || "").trim();
+  if (
+    directOption &&
+    selectedClassId &&
+    String(directOption.classId || "").trim() === selectedClassId
+  ) {
+    return directOption;
+  }
+
+  const matchedIndex = findScopeIndex(scopeOptions, selectedClassId);
+  if (matchedIndex >= 0) {
+    return scopeOptions[matchedIndex];
+  }
+
+  return {};
+}
+
+function sortSchoolItems(items) {
+  return [...items].sort((a, b) => {
+    const sortDiff = resolveSortValue(a) - resolveSortValue(b);
+    if (sortDiff !== 0) {
+      return sortDiff;
+    }
+    return String(a.name || "").localeCompare(String(b.name || ""), "zh-CN");
+  });
+}
+
+function sortGradeItems(items) {
+  return [...items].sort((a, b) => {
+    const sortDiff = resolveSortValue(a) - resolveSortValue(b);
+    if (sortDiff !== 0) {
+      return sortDiff;
+    }
+    return String(a.name || "").localeCompare(String(b.name || ""), "zh-CN");
+  });
+}
+
+function sortClassItems(items) {
+  return [...items].sort((a, b) => {
+    const sortDiff = resolveSortValue(a) - resolveSortValue(b);
+    if (sortDiff !== 0) {
+      return sortDiff;
+    }
+    return String(a.name || "").localeCompare(String(b.name || ""), "zh-CN");
+  });
+}
+
+function resolveSortValue(item) {
+  const value = Number(item && item.sort);
+  return Number.isFinite(value) ? value : 0;
+}
+
+function parseRuntimeOptionList(raw, fallback = []) {
+  if (Array.isArray(raw)) {
+    return raw.filter(Boolean);
+  }
+
+  const text = String(raw || "").trim();
+  if (!text) {
+    return fallback;
+  }
+
+  try {
+    const parsed = JSON.parse(text);
+    if (Array.isArray(parsed)) {
+      return parsed.filter(Boolean);
+    }
+  } catch (error) {
+  }
+
+  return text
+    .split(/[\n,，]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
 }

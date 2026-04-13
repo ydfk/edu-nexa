@@ -1,4 +1,3 @@
-const { env } = require("../config/env");
 const { request } = require("./request");
 
 function getOverview() {
@@ -145,8 +144,12 @@ function uploadAttachment(options) {
         formData: config.formData || {},
         uploadURL: config.host,
       }).then(() => ({
+        bucket: config.bucket,
+        extension: extractFileExtension(options.fileName || options.filePath),
+        name: options.fileName || extractFileName(options.filePath),
         objectKey: config.objectKey,
         provider: config.provider,
+        size: Number(options.fileSize) || 0,
         url: config.publicURL,
       })),
     )
@@ -162,8 +165,12 @@ function uploadAttachment(options) {
           method: config.method || "PUT",
           uploadURL: config.uploadURL,
         }).then(() => ({
+          bucket: config.bucket,
+          extension: extractFileExtension(options.fileName || options.filePath),
+          name: options.fileName || extractFileName(options.filePath),
           objectKey: config.objectKey,
           provider: config.provider,
+          size: Number(options.fileSize) || 0,
           url: config.publicURL,
         })),
       );
@@ -172,12 +179,20 @@ function uploadAttachment(options) {
 
 function getAttachmentAccessURL(options) {
   const targetURL = String((options && options.url) || "").trim();
-  if (!targetURL) {
-    return Promise.reject(new Error("附件地址不能为空"));
+  const objectKey = String((options && options.objectKey) || "").trim();
+  if (!targetURL && !objectKey) {
+    return Promise.reject(new Error("附件标识不能为空"));
   }
 
-  return Promise.resolve({
-    url: buildPreviewURL(targetURL),
+  return request({
+    method: "GET",
+    url: buildURL("/uploads/access-url", {
+      bucket: options && options.bucket,
+      disposition: options && options.disposition,
+      fileName: options && options.fileName,
+      objectKey,
+      url: targetURL,
+    }),
   });
 }
 
@@ -310,28 +325,13 @@ function buildURL(path, params) {
   return query ? `${path}?${query}` : path;
 }
 
-function buildPreviewURL(rawURL) {
-  return buildAbsoluteURL("/uploads/preview", {
-    url: rawURL,
-  });
-}
-
-function buildAbsoluteURL(path, params) {
-  const baseURL = String(env.baseURL || "").replace(/\/$/, "");
-  const query = buildQuery(params);
-  return query ? `${baseURL}${path}?${query}` : `${baseURL}${path}`;
-}
-
-function buildQuery(params) {
-  const segments = [];
-  Object.keys(params || {}).forEach((key) => {
-    const value = params[key];
-    if (value === undefined || value === null || value === "") {
-      return;
-    }
-    segments.push(`${encodeURIComponent(key)}=${encodeURIComponent(value)}`);
-  });
-  return segments.join("&");
+function extractFileExtension(fileName) {
+  const lower = String(fileName || "").trim().toLowerCase();
+  const extensionIndex = lower.lastIndexOf(".");
+  if (extensionIndex <= 0 || extensionIndex === lower.length - 1) {
+    return "";
+  }
+  return lower.slice(extensionIndex);
 }
 
 module.exports = {

@@ -31,6 +31,12 @@
   align-items: flex-start;
 }
 
+.mine-panel__login-row {
+  width: 100%;
+  display: flex;
+  justify-content: flex-start;
+}
+
 .mine-panel__name {
   font-size: 36rpx;
   font-weight: 700;
@@ -43,9 +49,15 @@
   color: #61736a;
 }
 
-.mine-panel__login {
+button.mine-panel__login {
   margin-top: 12rpx;
-  width: 180rpx;
+  margin-left: 0;
+  margin-right: 0;
+  padding: 0 32rpx;
+  min-width: 220rpx;
+  width: auto;
+  align-self: flex-start;
+  display: inline-flex;
 }
 
 .mine-footer {

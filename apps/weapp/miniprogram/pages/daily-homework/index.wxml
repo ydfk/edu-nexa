@@ -31,31 +31,25 @@
               <view class="grade-block__title">{{homework.subject || "未分类"}}</view>
               <view class="grade-block__meta" wx:if="{{homework.teacherName}}">教师：{{homework.teacherName}}</view>
             </view>
+            <view class="grade-block__action">
+              <text class="grade-block__action-text">{{canEdit ? "点击编辑" : "点击查看"}}</text>
+              <van-icon name="arrow" size="28rpx" color="#93a39a" />
+            </view>
           </view>
           <view class="homework-content">{{homework.contentText}}</view>
           <view class="homework-attachments" wx:if="{{homework.attachmentItems && homework.attachmentItems.length > 0}}">
-            <block wx:for="{{homework.attachmentItems}}" wx:for-item="attachment" wx:key="url">
-              <image
-                wx:if="{{attachment.type === 'image'}}"
-                src="{{attachment.url}}"
-                mode="aspectFill"
-                class="homework-attachment"
-                catchtap="openAttachment"
-                data-url="{{attachment.url}}"
-                data-type="{{attachment.type}}"
-                data-image-urls="{{homework.imageAttachmentUrls}}"
-              />
-              <view
-                wx:else
-                class="homework-attachment homework-attachment--file"
-                catchtap="openAttachment"
-                data-url="{{attachment.url}}"
-                data-type="{{attachment.type}}"
-              >
-                <van-icon name="description" size="36rpx" color="#c43d33" />
-                <text class="homework-attachment__name">{{attachment.name}}</text>
-              </view>
-            </block>
+            <view
+              wx:for="{{homework.attachmentItems}}"
+              wx:for-item="attachment"
+              wx:key="key"
+              class="homework-attachment {{attachment.type === 'image' ? 'homework-attachment--image' : 'homework-attachment--file'}}"
+              catchtap="openAttachment"
+              data-index="{{index}}"
+              data-attachments="{{homework.attachments}}"
+            >
+              <van-icon name="{{attachment.type === 'image' ? 'photo-o' : 'description'}}" size="36rpx" color="{{attachment.type === 'image' ? '#34845f' : '#c43d33'}}" />
+              <text class="homework-attachment__name">{{attachment.name}}</text>
+            </view>
           </view>
           <view class="homework-remark" wx:if="{{homework.remark}}">备注：{{homework.remark}}</view>
         </view>

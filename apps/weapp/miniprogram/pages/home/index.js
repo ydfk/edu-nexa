@@ -12,7 +12,6 @@ Page({
     currentDate: "",
     metrics: [],
     summaryCards: [],
-    latestItems: [],
   },
 
   onShow() {
@@ -36,7 +35,6 @@ Page({
         currentDate,
         metrics: [],
         summaryCards: [],
-        latestItems: [],
       });
       return;
     }
@@ -52,7 +50,6 @@ Page({
       currentDate,
       metrics: [],
       summaryCards: [],
-      latestItems: [],
     });
 
     try {
@@ -69,14 +66,12 @@ Page({
       this.setData({
         metrics: buildMetrics(overview.metrics || []),
         summaryCards: buildSummaryCards(mealItems, homeworkItems),
-        latestItems: buildLatestItems(mealItems, homeworkItems),
       });
     } catch (error) {
       console.warn("加载首页数据失败", error);
       this.setData({
         metrics: [],
         summaryCards: [],
-        latestItems: [],
       });
     }
   },
@@ -129,16 +124,6 @@ function buildHomeworkItems(items) {
     hasRemark: Boolean(item.remark),
     serviceDate: item.serviceDate || "",
   }));
-}
-
-function buildLatestItems(mealItems, homeworkItems) {
-  return [
-    ...mealItems,
-    ...homeworkItems,
-  ]
-    .sort((a, b) => String(b.serviceDate).localeCompare(String(a.serviceDate)))
-    .slice(0, 8)
-    .map(({ rawStatus, hasRemark, serviceDate, ...item }) => item);
 }
 
 function buildMealRecordDesc(item) {

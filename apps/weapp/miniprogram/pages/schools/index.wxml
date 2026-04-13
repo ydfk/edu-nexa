@@ -66,6 +66,10 @@
       <view class="form-label form-label--required">名称</view>
       <input class="form-input" value="{{editName}}" bindinput="onEditNameInput" placeholder="请输入名称" />
     </view>
+    <view class="form-group" wx:if="{{editType === 'class'}}">
+      <view class="form-label">排序</view>
+      <input class="form-input" value="{{editSort}}" bindinput="onEditSortInput" placeholder="请输入排序，默认0" type="digit" />
+    </view>
     <view class="mt-lg">
       <button class="btn btn--primary btn--block btn--round" bindtap="onEditConfirm">确定</button>
     </view>

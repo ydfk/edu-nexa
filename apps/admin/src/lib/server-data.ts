@@ -1,7 +1,6 @@
 import { expireAdminSession, getAdminSessionSnapshot } from "@/lib/auth/session";
 import {
   type AliyunOSSBrowserUploadConfig,
-  createAliyunOSSAccessURL,
   uploadFileByAliyunOSS,
 } from "@/lib/aliyun-oss";
 
@@ -13,8 +12,6 @@ type ApiEnvelope<T> = {
 };
 
 const apiBaseURL = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
-const attachmentAccessURLTTL = 8 * 60 * 1000;
-
 export type UserItem = {
   displayName: string;
   id: string;
@@ -43,6 +40,7 @@ export type ClassItem = {
   name: string;
   schoolId: string;
   schoolName: string;
+  sort: number;
   status: string;
 };
 
@@ -117,7 +115,7 @@ export type PaymentRecordItem = {
 
 export type MealRecordItem = {
   id: string;
-  imageUrls: string[];
+  imageUrls: AttachmentReference[];
   recordedBy: string;
   recordedById: string;
   remark: string;
@@ -131,7 +129,7 @@ export type HomeworkRecordItem = {
   assignmentId: string;
   className: string;
   id: string;
-  imageUrls: string[];
+  imageUrls: AttachmentReference[];
   recordedBy: string;
   recordedById: string;
   remark: string;
@@ -301,6 +299,7 @@ export async function saveClass(input: {
   name: string;
   schoolId: string;
   schoolName: string;
+  sort: number;
   status: string;
 }) {
   const path = input.id ? `/api/classes/${input.id}` : "/api/classes";
@@ -437,7 +436,7 @@ export async function fetchMealRecords(query?: ListQuery) {
 
 export async function saveMealRecord(input: {
   id?: string;
-  imageUrls: string[];
+  imageUrls: AttachmentReference[];
   recordedBy: string;
   recordedById: string;
   remark: string;
@@ -467,7 +466,7 @@ export async function saveHomeworkRecord(input: {
   assignmentId?: string;
   className: string;
   id?: string;
-  imageUrls: string[];
+  imageUrls: AttachmentReference[];
   recordedBy: string;
   recordedById: string;
   remark: string;
@@ -578,17 +577,6 @@ export type UploadResult = {
   url: string;
 };
 
-const attachmentAccessURLCache = new Map<
-  string,
-  { expiresAt: number; promise: Promise<string> }
->();
-let aliyunPreviewSTSCache:
-  | {
-      expiresAt: number;
-      promise: Promise<AliyunOSSBrowserUploadConfig>;
-    }
-  | null = null;
-
 export async function uploadFile(file: File, purpose = "homework"): Promise<UploadResult> {
   try {
     const uploadConfig = await request<AliyunOSSBrowserUploadConfig>("/api/uploads/aliyun-sts", {
@@ -636,30 +624,18 @@ export async function resolveAttachmentAccessURL(
     return "";
   }
 
-  const cacheKey = JSON.stringify({
-    bucket: normalizedReference.bucket || "",
-    disposition: options?.disposition || "",
-    fileName: options?.disposition === "attachment" ? options?.fileName || "" : "",
-    objectKey: normalizedReference.objectKey || "",
-    url: normalizedReference.url || "",
+  const result = await request<{
+    url?: string;
+  }>("/api/uploads/access-url", {
+    query: {
+      bucket: normalizedReference.bucket,
+      disposition: options?.disposition,
+      fileName: options?.disposition === "attachment" ? options?.fileName : undefined,
+      objectKey: normalizedReference.objectKey,
+      url: normalizedReference.url,
+    },
   });
-  const cached = attachmentAccessURLCache.get(cacheKey);
-  if (cached && cached.expiresAt > Date.now()) {
-    return cached.promise;
-  }
-  attachmentAccessURLCache.delete(cacheKey);
-
-  const promise = resolveAliyunAttachmentAccessURL(normalizedReference, options)
-    .catch((error) => {
-      attachmentAccessURLCache.delete(cacheKey);
-      throw error;
-    });
-
-  attachmentAccessURLCache.set(cacheKey, {
-    expiresAt: Date.now() + attachmentAccessURLTTL,
-    promise,
-  });
-  return promise;
+  return result.url || normalizedReference.url || "";
 }
 
 async function request<T>(
@@ -784,58 +760,6 @@ function normalizeAttachmentReference(reference: string | AttachmentReference) {
     size,
     url,
   };
-}
-
-async function resolveAliyunAttachmentAccessURL(
-  reference: AttachmentReference,
-  options?: {
-    disposition?: "attachment" | "inline";
-    fileName?: string;
-  },
-) {
-  if (!reference.objectKey) {
-    return reference.url || "";
-  }
-
-  const stsConfig = await getAliyunPreviewSTSCredentials();
-  return createAliyunOSSAccessURL(reference.objectKey, {
-    ...stsConfig,
-    bucket: reference.bucket || stsConfig.bucket,
-  }, options);
-}
-
-async function getAliyunPreviewSTSCredentials() {
-  if (aliyunPreviewSTSCache && aliyunPreviewSTSCache.expiresAt > Date.now()) {
-    return aliyunPreviewSTSCache.promise;
-  }
-
-  const promise = request<AliyunOSSBrowserUploadConfig>("/api/uploads/aliyun-sts")
-    .then((config) => {
-      aliyunPreviewSTSCache = {
-        expiresAt: resolveAliyunSTSCacheExpiresAt(config.expiration),
-        promise: Promise.resolve(config),
-      };
-      return config;
-    })
-    .catch((error) => {
-      aliyunPreviewSTSCache = null;
-      throw error;
-    });
-
-  aliyunPreviewSTSCache = {
-    expiresAt: Date.now() + 60 * 1000,
-    promise,
-  };
-  return promise;
-}
-
-function resolveAliyunSTSCacheExpiresAt(expiration: string) {
-  const expiresAt = Date.parse(expiration);
-  if (Number.isNaN(expiresAt)) {
-    return Date.now() + 8 * 60 * 1000;
-  }
-
-  return Math.max(Date.now() + 60 * 1000, expiresAt - 60 * 1000);
 }
 
 function buildURL(path: string, query?: ListQuery) {

@@ -172,7 +172,7 @@ const columns: ColumnDef<UserItem>[] = [
   },
   {
     accessorKey: "phone",
-    header: ({ column }) => <DataTableColumnHeader column={column} title="手机号" />,
+    header: ({ column }) => <DataTableColumnHeader column={column} title="账号" />,
     cell: ({ row }) => <span>{row.getValue("phone")}</span>,
   },
   {
@@ -249,7 +249,7 @@ function TeacherFormDialog({
 
   async function handleSave() {
     if (!form.displayName.trim() || !form.phone.trim()) {
-      toast.error("姓名和手机号不能为空");
+      toast.error("姓名和账号不能为空");
       return;
     }
     if (!currentRow && !form.password.trim()) {
@@ -318,7 +318,7 @@ function TeacherFormDialog({
           </div>
           <NameReminderAlert exact={exactDuplicate} label="教师" similarItems={similarItems} />
           <div className="grid grid-cols-4 items-center gap-x-4 gap-y-1">
-            <Label className="text-end" required>手机号</Label>
+            <Label className="text-end" required>账号</Label>
             <Input
               className="col-span-3"
               value={form.phone}
@@ -444,7 +444,7 @@ function ResetPasswordDialog({
         </DialogHeader>
         <div className="grid gap-4 py-2">
           <div className="grid grid-cols-4 items-center gap-x-4 gap-y-1">
-            <Label className="text-end">手机号</Label>
+            <Label className="text-end">账号</Label>
             <Input className="col-span-3" disabled value={currentRow.phone} />
           </div>
           <div className="grid grid-cols-4 items-center gap-x-4 gap-y-1">
@@ -537,7 +537,7 @@ export default function TeachersPage() {
           <div className="flex flex-1 flex-col gap-4">
             <DataTableToolbar
               table={table}
-              searchPlaceholder="搜索姓名 / 手机号..."
+              searchPlaceholder="搜索姓名 / 账号..."
               filters={[
                 {
                   columnId: "status",

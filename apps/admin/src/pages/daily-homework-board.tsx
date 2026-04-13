@@ -204,6 +204,19 @@ function HomeworkFormDialog({
     }
   }, [open, editItem, schools, classes, subjects]);
 
+  useEffect(() => {
+    if (!open || subjects.length !== 1) {
+      return;
+    }
+
+    const [subject] = subjects;
+    if (!subject || form.subject === subject) {
+      return;
+    }
+
+    setForm((prev) => ({ ...prev, subject }));
+  }, [form.subject, open, subjects]);
+
   async function handleSave() {
     const school = schools.find((s) => s.id === form.schoolId);
     const cls = classes.find((c) => c.id === form.classId);

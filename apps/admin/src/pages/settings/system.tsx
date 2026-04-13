@@ -421,7 +421,7 @@ function DemoConfigCard({
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="demo-teacher-phone">手机号</Label>
+                  <Label htmlFor="demo-teacher-phone">账号</Label>
               <Input
                 id="demo-teacher-phone"
                 disabled={disabled}
@@ -471,7 +471,7 @@ function DemoConfigCard({
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="demo-guardian-phone">手机号</Label>
+                  <Label htmlFor="demo-guardian-phone">账号</Label>
               <Input
                 id="demo-guardian-phone"
                 disabled={disabled}

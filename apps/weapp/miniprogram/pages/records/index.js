@@ -1,6 +1,11 @@
 const { getDailyHomework, getHomeworkRecords, getMealRecords, getStudents } = require("../../services/records");
 const { getSession, isLoggedIn, isGuardian, canEdit } = require("../../store/session");
 const { getStatusName, getStatusTagType } = require("../../utils/permission");
+const {
+  buildAttachmentCardItems,
+  normalizeAttachmentList,
+  openAttachment,
+} = require("../../utils/attachment");
 const { getToday, shiftDate, formatDateCN, formatDate } = require("../../utils/date");
 
 Page({
@@ -228,13 +233,17 @@ Page({
     }
   },
 
-  previewRecordImages(e) {
-    const current = e.currentTarget.dataset.current || "";
-    const urls = e.currentTarget.dataset.urls || [];
-    if (!current || !Array.isArray(urls) || urls.length === 0) {
+  previewRecordAttachment(e) {
+    const attachmentIndex = Number(e.currentTarget.dataset.index || 0);
+    const attachments = normalizeAttachmentList(e.currentTarget.dataset.attachments || []);
+    const attachment = attachments[attachmentIndex];
+    if (!attachment) {
       return;
     }
-    wx.previewImage({ current, urls });
+
+    openAttachment(attachment, attachments).catch((error) => {
+      wx.showToast({ title: (error && error.message) || "打开失败", icon: "none" });
+    });
   },
 });
 
@@ -243,7 +252,8 @@ function buildMealCards(records) {
     assignmentId: "",
     detailText: String(item.remark || ""),
     id: item.id,
-    imageUrls: normalizeImageURLs(item.imageUrls),
+    attachmentItems: buildAttachmentCardItems(item.imageUrls),
+    attachments: normalizeAttachmentList(item.imageUrls),
     metaText: String(item.serviceDate || ""),
     recorded: true,
     recordId: item.id,
@@ -310,7 +320,8 @@ function buildHomeworkCard(student, assignment, recordMap) {
     assignmentId: assignment.id || "",
     detailText: record && record.remark ? `备注：${record.remark}` : "",
     id: record ? record.id : `${student.id}-${assignment.id || subject}`,
-    imageUrls: normalizeImageURLs(record ? record.imageUrls : []),
+    attachmentItems: buildAttachmentCardItems(record ? record.imageUrls : []),
+    attachments: normalizeAttachmentList(record ? record.imageUrls : []),
     metaText: buildHomeworkMetaText(assignment),
     recorded: !!record,
     recordId: record ? record.id : "",
@@ -395,25 +406,6 @@ function getMealStatusText(status) {
     absent: "未用餐",
   };
   return map[status] || status;
-}
-
-function normalizeImageURLs(raw) {
-  if (!raw) return [];
-  if (Array.isArray(raw)) {
-    return raw.map((item) => String(item || "").trim()).filter(Boolean);
-  }
-  try {
-    const parsed = JSON.parse(String(raw));
-    if (Array.isArray(parsed)) {
-      return parsed.map((item) => String(item || "").trim()).filter(Boolean);
-    }
-  } catch (error) {
-    // 兼容逗号分隔的历史数据
-  }
-  return String(raw)
-    .split(",")
-    .map((item) => item.trim().replace(/^\[/, "").replace(/\]$/, "").replace(/^"/, "").replace(/"$/, ""))
-    .filter(Boolean);
 }
 
 function normalizeKey(value) {

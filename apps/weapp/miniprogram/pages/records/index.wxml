@@ -44,8 +44,19 @@
             </view>
             <view class="record-card__remark" wx:if="{{item.detailText}}">{{item.detailText}}</view>
           </view>
-          <view class="record-card__images" wx:if="{{item.imageUrls && item.imageUrls.length > 0}}">
-            <image wx:for="{{item.imageUrls}}" wx:for-item="img" wx:key="*this" src="{{img}}" mode="aspectFill" class="record-card__thumb" catchtap="previewRecordImages" data-current="{{img}}" data-urls="{{item.imageUrls}}" />
+          <view class="record-card__images" wx:if="{{item.attachmentItems && item.attachmentItems.length > 0}}">
+            <view
+              wx:for="{{item.attachmentItems}}"
+              wx:for-item="attachment"
+              wx:key="key"
+              class="record-card__thumb record-card__thumb--{{attachment.type}}"
+              catchtap="previewRecordAttachment"
+              data-index="{{index}}"
+              data-attachments="{{item.attachments}}"
+            >
+              <van-icon name="{{attachment.type === 'image' ? 'photo-o' : 'description'}}" size="32rpx" color="{{attachment.type === 'image' ? '#34845f' : '#c43d33'}}" />
+              <text class="record-card__thumb-name">{{attachment.name}}</text>
+            </view>
           </view>
         </view>
       </view>

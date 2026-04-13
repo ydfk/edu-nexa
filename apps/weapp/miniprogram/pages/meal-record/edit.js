@@ -1,6 +1,13 @@
-const { getAttachmentAccessURL, getMealRecords, getStudents, saveMealRecord, uploadAttachment } = require("../../services/records");
+const { getMealRecords, getStudents, saveMealRecord, uploadAttachment } = require("../../services/records");
 const { getSession, isGuardian } = require("../../store/session");
 const { requireAuth, requireEditor } = require("../../utils/permission");
+const {
+  buildAttachmentFileList,
+  createAttachmentRefFromUploadResult,
+  normalizeAttachmentList,
+  openAttachment,
+  serializeAttachmentList,
+} = require("../../utils/attachment");
 const { getToday, formatDate } = require("../../utils/date");
 const Dialog = require("@vant/weapp/dialog/dialog").default;
 
@@ -15,7 +22,7 @@ Page({
     statusText: "已用餐",
     remark: "",
     fileList: [],
-    imageUrls: [],
+    attachments: [],
     selectedStudent: {},
     showStudentPicker: false,
     showDatePicker: false,
@@ -67,6 +74,8 @@ Page({
         if (selectedStudent) {
           nextData.selectedStudent = { id: selectedStudent.id, name: buildStudentLabel(selectedStudent) };
         }
+      } else if (!this.data.isEdit && !this.data.selectedStudent.id && list.length === 1) {
+        nextData.selectedStudent = { id: list[0].id, name: buildStudentLabel(list[0]) };
       }
       this.setData(nextData);
     } catch (e) {
@@ -89,15 +98,15 @@ Page({
       }
 
       const student = this.data.students.find((s) => String(s.id) === String(record.studentId)) || {};
-      const imageUrls = normalizeImageURLs(record.imageUrls);
-      const fileList = await buildImageFileList(imageUrls);
+      const attachments = normalizeAttachmentList(record.imageUrls);
+      const fileList = buildAttachmentFileList(attachments);
       this.setData({
         status: record.status || "completed",
         statusText: getMealStatusText(record.status || "completed"),
         remark: record.remark || "",
         serviceDate: record.serviceDate || getToday(),
         selectedStudent: { id: record.studentId, name: buildRecordStudentLabel(record, student) },
-        imageUrls,
+        attachments,
         fileList,
       });
     } catch (e) {
@@ -165,8 +174,7 @@ Page({
         return;
       }
       console.warn("选择图片失败", error);
-      const message = String((error && (error.errMsg || error.message)) || "选择图片失败");
-      wx.showToast({ title: message.slice(0, 20), icon: "none" });
+      wx.showToast({ title: resolvePrivacyErrorMessage(error), icon: "none" });
     }
   },
 
@@ -187,11 +195,10 @@ Page({
           filePath: f.url || f.path,
           fileSize: f.size,
         });
-        const rawURL = res.url || res;
-        const previewURL = await resolveImagePreviewURL(rawURL);
-        const urls = [...this.data.imageUrls, rawURL];
-        const fl = [...this.data.fileList, { isImage: true, name: f.name || `img${urls.length}`, url: previewURL }];
-        this.setData({ imageUrls: urls, fileList: fl });
+        const attachment = createAttachmentRefFromUploadResult(res, f.name);
+        const attachments = [...this.data.attachments, attachment];
+        const fileList = [...this.data.fileList, ...buildAttachmentFileList([attachment])];
+        this.setData({ attachments, fileList });
       } catch (err) {
         wx.showToast({ title: "上传失败", icon: "none" });
       } finally {
@@ -205,11 +212,33 @@ Page({
     const idx = e.detail && e.detail.index !== undefined
       ? Number(e.detail.index)
       : Number(e.currentTarget.dataset.index || 0);
-    const urls = [...this.data.imageUrls];
-    const fl = [...this.data.fileList];
-    urls.splice(idx, 1);
-    fl.splice(idx, 1);
-    this.setData({ imageUrls: urls, fileList: fl });
+    const attachments = [...this.data.attachments];
+    const fileList = [...this.data.fileList];
+    attachments.splice(idx, 1);
+    fileList.splice(idx, 1);
+    this.setData({ attachments, fileList });
+  },
+
+  onDeleteAttachment(e) {
+    if (this.data.readOnly) return;
+    const idx = Number((e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.index) || 0);
+    const attachments = [...this.data.attachments];
+    const fileList = [...this.data.fileList];
+    attachments.splice(idx, 1);
+    fileList.splice(idx, 1);
+    this.setData({ attachments, fileList });
+  },
+
+  onPreviewAttachment(e) {
+    const idx = Number((e.detail && e.detail.index) || 0);
+    const attachment = this.data.attachments[idx];
+    if (!attachment) {
+      return;
+    }
+
+    openAttachment(attachment, this.data.attachments).catch((error) => {
+      wx.showToast({ title: (error && error.message) || "打开失败", icon: "none" });
+    });
   },
 
   async onSubmit() {
@@ -225,7 +254,7 @@ Page({
         serviceDate: this.data.serviceDate,
         status: this.data.status,
         remark: this.data.remark,
-        imageUrls: this.data.imageUrls,
+        imageUrls: serializeAttachmentList(this.data.attachments),
       };
       if (this.data.isEdit) payload.id = this.data.recordId;
       await saveMealRecord(payload);
@@ -276,65 +305,6 @@ function getMealStatusText(status) {
     absent: "未用餐",
   };
   return map[status] || status;
-}
-
-async function buildImageFileList(urls) {
-  const fileItems = [];
-
-  for (const url of urls || []) {
-    const previewURL = await resolveImagePreviewURL(url);
-    fileItems.push({
-      isImage: true,
-      name: getImageName(url),
-      url: previewURL,
-    });
-  }
-
-  return fileItems;
-}
-
-async function resolveImagePreviewURL(rawURL) {
-  if (!rawURL) {
-    return "";
-  }
-
-  try {
-    const result = await getAttachmentAccessURL({
-      disposition: "inline",
-      fileName: getImageName(rawURL),
-      url: rawURL,
-    });
-    return result.url || rawURL;
-  } catch (error) {
-    return rawURL;
-  }
-}
-
-function getImageName(url) {
-  const parts = String(url || "")
-    .split("#")[0]
-    .split("?")[0]
-    .split("/");
-  return parts[parts.length - 1] || "图片";
-}
-
-function normalizeImageURLs(raw) {
-  if (!raw) return [];
-  if (Array.isArray(raw)) {
-    return raw.map((item) => String(item || "").trim()).filter(Boolean);
-  }
-  try {
-    const parsed = JSON.parse(String(raw));
-    if (Array.isArray(parsed)) {
-      return parsed.map((item) => String(item || "").trim()).filter(Boolean);
-    }
-  } catch (error) {
-    // 兼容历史逗号分隔字段
-  }
-  return String(raw)
-    .split(",")
-    .map((item) => item.trim().replace(/^\[/, "").replace(/\]$/, "").replace(/^"/, "").replace(/"$/, ""))
-    .filter(Boolean);
 }
 
 function extractPickerValue(detail) {
@@ -416,4 +386,13 @@ function ensurePrivacyAuthorization() {
       fail: reject,
     });
   });
+}
+
+function resolvePrivacyErrorMessage(error) {
+  if (Number(error && error.errno) === 112) {
+    return "请先补充隐私指引";
+  }
+
+  const message = String((error && (error.errMsg || error.message)) || "选择图片失败");
+  return message.slice(0, 20);
 }

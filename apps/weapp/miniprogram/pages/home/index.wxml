@@ -36,20 +36,4 @@
     </view>
     <van-empty wx:else description="{{loggedIn ? '暂无数据' : '未登录'}}" image="search" />
   </view>
-
-  <view class="section">
-    <view class="section-header">
-      <text class="section-title">最新状态</text>
-    </view>
-    <view class="list" wx:if="{{latestItems.length > 0}}">
-      <view class="list-item" wx:for="{{latestItems}}" wx:key="id">
-        <view class="list-content">
-          <view class="list-title">{{item.title}}</view>
-          <view class="list-desc">{{item.desc}}</view>
-        </view>
-        <view class="tag tag--{{item.tagType}}">{{item.tagText}}</view>
-      </view>
-    </view>
-    <van-empty wx:else description="{{loggedIn ? '暂无数据' : '未登录'}}" image="search" />
-  </view>
 </view>

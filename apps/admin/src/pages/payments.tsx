@@ -49,6 +49,7 @@ import {
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import useDialogState from "@/hooks/use-dialog-state";
+import { useAutoSelectSingleID } from "@/hooks/use-auto-select-single-id";
 import {
   fetchRuntimeSettings,
   parsePaymentTypes,
@@ -297,6 +298,31 @@ export default function PaymentsPage() {
     const currentStudent = students.find((item) => item.id === form.studentId);
     return currentStudent ? [...activeItems, currentStudent] : activeItems;
   }, [form.studentId, students]);
+
+  useAutoSelectSingleID(
+    selectableStudents,
+    form.studentId,
+    (student) =>
+      setForm((current) =>
+        current.studentId === student.id
+          ? current
+          : { ...current, studentId: student.id },
+      ),
+    open === "create" || open === "edit",
+  );
+
+  useEffect(() => {
+    if ((open !== "create" && open !== "edit") || paymentTypes.length !== 1) {
+      return;
+    }
+
+    const [paymentType] = paymentTypes;
+    if (!paymentType || form.paymentType === paymentType) {
+      return;
+    }
+
+    setForm((current) => ({ ...current, paymentType }));
+  }, [form.paymentType, open, paymentTypes]);
 
   async function handleSave() {
     if (!form.studentId || !form.paymentType.trim()) {
@@ -608,7 +634,7 @@ export default function PaymentsPage() {
                 <div>学校：{selectedStudent?.schoolName || "-"}</div>
                 <div>年级 / 班级：{[selectedStudent?.grade, selectedStudent?.className].filter(Boolean).join(" / ") || "-"}</div>
                 <div>家长：{selectedStudent?.guardianName || "-"}</div>
-                <div>家长手机号：{selectedStudent?.guardianPhone || "-"}</div>
+                <div>家长账号：{selectedStudent?.guardianPhone || "-"}</div>
               </div>
             </div>
             <div className="grid gap-2 md:col-span-2">

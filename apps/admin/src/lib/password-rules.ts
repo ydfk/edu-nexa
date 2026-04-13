@@ -10,12 +10,12 @@ export function getDefaultLoginPasswordHint(phone: string) {
   const example = getDefaultLoginPassword(phone);
 
   if (!normalized) {
-    return "默认密码为手机号后四位 + 1234，输入手机号后会自动生成。";
+    return "默认密码为账号后四位 + 1234，输入账号后会自动生成。";
   }
 
   if (normalized.length < 4) {
-    return `默认密码为手机号 + 1234，例如 ${example}。`;
+    return `默认密码为账号 + 1234，例如 ${example}。`;
   }
 
-  return `默认密码为手机号后四位 + 1234，例如 ${example}。`;
+  return `默认密码为账号后四位 + 1234，例如 ${example}。`;
 }

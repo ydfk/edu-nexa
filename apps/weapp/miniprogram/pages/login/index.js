@@ -44,7 +44,7 @@ Page({
       return;
     }
     if (!/^1\d{10}$/.test(phone)) {
-      wx.showToast({ title: "请输入正确手机号", icon: "none" });
+      wx.showToast({ title: "请输入正确账号", icon: "none" });
       return;
     }
     if (!password) {

@@ -6,7 +6,9 @@
     <view class="mine-panel__body">
       <view class="mine-panel__name">{{headerName}}</view>
       <view class="mine-panel__meta" wx:if="{{loggedIn}}">{{phone}} · {{roleName}}</view>
-      <button wx:if="{{!loggedIn}}" class="btn btn--primary btn--small btn--round mine-panel__login" bindtap="goLogin">登录</button>
+      <view wx:if="{{!loggedIn}}" class="mine-panel__login-row">
+        <button class="btn btn--primary btn--small btn--round mine-panel__login" bindtap="goLogin">登录</button>
+      </view>
     </view>
   </view>
 

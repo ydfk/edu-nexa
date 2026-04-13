@@ -1,6 +1,7 @@
 package homeworkrecord
 
 import (
+	"encoding/json"
 	"errors"
 	"strings"
 
@@ -9,6 +10,7 @@ import (
 	model "github.com/ydfk/edu-nexa/apps/api/internal/model/homeworkrecord"
 	studentModel "github.com/ydfk/edu-nexa/apps/api/internal/model/student"
 	"github.com/ydfk/edu-nexa/apps/api/internal/service"
+	attachmentservice "github.com/ydfk/edu-nexa/apps/api/internal/service/attachmentref"
 	"github.com/ydfk/edu-nexa/apps/api/internal/service/contentsafety"
 	"github.com/ydfk/edu-nexa/apps/api/pkg/db"
 
@@ -17,20 +19,20 @@ import (
 )
 
 type homeworkRecordPayload struct {
-	CampusID      string   `json:"campusId"`
-	AssignmentID   string   `json:"assignmentId"`
-	ClassName      string   `json:"className"`
-	ImageURLs      []string `json:"imageUrls"`
-	RecordedBy     string   `json:"recordedBy"`
-	RecordedByID   string   `json:"recordedById"`
-	Remark         string   `json:"remark"`
-	SchoolName     string   `json:"schoolName"`
-	ServiceDate    string   `json:"serviceDate"`
-	Status         string   `json:"status"`
-	StudentID      string   `json:"studentId"`
-	StudentName    string   `json:"studentName"`
-	Subject        string   `json:"subject"`
-	SubjectSummary string   `json:"subjectSummary"`
+	CampusID       string          `json:"campusId"`
+	AssignmentID   string          `json:"assignmentId"`
+	ClassName      string          `json:"className"`
+	ImageURLs      json.RawMessage `json:"imageUrls"`
+	RecordedBy     string          `json:"recordedBy"`
+	RecordedByID   string          `json:"recordedById"`
+	Remark         string          `json:"remark"`
+	SchoolName     string          `json:"schoolName"`
+	ServiceDate    string          `json:"serviceDate"`
+	Status         string          `json:"status"`
+	StudentID      string          `json:"studentId"`
+	StudentName    string          `json:"studentName"`
+	Subject        string          `json:"subject"`
+	SubjectSummary string          `json:"subjectSummary"`
 }
 
 func List(c *fiber.Ctx) error {
@@ -79,6 +81,10 @@ func Create(c *fiber.Ctx) error {
 	if err := validateHomeworkRecordPayload(req); err != nil {
 		return response.Error(c, err.Error(), fiber.StatusBadRequest)
 	}
+	attachments, err := attachmentservice.ParseRequest(req.ImageURLs)
+	if err != nil {
+		return response.Error(c, err.Error(), fiber.StatusBadRequest)
+	}
 	student, err := findHomeworkStudent(database, req.StudentID, "")
 	if err != nil {
 		return response.Error(c, err.Error(), fiber.StatusBadRequest)
@@ -93,12 +99,16 @@ func Create(c *fiber.Ctx) error {
 	if err := contentsafety.CheckText(req.Remark + "\n" + req.SubjectSummary); err != nil {
 		return response.Error(c, err.Error())
 	}
+	storedAttachments, err := attachmentservice.SerializePayloads(attachments)
+	if err != nil {
+		return response.Error(c, err.Error(), fiber.StatusBadRequest)
+	}
 
 	record := model.Record{
-		CampusID:      strings.TrimSpace(req.CampusID),
+		CampusID:       strings.TrimSpace(req.CampusID),
 		AssignmentID:   assignment.Id.String(),
 		ClassName:      student.ClassName,
-		ImageURLs:      strings.Join(req.ImageURLs, ","),
+		ImageURLs:      storedAttachments,
 		RecordedBy:     req.RecordedBy,
 		RecordedByID:   req.RecordedByID,
 		Remark:         req.Remark,
@@ -132,6 +142,10 @@ func Update(c *fiber.Ctx) error {
 	if err := validateHomeworkRecordPayload(req); err != nil {
 		return response.Error(c, err.Error(), fiber.StatusBadRequest)
 	}
+	attachments, err := attachmentservice.ParseRequest(req.ImageURLs)
+	if err != nil {
+		return response.Error(c, err.Error(), fiber.StatusBadRequest)
+	}
 	student, err := findHomeworkStudent(database, req.StudentID, record.StudentID)
 	if err != nil {
 		return response.Error(c, err.Error(), fiber.StatusBadRequest)
@@ -146,11 +160,15 @@ func Update(c *fiber.Ctx) error {
 	if err := contentsafety.CheckText(req.Remark + "\n" + req.SubjectSummary); err != nil {
 		return response.Error(c, err.Error())
 	}
+	storedAttachments, err := attachmentservice.SerializePayloads(attachments)
+	if err != nil {
+		return response.Error(c, err.Error(), fiber.StatusBadRequest)
+	}
 
 	record.CampusID = strings.TrimSpace(req.CampusID)
 	record.AssignmentID = assignment.Id.String()
 	record.ClassName = student.ClassName
-	record.ImageURLs = strings.Join(req.ImageURLs, ",")
+	record.ImageURLs = storedAttachments
 	record.RecordedBy = req.RecordedBy
 	record.RecordedByID = req.RecordedByID
 	record.Remark = req.Remark
@@ -184,12 +202,24 @@ func Delete(c *fiber.Ctx) error {
 }
 
 func buildHomeworkRecordPayload(item model.Record) fiber.Map {
+	attachments := attachmentservice.ParseStored(item.ImageURLs)
+	payloadAttachments := make([]fiber.Map, 0, len(attachments))
+	for _, attachment := range attachments {
+		payloadAttachments = append(payloadAttachments, fiber.Map{
+			"bucket":    attachment.Bucket,
+			"extension": attachment.Extension,
+			"name":      attachment.Name,
+			"objectKey": attachment.ObjectKey,
+			"size":      attachment.Size,
+		})
+	}
+
 	return fiber.Map{
 		"campusId":       item.CampusID,
 		"assignmentId":   item.AssignmentID,
 		"className":      item.ClassName,
 		"id":             item.Id,
-		"imageUrls":      splitHomeworkCommaField(item.ImageURLs),
+		"imageUrls":      payloadAttachments,
 		"recordedBy":     item.RecordedBy,
 		"recordedById":   item.RecordedByID,
 		"remark":         item.Remark,
@@ -201,24 +231,6 @@ func buildHomeworkRecordPayload(item model.Record) fiber.Map {
 		"subject":        item.Subject,
 		"subjectSummary": item.SubjectSummary,
 	}
-}
-
-func splitHomeworkCommaField(raw string) []string {
-	if raw == "" {
-		return []string{}
-	}
-
-	parts := strings.Split(raw, ",")
-	items := make([]string, 0, len(parts))
-	for _, part := range parts {
-		value := strings.TrimSpace(part)
-		if value == "" {
-			continue
-		}
-		items = append(items, value)
-	}
-
-	return items
 }
 
 func defaultHomeworkStatus(status string) string {

@@ -1,4 +1,12 @@
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { ReactNode } from "react";
 import {
   type ColumnDef,
@@ -52,6 +60,7 @@ import {
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import useDialogState from "@/hooks/use-dialog-state";
+import { useAutoSelectSingleID } from "@/hooks/use-auto-select-single-id";
 import { findSimilarNames, hasExactName } from "@/lib/name-check";
 import {
   emptyRelationshipValue,
@@ -355,8 +364,8 @@ function StudentFormDialog() {
     [schools, form.schoolId],
   );
   const selectableGrades = useMemo(
-    () => buildSelectableItems(grades, form.gradeId),
-    [grades, form.gradeId],
+    () => (form.schoolId ? buildSelectableItems(grades, form.gradeId) : []),
+    [grades, form.gradeId, form.schoolId],
   );
   const selectableGuardians = useMemo(
     () => buildSelectableItems(guardians, form.guardianId),
@@ -364,12 +373,24 @@ function StudentFormDialog() {
   );
 
   const filteredClasses = useMemo(() => {
+    if (!form.schoolId || !form.gradeId) {
+      return [];
+    }
+
     return buildSelectableItems(classes, form.classId).filter((item) => {
       if (form.schoolId && item.schoolId !== form.schoolId) return false;
       if (form.gradeId && item.gradeId !== form.gradeId) return false;
       return true;
     });
   }, [classes, form.classId, form.gradeId, form.schoolId]);
+  const quickClassSchools = useMemo(
+    () => schools.filter(isActiveItem),
+    [schools],
+  );
+  const quickClassGrades = useMemo(
+    () => grades.filter(isActiveItem),
+    [grades],
+  );
   const quickGuardianExactDuplicate = hasExactName(guardians, guardianForm.name);
   const quickGuardianSimilarItems = findSimilarNames(guardians, guardianForm.name);
   const quickGuardianPhoneExists = guardians.some(
@@ -403,6 +424,102 @@ function StudentFormDialog() {
 
     previousDialogRef.current = open;
   }, [open, currentItem, isEdit]);
+
+  const handleAutoSelectSchool = useCallback((item: SchoolItem) => {
+    setForm((current) => {
+      if (current.schoolId === item.id) {
+        return current;
+      }
+      return { ...current, classId: "", gradeId: "", schoolId: item.id };
+    });
+  }, []);
+
+  const handleAutoSelectGrade = useCallback((item: GradeItem) => {
+    setForm((current) => {
+      if (current.gradeId === item.id) {
+        return current;
+      }
+      return { ...current, classId: "", gradeId: item.id };
+    });
+  }, []);
+
+  const handleAutoSelectClass = useCallback((item: ClassItem) => {
+    setForm((current) => {
+      if (current.classId === item.id) {
+        return current;
+      }
+      return {
+        ...current,
+        classId: item.id,
+        gradeId: item.gradeId || current.gradeId,
+        schoolId: item.schoolId || current.schoolId,
+      };
+    });
+  }, []);
+
+  const handleAutoSelectGuardian = useCallback((item: GuardianProfileItem) => {
+    setForm((current) => {
+      if (current.guardianId === item.id) {
+        return current;
+      }
+      return { ...current, guardianId: item.id };
+    });
+  }, []);
+
+  const handleAutoSelectQuickClassSchool = useCallback((item: SchoolItem) => {
+    setClassForm((current) => {
+      if (current.schoolId === item.id) {
+        return current;
+      }
+      return { ...current, schoolId: item.id };
+    });
+  }, []);
+
+  const handleAutoSelectQuickClassGrade = useCallback((item: GradeItem) => {
+    setClassForm((current) => {
+      if (current.gradeId === item.id) {
+        return current;
+      }
+      return { ...current, gradeId: item.id };
+    });
+  }, []);
+
+  useAutoSelectSingleID(
+    selectableSchools,
+    form.schoolId,
+    handleAutoSelectSchool,
+    isOpen,
+  );
+  useAutoSelectSingleID(
+    selectableGrades,
+    form.gradeId,
+    handleAutoSelectGrade,
+    isOpen && !!form.schoolId,
+  );
+  useAutoSelectSingleID(
+    filteredClasses,
+    form.classId,
+    handleAutoSelectClass,
+    isOpen && !!form.schoolId && !!form.gradeId,
+  );
+  useAutoSelectSingleID(
+    selectableGuardians,
+    form.guardianId,
+    handleAutoSelectGuardian,
+    isOpen,
+  );
+  useAutoSelectSingleID(
+    quickClassSchools,
+    classForm.schoolId,
+    handleAutoSelectQuickClassSchool,
+    open === "quick-class",
+  );
+  useAutoSelectSingleID(
+    quickClassGrades,
+    classForm.gradeId,
+    handleAutoSelectQuickClassGrade,
+    open === "quick-class",
+  );
 
   async function handleSave() {
     const school = schools.find((item) => item.id === form.schoolId);
@@ -480,7 +597,7 @@ function StudentFormDialog() {
           name: schoolForm.name.trim(),
           status: schoolForm.status,
         });
-        setForm((c) => ({ ...c, schoolId: item.id, classId: "" }));
+        setForm((c) => ({ ...c, schoolId: item.id, gradeId: "", classId: "" }));
       }
 
       if (open === "quick-grade") {
@@ -507,6 +624,7 @@ function StudentFormDialog() {
           name: classForm.name.trim(),
           schoolId: school.id,
           schoolName: school.name,
+          sort: 0,
           status: classForm.status,
         });
         setForm((c) => ({
@@ -519,12 +637,12 @@ function StudentFormDialog() {
 
       if (open === "quick-guardian") {
         if (!guardianForm.name.trim() || !guardianForm.phone.trim())
-          throw new Error("家长姓名和手机号不能为空");
+        throw new Error("家长姓名和账号不能为空");
         if (!guardianForm.password.trim()) {
           throw new Error("密码不能为空");
         }
         if (quickGuardianPhoneExists) {
-          throw new Error("家长手机号已存在");
+          throw new Error("家长账号已存在");
         }
         const item = await saveGuardianProfile({
           name: guardianForm.name.trim(),
@@ -619,7 +737,7 @@ function StudentFormDialog() {
                 <Select
                   value={form.schoolId}
                   onValueChange={(v) =>
-                    setForm((c) => ({ ...c, classId: "", schoolId: v }))
+                    setForm((c) => ({ ...c, schoolId: v, gradeId: "", classId: "" }))
                   }
                 >
                   <SelectTrigger>
@@ -639,6 +757,7 @@ function StudentFormDialog() {
                 onCreate={() => openQuickDialog("quick-grade")}
               >
                 <Select
+                  disabled={!form.schoolId}
                   value={form.gradeId}
                   onValueChange={(v) =>
                     setForm((c) => ({ ...c, classId: "", gradeId: v }))
@@ -661,6 +780,7 @@ function StudentFormDialog() {
                 onCreate={() => openQuickDialog("quick-class")}
               >
                 <Select
+                  disabled={!form.schoolId || !form.gradeId}
                   value={form.classId}
                   onValueChange={(v) => {
                     const item = classes.find((entry) => entry.id === v);
@@ -835,7 +955,7 @@ function StudentFormDialog() {
                 similarItems={quickGuardianSimilarItems}
               />
               <div className="grid gap-2">
-                <Label required>手机号</Label>
+                <Label required>账号</Label>
                 <Input
                   value={guardianForm.phone}
                   onChange={(e) =>
@@ -856,8 +976,8 @@ function StudentFormDialog() {
               </div>
               {quickGuardianPhoneExists ? (
                 <Alert variant="destructive">
-                  <AlertTitle>手机号已存在</AlertTitle>
-                  <AlertDescription>当前手机号已被其他家长使用。</AlertDescription>
+                  <AlertTitle>账号已存在</AlertTitle>
+                  <AlertDescription>当前账号已被其他家长使用。</AlertDescription>
                 </Alert>
               ) : null}
               <div className="grid gap-2">

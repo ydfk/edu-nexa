@@ -1,10 +1,9 @@
 import { useMemo, useState } from "react";
-import { Eye, FileText } from "lucide-react";
+import { Eye, FileText, ImageIcon } from "lucide-react";
 import { AttachmentPreviewDialog } from "@/components/domain/attachment-preview-dialog";
 import { Button } from "@/components/ui/button";
-import { useAttachmentAccessURLMap } from "@/hooks/use-attachment-access-url-map";
 import { cn } from "@/lib/utils";
-import { getFileItemKey, type FileItem, resolveAttachmentDisplayURL } from "@/components/domain/file-upload";
+import { getFileItemKey, type FileItem } from "@/components/domain/file-upload";
 
 type AttachmentPreviewListProps = {
   className?: string;
@@ -16,11 +15,6 @@ type AttachmentPreviewListProps = {
 
 export function AttachmentPreviewList({ className, compact = false, emptyText = "-", items, maxVisible }: AttachmentPreviewListProps) {
   const [previewFile, setPreviewFile] = useState<FileItem | null>(null);
-  const accessURLMap = useAttachmentAccessURLMap(
-    items
-      .filter((item) => item.type === "image")
-      .map((item) => ({ name: item.name, bucket: item.bucket, objectKey: item.objectKey, url: item.url })),
-  );
   const visibleItems = useMemo(() => (typeof maxVisible === "number" ? items.slice(0, maxVisible) : items), [items, maxVisible]);
 
   if (items.length === 0) {
@@ -32,7 +26,6 @@ export function AttachmentPreviewList({ className, compact = false, emptyText = 
       <div className={cn("flex flex-wrap gap-2", className)}>
         {visibleItems.map((item, index) => {
           const itemKey = getFileItemKey(item);
-          const previewImageURL = resolveAttachmentDisplayURL(item.url || "", accessURLMap[itemKey]);
 
           return (
             <button
@@ -45,11 +38,9 @@ export function AttachmentPreviewList({ className, compact = false, emptyText = 
               onClick={() => setPreviewFile(item)}
             >
               {item.type === "image" ? (
-                previewImageURL ? (
-                  <img src={previewImageURL} alt={item.name} className={cn("rounded border object-cover", compact ? "size-8" : "size-10")} />
-                ) : (
-                  <div className={cn("rounded border bg-muted", compact ? "size-8" : "size-10")} />
-                )
+                <div className={cn("flex items-center justify-center rounded border bg-emerald-50 text-emerald-700", compact ? "size-8" : "size-10")}>
+                  <ImageIcon className={compact ? "size-4" : "size-5"} />
+                </div>
               ) : (
                 <div className={cn("flex items-center justify-center rounded border bg-red-50 text-red-600", compact ? "size-8" : "size-10")}>
                   <FileText className={compact ? "size-4" : "size-5"} />

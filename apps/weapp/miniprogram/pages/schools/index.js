@@ -22,6 +22,7 @@ Page({
     editParentName: "",
     editSchoolId: "",
     editSchoolName: "",
+    editSort: "",
   },
 
   onShow() {
@@ -63,8 +64,12 @@ Page({
     this.setData({ editName: e.detail.value });
   },
 
+  onEditSortInput(e) {
+    this.setData({ editSort: e.detail.value });
+  },
+
   closeEditPopup() {
-    this.setData({ showEditPopup: false });
+    this.setData({ showEditPopup: false, editSort: "" });
   },
 
   addSchool() {
@@ -78,6 +83,7 @@ Page({
       editParentName: "",
       editSchoolId: "",
       editSchoolName: "",
+      editSort: "",
     });
   },
 
@@ -93,6 +99,7 @@ Page({
       editParentName: "",
       editSchoolId: "",
       editSchoolName: "",
+      editSort: "",
     });
   },
 
@@ -107,6 +114,7 @@ Page({
       editParentName: "",
       editSchoolId: "",
       editSchoolName: "",
+      editSort: "",
     });
   },
 
@@ -122,6 +130,7 @@ Page({
       editParentName: "",
       editSchoolId: "",
       editSchoolName: "",
+      editSort: "",
     });
   },
 
@@ -138,6 +147,7 @@ Page({
       editParentName: grade.name,
       editSchoolId: school.id,
       editSchoolName: school.name,
+      editSort: "",
     });
   },
 
@@ -155,6 +165,7 @@ Page({
       editParentName: grade.name,
       editSchoolId: school.id,
       editSchoolName: school.name,
+      editSort: String(cls.sort || 0),
     });
   },
 
@@ -167,6 +178,7 @@ Page({
       editParentName,
       editSchoolId,
       editSchoolName,
+      editSort,
     } = this.data;
 
     if (!editName.trim()) {
@@ -187,6 +199,7 @@ Page({
         payload.gradeName = editParentName;
         payload.schoolId = editSchoolId;
         payload.schoolName = editSchoolName;
+        payload.sort = Number(editSort) || 0;
         await saveClass(payload);
       }
 
@@ -284,6 +297,7 @@ function buildSchoolGrades(classes, gradeMap, classStudentCountMap) {
       grouped[gradeKey] = {
         id: item.gradeId || gradeKey,
         name: item.gradeName || gradeInfo.name || "未分组年级",
+        sort: Number(gradeInfo.sort) || 0,
         classes: [],
       };
     }
@@ -298,9 +312,17 @@ function buildSchoolGrades(classes, gradeMap, classStudentCountMap) {
     .map((key) => ({
       ...grouped[key],
       classCount: grouped[key].classes.length,
-      classes: grouped[key].classes.sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), "zh-CN")),
+      classes: grouped[key].classes.sort(
+        (a, b) =>
+          (Number(a.sort) || 0) - (Number(b.sort) || 0) ||
+          String(a.name || "").localeCompare(String(b.name || ""), "zh-CN"),
+      ),
     }))
-    .sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), "zh-CN"));
+    .sort(
+      (a, b) =>
+        (Number(a.sort) || 0) - (Number(b.sort) || 0) ||
+        String(a.name || "").localeCompare(String(b.name || ""), "zh-CN"),
+    );
 }
 
 function resolveClassStudentCount(item, classStudentCountMap) {

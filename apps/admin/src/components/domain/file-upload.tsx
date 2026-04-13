@@ -1,9 +1,8 @@
 import { useCallback, useRef, useState } from "react";
-import { FileUp, FileText, X, Eye } from "lucide-react";
+import { FileUp, FileText, ImageIcon, X, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { AttachmentPreviewDialog } from "@/components/domain/attachment-preview-dialog";
-import { useAttachmentAccessURLMap } from "@/hooks/use-attachment-access-url-map";
 import { uploadFile, type UploadResult } from "@/lib/server-data";
 
 export type FileItem = {
@@ -51,7 +50,11 @@ export function createFileItemFromUrl(url: string, fallbackName?: string): FileI
 }
 
 export function createFileItemFromUploadResult(result: UploadResult, fallbackName?: string): FileItem {
-  const resolvedName = (fallbackName || result.name || extractFileName(result.objectKey || result.url)).trim();
+  const resolvedName = normalizeAttachmentDisplayName(
+    fallbackName || result.name,
+    result.objectKey || result.url,
+    detectFileType(result.extension || fallbackName || result.name || result.objectKey || result.url),
+  );
   const source = result.objectKey || result.url || resolvedName;
   return {
     bucket: result.bucket,
@@ -122,11 +125,6 @@ export function FileUpload({
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [previewFile, setPreviewFile] = useState<FileItem | null>(null);
-  const accessURLMap = useAttachmentAccessURLMap(
-    value
-      .filter((item) => item.type === "image")
-      .map((item) => ({ name: item.name, bucket: item.bucket, objectKey: item.objectKey, url: item.url })),
-  );
 
   const handleFiles = useCallback(
     async (files: FileList | null) => {
@@ -169,16 +167,13 @@ export function FileUpload({
       <div className="flex flex-wrap gap-2">
         {value.map((item, index) => {
           const itemKey = getFileItemKey(item);
-          const previewImageURL = resolveAttachmentDisplayURL(item.url || "", accessURLMap[itemKey]);
 
           return (
             <div key={`${itemKey}-${index}`} className="group relative flex items-center gap-2 rounded-md border bg-muted/30 px-3 py-2">
               {item.type === "image" ? (
-                previewImageURL ? (
-                  <img src={previewImageURL} alt={item.name} className="size-10 rounded object-cover" />
-                ) : (
-                  <div className="size-10 rounded bg-muted" />
-                )
+                <div className="flex size-10 items-center justify-center rounded border bg-emerald-50 text-emerald-700">
+                  <ImageIcon className="size-5" />
+                </div>
               ) : (
                 <FileText className="size-10 text-red-500" />
               )}
@@ -234,13 +229,14 @@ function normalizeAttachmentValue(value: AttachmentValue) {
   const trimmedBucket = String(value.bucket || "").trim();
   const trimmedObjectKey = String(value.objectKey || "").trim();
   if (trimmedObjectKey) {
+    const type = detectFileType(String(value.extension || "").trim() || String(value.name || "").trim() || trimmedObjectKey);
     return {
       bucket: trimmedBucket || undefined,
       extension: normalizeAttachmentExtension(String(value.extension || "").trim(), String(value.name || "").trim(), trimmedObjectKey),
-      name: String(value.name || "").trim() || extractFileName(trimmedObjectKey),
+      name: normalizeAttachmentDisplayName(String(value.name || "").trim(), trimmedObjectKey, type),
       objectKey: trimmedObjectKey,
       size: normalizeAttachmentSize(value.size),
-      type: detectFileType(String(value.extension || "").trim() || String(value.name || "").trim() || trimmedObjectKey),
+      type,
       url: String(value.url || "").trim(),
     };
   }
@@ -251,7 +247,7 @@ function normalizeAttachmentValue(value: AttachmentValue) {
   }
 
   const trimmedName = String(value.name || "").trim();
-  const item = createFileItemFromUrl(trimmedURL, trimmedName || undefined);
+  const item = createFileItemFromUrl(trimmedURL, normalizeAttachmentDisplayName(trimmedName, trimmedURL, detectFileType(trimmedName || trimmedURL)));
   return {
     ...item,
     extension: normalizeAttachmentExtension(String(value.extension || "").trim(), trimmedName, trimmedURL),
@@ -280,4 +276,28 @@ function normalizeAttachmentSize(rawSize: unknown) {
   }
 
   return rawSize;
+}
+
+function normalizeAttachmentDisplayName(rawName: string | undefined, rawSource: string, type: "image" | "pdf") {
+  const sourceName = (rawName || "").trim() || extractFileName(rawSource);
+  if (!looksLikeOpaqueName(sourceName)) {
+    return sourceName || "附件";
+  }
+
+  const extension = normalizeAttachmentExtension("", sourceName, rawSource);
+  return `${type === "image" ? "图片" : "附件"}${extension || ""}`;
+}
+
+function looksLikeOpaqueName(fileName: string) {
+  const normalized = fileName.trim();
+  if (!normalized) {
+    return true;
+  }
+
+  const baseName = normalized.replace(/\.[^.]+$/, "");
+  if (!baseName) {
+    return true;
+  }
+
+  return /^tmp[_-]/i.test(baseName) || /^[a-f0-9-]{20,}$/i.test(baseName) || /^[a-z0-9]{24,}$/i.test(baseName);
 }

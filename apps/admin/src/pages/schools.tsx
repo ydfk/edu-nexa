@@ -209,7 +209,14 @@ function SchoolTreeItem({ school }: { school: SchoolItem }) {
   const [isOpen, setIsOpen] = useState(true);
 
   const schoolClasses = useMemo(
-    () => classes.filter((c) => c.schoolId === school.id),
+    () =>
+      classes
+        .filter((c) => c.schoolId === school.id)
+        .slice()
+        .sort(
+          (a, b) =>
+            a.sort - b.sort || a.name.localeCompare(b.name, "zh-CN"),
+        ),
     [classes, school.id],
   );
 
@@ -329,6 +336,7 @@ function GradeGroup({
   } = useSchoolsContext();
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState("");
+  const [newSort, setNewSort] = useState("");
   const [saving, setSaving] = useState(false);
   const exactDup = hasExactName(gradeClasses, newName);
 
@@ -347,10 +355,12 @@ function GradeGroup({
         schoolName: school.name,
         gradeId: grade.id,
         gradeName: grade.name,
+        sort: Number(newSort) || 0,
         status: "active",
       });
       toast.success(`班级「${name}」已添加`);
       setNewName("");
+      setNewSort("");
       setAdding(false);
       reloadData();
     } catch (error) {
@@ -456,6 +466,13 @@ function GradeGroup({
               onKeyDown={(e) => e.key === "Enter" && handleQuickAdd()}
               autoFocus
             />
+            <Input
+              className="h-7 w-[70px]"
+              placeholder="排序"
+              type="number"
+              value={newSort}
+              onChange={(e) => setNewSort(e.target.value)}
+            />
             <Button
               size="sm"
               variant="outline"
@@ -472,6 +489,7 @@ function GradeGroup({
               onClick={() => {
                 setAdding(false);
                 setNewName("");
+                setNewSort("");
               }}
             >
               取消
@@ -686,6 +704,7 @@ function EditClassDialog() {
   const { setOpen, currentClass, classes, reloadData } = useSchoolsContext();
   const [form, setForm] = useState({
     name: currentClass?.name ?? "",
+    sort: String(currentClass?.sort ?? 0),
     status: currentClass?.status ?? "active",
   });
   const [saving, setSaving] = useState(false);
@@ -706,6 +725,7 @@ function EditClassDialog() {
       await saveClass({
         id: currentClass.id,
         name: form.name.trim(),
+        sort: Number(form.sort) || 0,
         status: form.status,
         schoolId: currentClass.schoolId,
         schoolName: currentClass.schoolName,
@@ -741,6 +761,14 @@ function EditClassDialog() {
             {exactDup ? (
               <p className="text-sm text-destructive">当前年级下已存在同名班级</p>
             ) : null}
+          </div>
+          <div className="space-y-2">
+            <Label>排序</Label>
+            <Input
+              type="number"
+              value={form.sort}
+              onChange={(e) => setForm({ ...form, sort: e.target.value })}
+            />
           </div>
           <div className="space-y-2">
             <Label>状态</Label>

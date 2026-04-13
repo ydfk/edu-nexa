@@ -55,10 +55,5 @@
   "style": "v2",
   "sitemapLocation": "sitemap.json",
   "lazyCodeLoading": "requiredComponents",
-  "requiredPrivateInfos": [
-    "chooseImage",
-    "chooseMedia",
-    "chooseMessageFile"
-  ],
   "__usePrivacyCheck__": true
 }
