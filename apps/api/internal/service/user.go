@@ -92,22 +92,6 @@ func IsDemoUser(c *fiber.Ctx) bool {
 	return parseLocalDemoFlag(c)
 }
 
-func CanDemoMutate(c *fiber.Ctx) bool {
-	method := strings.ToUpper(strings.TrimSpace(c.Method()))
-	if method == fiber.MethodGet || method == fiber.MethodHead || method == fiber.MethodOptions {
-		return true
-	}
-
-	switch strings.TrimSpace(c.Path()) {
-	case "/api/auth/profile":
-		return method == fiber.MethodPut
-	case "/api/auth/change-password":
-		return method == fiber.MethodPost
-	default:
-		return false
-	}
-}
-
 func EnsureUserActive(user model.User) error {
 	if IsActiveStatus(user.Status) {
 		return nil

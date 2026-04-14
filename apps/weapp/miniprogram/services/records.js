@@ -231,9 +231,16 @@ function uploadFileByAliyunPostForm(options) {
           resolve();
           return;
         }
-        reject(new Error("上传失败"));
+        reject(createUploadError("上传失败", {
+          responseData: result.data,
+          statusCode: result.statusCode,
+        }));
       },
-      fail: reject,
+      fail(error) {
+        reject(createUploadError("上传失败", {
+          errMsg: error && error.errMsg,
+        }));
+      },
       url: options.uploadURL,
     });
   });
@@ -253,13 +260,88 @@ function uploadFileToSignedURL(options) {
             resolve();
             return;
           }
-          reject(new Error("上传失败"));
+          reject(createUploadError("上传失败", {
+            responseData: result.data,
+            statusCode: result.statusCode,
+          }));
         },
-        fail: reject,
+        fail(error) {
+          reject(createUploadError("上传失败", {
+            errMsg: error && error.errMsg,
+          }));
+        },
         url: options.uploadURL,
       });
     }),
   );
+}
+
+function createUploadError(title, details) {
+  const error = new Error(buildUploadErrorMessage(title, details));
+  error.errMsg = details && details.errMsg;
+  error.responseData = details && details.responseData;
+  error.statusCode = details && details.statusCode;
+  return error;
+}
+
+function buildUploadErrorMessage(title, details) {
+  const errMsg = String((details && details.errMsg) || "").trim();
+  if (errMsg) {
+    return errMsg;
+  }
+
+  const responseMessage = extractUploadResponseMessage(details && details.responseData);
+  const statusCode = Number(details && details.statusCode);
+  if (responseMessage) {
+    return Number.isFinite(statusCode) && statusCode > 0
+      ? `${title}(${statusCode})：${responseMessage}`
+      : `${title}：${responseMessage}`;
+  }
+
+  if (Number.isFinite(statusCode) && statusCode > 0) {
+    return `${title}(${statusCode})`;
+  }
+
+  return title;
+}
+
+function extractUploadResponseMessage(responseData) {
+  const text = normalizeUploadResponseText(responseData);
+  if (!text) {
+    return "";
+  }
+
+  try {
+    const payload = JSON.parse(text);
+    const message = String(payload.msg || payload.message || "").trim();
+    if (message) {
+      return message;
+    }
+  } catch (error) {
+  }
+
+  const xmlMatch = text.match(/<Message>([^<]+)<\/Message>/i);
+  if (xmlMatch && xmlMatch[1]) {
+    return xmlMatch[1].trim();
+  }
+
+  return text.replace(/\s+/g, " ").trim().slice(0, 120);
+}
+
+function normalizeUploadResponseText(responseData) {
+  if (typeof responseData === "string") {
+    return responseData.trim();
+  }
+
+  if (!responseData || typeof responseData !== "object") {
+    return "";
+  }
+
+  try {
+    return JSON.stringify(responseData);
+  } catch (error) {
+    return "";
+  }
 }
 
 function extractFileName(filePath) {
@@ -352,5 +434,8 @@ module.exports = {
   saveStudent,
   saveStudentService,
   getAttachmentAccessURL,
+  resolveUploadErrorMessage(error) {
+    return String((error && (error.message || error.errMsg)) || "上传失败").trim() || "上传失败";
+  },
   uploadAttachment,
 };

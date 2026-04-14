@@ -38,6 +38,21 @@
   color: var(--color-text-secondary);
 }
 
+.attachment-section {
+  margin-top: 16rpx;
+}
+
+.attachment-section:first-of-type {
+  margin-top: 12rpx;
+}
+
+.attachment-section__title {
+  margin-bottom: 10rpx;
+  font-size: 22rpx;
+  font-weight: 600;
+  color: #617168;
+}
+
 .detail-attachments {
   display: flex;
   flex-wrap: wrap;
@@ -71,6 +86,16 @@
   border: 1rpx solid rgba(185, 195, 188, 0.28);
 }
 
+.detail-attachment--upload-image {
+  background: linear-gradient(180deg, #f3faf6 0%, #edf6f0 100%);
+  border-color: rgba(52, 132, 95, 0.18);
+}
+
+.detail-attachment--upload-file {
+  background: linear-gradient(180deg, #faf5f4 0%, #f7f0ee 100%);
+  border-color: rgba(196, 61, 51, 0.14);
+}
+
 .detail-attachment__delete {
   position: absolute;
   top: 8rpx;
@@ -100,4 +125,12 @@
   line-height: 1.4;
   color: #9aa59d;
   text-align: center;
+}
+
+.detail-attachment__upload-text--image {
+  color: #5f8a74;
+}
+
+.detail-attachment__upload-text--file {
+  color: #a67a73;
 }

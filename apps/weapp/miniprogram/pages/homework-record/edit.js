@@ -1,4 +1,10 @@
-const { getStudents, getHomeworkRecords, saveHomeworkRecord, uploadAttachment } = require("../../services/records");
+const {
+  getStudents,
+  getHomeworkRecords,
+  saveHomeworkRecord,
+  uploadAttachment,
+  resolveUploadErrorMessage,
+} = require("../../services/records");
 const { getRuntimeSettings } = require("../../services/common");
 const { getSession, isGuardian } = require("../../store/session");
 const { requireAuth, requireEditor } = require("../../utils/permission");
@@ -216,7 +222,8 @@ Page({
         const fileList = [...this.data.fileList, ...buildAttachmentFileList([attachment])];
         this.setData({ attachments, fileList });
       } catch (err) {
-        wx.showToast({ title: "上传失败", icon: "none" });
+        console.warn("上传图片失败", err);
+        showErrorDialog("上传失败", resolveUploadErrorMessage(err));
       } finally {
         wx.hideLoading();
       }
@@ -398,4 +405,12 @@ function buildHomeworkContent(record) {
     .map((item) => String((item && item.content) || "").trim())
     .filter(Boolean)
     .join("；");
+}
+
+function showErrorDialog(title, content) {
+  wx.showModal({
+    title,
+    content: String(content || title),
+    showCancel: false,
+  });
 }

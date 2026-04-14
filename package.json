@@ -25,6 +25,9 @@
     "miniprogram-ci": "^2.1.13"
   },
   "pnpm": {
+    "overrides": {
+      "@babel/helper-compilation-targets>lru-cache": "5.1.1"
+    },
     "ignoredBuiltDependencies": []
   }
 }

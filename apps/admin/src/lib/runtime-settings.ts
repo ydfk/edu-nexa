@@ -66,9 +66,6 @@ export async function fetchRuntimeSettings() {
 
 export async function saveRuntimeSettings(settings: RuntimeSettings) {
   const session = getAdminSessionSnapshot();
-  if (session.user?.isDemo) {
-    throw new Error("demo 环境仅支持查看数据，不能修改管理数据");
-  }
   const normalized = normalizeRuntimeSettings(settings);
 
   try {
@@ -115,9 +112,6 @@ export async function fetchAdminRuntimeSettings() {
 
 export async function saveAdminRuntimeSettings(settings: RuntimeSettings) {
   const session = getAdminSessionSnapshot();
-  if (session.user?.isDemo) {
-    throw new Error("demo 环境仅支持查看数据，不能修改管理数据");
-  }
   const normalized = normalizeRuntimeSettings(settings);
   const response = await fetch("/api/runtime-settings", {
     body: JSON.stringify(normalized),
@@ -138,9 +132,6 @@ export async function saveAdminRuntimeSettings(settings: RuntimeSettings) {
 
 export async function initializeDemoEnvironment() {
   const session = getAdminSessionSnapshot();
-  if (session.user?.isDemo) {
-    throw new Error("demo 环境仅支持查看数据，不能修改管理数据");
-  }
   const response = await fetch("/api/runtime-settings/demo/initialize", {
     headers: {
       Authorization: session.token ? `Bearer ${session.token}` : "",

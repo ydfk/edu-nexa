@@ -106,17 +106,7 @@ pnpm check:weapp
 
 ## 小程序版本管理与上传
 
-这是当前仓库里最重要的一套小程序发布约定。
-
-### 设计目标
-
-- 版本号使用固定语义化格式，例如 `1.0.0`
-- 小程序代码上传只保留一条脚本链路，不区分开发版、体验版
-- 小程序源码中的 `env.js` 只维护一个当前地址
-- 上传前自动切换为线上地址，上传后自动恢复为开发地址
-- 上传密钥、开发地址、正式地址统一存放在本地未提交配置文件中
-
-### 相关文件
+### 约定
 
 | 文件 | 是否提交 | 作用 |
 | --- | --- | --- |
@@ -125,139 +115,30 @@ pnpm check:weapp
 | `apps/weapp/.release.local.json` | 否 | 本地私有发布配置 |
 | `apps/weapp/miniprogram/config/env.js` | 是 | 小程序当前实际使用的接口地址 |
 
-### 第一次使用
+当前发布约定很简单：
 
-1. 复制本地配置模板
+- 版本号固定使用 `1.0.0` 这样的语义化版本
+- 小程序只保留一条上传脚本，不区分开发版、体验版
+- `env.js` 只保留一个当前地址
+- 上传前自动切正式地址，上传后自动恢复开发地址
+- 上传密钥、开发地址、正式地址统一放到本地未提交配置文件
 
-```powershell
-Copy-Item .\apps\weapp\release.local.example.json .\apps\weapp\.release.local.json
-```
-
-2. 编辑 `apps/weapp/.release.local.json`
-
-示例：
-
-```json
-{
-  "privateKeyPath": "C:/wechat/keys/edunexa.private.key",
-  "devBaseURL": "http://127.0.0.1:33001/api",
-  "prodBaseURL": "https://yyxw-api.ydfk.site/api",
-  "robot": 1
-}
-```
-
-字段说明：
-
-- `privateKeyPath`：微信小程序代码上传密钥路径
-- `devBaseURL`：本地开发接口地址
-- `prodBaseURL`：正式接口地址
-- `robot`：默认上传机器人编号，通常保留为 `1`
-
-3. 确认微信后台已完成以下准备
-
-- 已下载代码上传密钥
-- 上传机器 IP 已加入小程序后台白名单
-
-### 版本管理命令
-
-查看当前版本：
+### 常用命令
 
 ```bash
 pnpm weapp:version -- show
-```
-
-直接设置版本：
-
-```bash
 pnpm weapp:version -- set 1.0.0
-```
-
-递增补丁版本：
-
-```bash
 pnpm weapp:version -- bump patch
-```
-
-递增次版本：
-
-```bash
-pnpm weapp:version -- bump minor
-```
-
-递增主版本：
-
-```bash
-pnpm weapp:version -- bump major
-```
-
-修改默认上传说明：
-
-```bash
-pnpm weapp:version -- desc 修复附件预览与版本管理脚本
-```
-
-### 环境地址命令
-
-查看当前小程序接口地址：
-
-```bash
-pnpm weapp:env -- show
-```
-
-切回开发地址：
-
-```bash
-pnpm weapp:env -- dev
-```
-
-手动切到正式地址：
-
-```bash
-pnpm weapp:env -- prod
-```
-
-### 上传命令
-
-使用 `release.json` 中的版本号上传：
-
-```bash
 pnpm weapp:upload
+pnpm weapp:upload -- --version 1.0.1 --desc 修复附件预览
 ```
 
-上传时直接指定版本号：
+### 说明
 
-```bash
-pnpm weapp:upload -- --version 1.0.1
-```
-
-上传时临时指定说明：
-
-```bash
-pnpm weapp:upload -- --desc 修复每日作业附件预览
-```
-
-同时指定版本号和说明：
-
-```bash
-pnpm weapp:upload -- --version 1.0.2 --desc 修复记录附件链路
-```
-
-### 上传脚本实际做了什么
-
-`pnpm weapp:upload` 的流程如下：
-
-1. 读取 `apps/weapp/release.json`
-2. 读取 `apps/weapp/.release.local.json`
-3. 将 `env.js` 临时切换为正式地址
-4. 自动执行 `pnpm check:weapp`
-5. 调用 `miniprogram-ci` 上传小程序代码
-6. 无论上传成功还是失败，都会将 `env.js` 恢复为开发地址
-
-### 注意事项
-
-- `apps/weapp/.release.local.json` 已加入 `.gitignore`，不会提交到仓库
-- `env.js` 已经简化为单地址模式，旧的 `env.local.js` 不再参与版本切换
-- 如果上传时传入 `--version`，脚本会同步更新 `apps/weapp/release.json`
+- `apps/weapp/.release.local.json` 不会提交到仓库
+- `env.js` 已改成单地址模式
+- 上传脚本会在上传前切正式地址，上传后自动恢复
+- 更完整的小程序发布说明见 [docs/release-guide.md](./docs/release-guide.md)
 
 ## 后端与管理端发布
 

@@ -181,18 +181,15 @@ func detectDirectUploadMeta(fileName string, rawContentType string) (string, str
 			extension = strings.ToLower(extensions[0])
 		}
 	}
-	if !allowedFileExtensions[extension] {
-		return "", "", fmt.Errorf("仅支持 jpg、png、webp、gif、heic 图片和 pdf 文件")
-	}
 
 	contentType := strings.TrimSpace(rawContentType)
 	if extension == ".pdf" {
 		contentType = "application/pdf"
-	} else if !strings.HasPrefix(contentType, "image/") {
+	} else if extension != "" && !strings.HasPrefix(contentType, "image/") {
 		contentType = mime.TypeByExtension(extension)
 	}
 	if contentType == "" {
-		return "", "", fmt.Errorf("无法识别文件类型")
+		contentType = "application/octet-stream"
 	}
 
 	return contentType, extension, nil

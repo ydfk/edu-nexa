@@ -1,0 +1,8 @@
+const release = {
+  desc: "初始化版本",
+  version: "1.0.3",
+};
+
+module.exports = {
+  release,
+};

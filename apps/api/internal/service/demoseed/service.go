@@ -56,7 +56,7 @@ func RebuildFromRuntimeSettings() (*runtimeconfigService.Snapshot, error) {
 			return err
 		}
 
-		school, err := createDemoSchool(tx, "壹一小屋 学栖演示校")
+		school, err := createDemoSchool(tx, "某某小学")
 		if err != nil {
 			return err
 		}

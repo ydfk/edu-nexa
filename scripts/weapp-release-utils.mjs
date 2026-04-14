@@ -8,6 +8,7 @@ const scriptsDir = path.dirname(currentFilePath);
 export const repoRoot = path.resolve(scriptsDir, "..");
 export const weappRoot = path.join(repoRoot, "apps", "weapp");
 export const envFilePath = path.join(weappRoot, "miniprogram", "config", "env.js");
+export const runtimeReleaseFilePath = path.join(weappRoot, "miniprogram", "config", "release.js");
 export const localConfigPath = path.join(weappRoot, ".release.local.json");
 export const localConfigExamplePath = path.join(weappRoot, "release.local.example.json");
 export const projectConfigPath = path.join(weappRoot, "project.config.json");
@@ -45,10 +46,12 @@ export async function loadReleaseConfig() {
 }
 
 export async function saveReleaseConfig(config) {
-  await writeJSON(releaseConfigPath, {
+  const nextConfig = {
     desc: String(config.desc || "").trim(),
     version: normalizeVersion(config.version),
-  });
+  };
+  await writeJSON(releaseConfigPath, nextConfig);
+  await syncRuntimeReleaseConfig(nextConfig);
 }
 
 export async function loadLocalReleaseConfig() {
@@ -178,6 +181,27 @@ export function resolveUploadDescription(releaseConfig, overrideDesc) {
   return desc || `上传版本 ${releaseConfig.version}`;
 }
 
+export async function syncRuntimeReleaseConfig(config) {
+  const version = normalizeVersion(config.version);
+  if (!version) {
+    throw new Error("release.json 中的 version 必须为 x.y.z 格式");
+  }
+
+  const content = [
+    "const release = {",
+    `  desc: ${JSON.stringify(String(config.desc || "").trim())},`,
+    `  version: ${JSON.stringify(version)},`,
+    "};",
+    "",
+    "module.exports = {",
+    "  release,",
+    "};",
+    "",
+  ].join("\n");
+
+  await fs.writeFile(runtimeReleaseFilePath, content, "utf8");
+}
+
 export async function runNodeScript(scriptPath, args = []) {
   const { spawn } = await import("node:child_process");
 
@@ -201,6 +225,59 @@ export async function runNodeScript(scriptPath, args = []) {
 
 export function printKeyValue(label, value) {
   console.log(`${label}: ${value}`);
+}
+
+export async function ensureMiniprogramCICompatibility() {
+  const helperFilePaths = [
+    path.join(
+      repoRoot,
+      "node_modules",
+      ".pnpm",
+      "node_modules",
+      "@babel",
+      "helper-compilation-targets",
+      "lib",
+      "index.js",
+    ),
+    path.join(
+      repoRoot,
+      "node_modules",
+      ".pnpm",
+      "@babel+helper-compilation-targets@7.22.10",
+      "node_modules",
+      "@babel",
+      "helper-compilation-targets",
+      "lib",
+      "index.js",
+    ),
+  ];
+
+  for (const helperFilePath of helperFilePaths) {
+    try {
+      const content = await fs.readFile(helperFilePath, "utf8");
+      if (!content.includes('var _lruCache = require("lru-cache");')) {
+        continue;
+      }
+      if (content.includes("const targetsCache = new (_lruCache.LRUCache || _lruCache)({")) {
+        continue;
+      }
+
+      const nextContent = content.replace(
+        "const targetsCache = new _lruCache({",
+        "const targetsCache = new (_lruCache.LRUCache || _lruCache)({",
+      );
+
+      if (nextContent !== content) {
+        await fs.writeFile(helperFilePath, nextContent, "utf8");
+      }
+    } catch (error) {
+      if (error && error.code === "ENOENT") {
+        continue;
+      }
+
+      throw error;
+    }
+  }
 }
 
 async function assertFileExists(filePath, label) {

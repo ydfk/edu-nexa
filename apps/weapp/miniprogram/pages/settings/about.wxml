@@ -4,7 +4,7 @@
       <image src="/assets/logo-study-record-mini.png" mode="aspectFit" style="width: 128rpx; height: 128rpx;" />
     </view>
     <view class="about-name">作业用餐小记</view>
-    <view class="about-version">v1.0.0</view>
+    <view class="about-version">v{{version}}</view>
   </view>
 
   <view class="section">
@@ -13,7 +13,6 @@
     </view>
     <van-cell-group>
       <van-cell title="系统名称" value="作业用餐小记" />
-      <van-cell title="版本" value="1.0.0" />
     </van-cell-group>
   </view>
 

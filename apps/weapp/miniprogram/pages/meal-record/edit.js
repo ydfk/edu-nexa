@@ -1,4 +1,10 @@
-const { getMealRecords, getStudents, saveMealRecord, uploadAttachment } = require("../../services/records");
+const {
+  getMealRecords,
+  getStudents,
+  saveMealRecord,
+  uploadAttachment,
+  resolveUploadErrorMessage,
+} = require("../../services/records");
 const { getSession, isGuardian } = require("../../store/session");
 const { requireAuth, requireEditor } = require("../../utils/permission");
 const {
@@ -174,15 +180,8 @@ Page({
         return;
       }
       console.warn("选择图片失败", error);
-      wx.showToast({ title: resolvePrivacyErrorMessage(error), icon: "none" });
+      showErrorDialog("选择图片失败", resolvePrivacyErrorMessage(error));
     }
-  },
-
-  async afterRead(e) {
-    if (this.data.readOnly) return;
-    const { file } = e.detail;
-    const files = Array.isArray(file) ? file : [file];
-    await this.uploadSelectedFiles(files);
   },
 
   async uploadSelectedFiles(files) {
@@ -200,7 +199,8 @@ Page({
         const fileList = [...this.data.fileList, ...buildAttachmentFileList([attachment])];
         this.setData({ attachments, fileList });
       } catch (err) {
-        wx.showToast({ title: "上传失败", icon: "none" });
+        console.warn("上传图片失败", err);
+        showErrorDialog("上传失败", resolveUploadErrorMessage(err));
       } finally {
         wx.hideLoading();
       }
@@ -230,7 +230,9 @@ Page({
   },
 
   onPreviewAttachment(e) {
-    const idx = Number((e.detail && e.detail.index) || 0);
+    const idx = e.detail && e.detail.index !== undefined
+      ? Number(e.detail.index)
+      : Number((e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.index) || 0);
     const attachment = this.data.attachments[idx];
     if (!attachment) {
       return;
@@ -326,35 +328,16 @@ function extractPickerValue(detail) {
 
 async function chooseImageFiles(count) {
   const maxCount = Math.min(Number(count || 1), 9);
-
-  try {
-    const result = await new Promise((resolve, reject) => {
-      wx.chooseImage({
-        count: maxCount,
-        sourceType: ["album", "camera"],
-        sizeType: ["compressed"],
-        success: resolve,
-        fail: reject,
-      });
-    });
-    return normalizeChosenFiles(result);
-  } catch (error) {
-    const fallback = await chooseMessageImages(maxCount).catch(() => {
-      throw error;
-    });
-    return normalizeChosenFiles(fallback);
-  }
-}
-
-function chooseMessageImages(count) {
-  return new Promise((resolve, reject) => {
-    wx.chooseMessageFile({
-      count,
-      type: "image",
+  const result = await new Promise((resolve, reject) => {
+    wx.chooseImage({
+      count: maxCount,
+      sourceType: ["album", "camera"],
+      sizeType: ["compressed"],
       success: resolve,
       fail: reject,
     });
   });
+  return normalizeChosenFiles(result);
 }
 
 function normalizeChosenFiles(result) {
@@ -393,6 +376,13 @@ function resolvePrivacyErrorMessage(error) {
     return "请先补充隐私指引";
   }
 
-  const message = String((error && (error.errMsg || error.message)) || "选择图片失败");
-  return message.slice(0, 20);
+  return String((error && (error.errMsg || error.message)) || "选择图片失败");
+}
+
+function showErrorDialog(title, content) {
+  wx.showModal({
+    title,
+    content: String(content || title),
+    showCancel: false,
+  });
 }

@@ -1,4 +1,9 @@
-const { getDailyHomework, saveDailyHomework, uploadAttachment } = require("../../services/records");
+const {
+  getDailyHomework,
+  saveDailyHomework,
+  uploadAttachment,
+  resolveUploadErrorMessage,
+} = require("../../services/records");
 const { getSchools, getGrades, getClasses } = require("../../services/schools");
 const { getRuntimeSettings } = require("../../services/common");
 const { requireEditor } = require("../../utils/permission");
@@ -21,6 +26,8 @@ Page({
     content: "",
     fileList: [],
     attachments: [],
+    fileAttachmentCards: [],
+    imageAttachmentCards: [],
     submitting: false,
 
     selectedSchool: {},
@@ -84,18 +91,15 @@ Page({
       if (!hw) return;
 
       const attachments = normalizeAttachmentList(hw.attachments);
-      const fileList = buildAttachmentFileList(attachments);
-
       this.setData({
         serviceDate: hw.serviceDate || getToday(),
         subject: hw.subject || "",
         content: hw.content || "",
-        attachments,
-        fileList,
         selectedSchool: { id: hw.schoolId, name: hw.schoolName },
         selectedGrade: { id: hw.gradeId || "", name: hw.gradeName || hw.grade },
         selectedClass: { id: hw.classId, name: hw.className || "" },
       });
+      syncAttachmentState(this, attachments);
       this.syncSelectedScopeIndex();
     } catch (e) {
       console.warn("加载作业详情失败", e);
@@ -162,10 +166,51 @@ Page({
     });
   },
 
-  async afterRead(e) {
-    const { file } = e.detail;
-    const files = Array.isArray(file) ? file : [file];
+  async chooseImageAttachments() {
+    const remainingCount = getRemainingAttachmentCount(this.data.fileList.length);
+    if (remainingCount <= 0) {
+      wx.showToast({ title: "最多上传9个", icon: "none" });
+      return;
+    }
 
+    try {
+      const files = await chooseImageFiles(remainingCount);
+      if (files.length === 0) {
+        return;
+      }
+      await this.uploadSelectedFiles(files);
+    } catch (error) {
+      if (isPickerCancelled(error)) {
+        return;
+      }
+      console.warn("选择图片失败", error);
+      showErrorDialog("选择图片失败", resolvePickerErrorMessage(error));
+    }
+  },
+
+  async chooseFileAttachments() {
+    const remainingCount = getRemainingAttachmentCount(this.data.fileList.length);
+    if (remainingCount <= 0) {
+      wx.showToast({ title: "最多上传9个", icon: "none" });
+      return;
+    }
+
+    try {
+      const files = await chooseMessageFiles(remainingCount);
+      if (files.length === 0) {
+        return;
+      }
+      await this.uploadSelectedFiles(files);
+    } catch (error) {
+      if (isPickerCancelled(error)) {
+        return;
+      }
+      console.warn("选择文件失败", error);
+      showErrorDialog("选择文件失败", resolvePickerErrorMessage(error));
+    }
+  },
+
+  async uploadSelectedFiles(files) {
     for (const item of files) {
       try {
         wx.showLoading({ title: "上传中..." });
@@ -178,16 +223,11 @@ Page({
         });
         const attachment = createAttachmentRefFromUploadResult(res, item.name);
         const nextAttachments = [...this.data.attachments, attachment];
-        const nextFileList = [
-          ...this.data.fileList,
-          ...buildAttachmentFileList([attachment]),
-        ];
-        this.setData({
-          attachments: nextAttachments,
-          fileList: nextFileList,
-        });
-      } catch (err) {
-        wx.showToast({ title: "上传失败", icon: "none" });
+        syncAttachmentState(this, nextAttachments);
+      } catch (error) {
+        console.warn("上传附件失败", error);
+        showErrorDialog("上传失败", resolveUploadErrorMessage(error));
+        return;
       } finally {
         wx.hideLoading();
       }
@@ -195,27 +235,21 @@ Page({
   },
 
   onDeleteImage(e) {
-    const idx = Number(e.detail.index || 0);
+    const idx = Number(
+      (e.detail && e.detail.index) ||
+      (e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.index) ||
+      0,
+    );
     const nextAttachments = [...this.data.attachments];
-    const nextFileList = [...this.data.fileList];
     nextAttachments.splice(idx, 1);
-    nextFileList.splice(idx, 1);
-    this.setData({
-      attachments: nextAttachments,
-      fileList: nextFileList,
-    });
+    syncAttachmentState(this, nextAttachments);
   },
 
   onDeleteAttachment(e) {
     const idx = Number((e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.index) || 0);
     const nextAttachments = [...this.data.attachments];
-    const nextFileList = [...this.data.fileList];
     nextAttachments.splice(idx, 1);
-    nextFileList.splice(idx, 1);
-    this.setData({
-      attachments: nextAttachments,
-      fileList: nextFileList,
-    });
+    syncAttachmentState(this, nextAttachments);
   },
 
   onPreviewAttachment(e) {
@@ -514,4 +548,118 @@ function parseRuntimeOptionList(raw, fallback = []) {
     .split(/[\n,，]/)
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+function getRemainingAttachmentCount(fileCount) {
+  return Math.max(0, 9 - Number(fileCount || 0));
+}
+
+function chooseImageFiles(count) {
+  return ensurePrivacyAuthorization().then(
+    () =>
+      new Promise((resolve, reject) => {
+        wx.chooseImage({
+          count: Math.min(Number(count || 1), 9),
+          sourceType: ["album", "camera"],
+          sizeType: ["compressed"],
+          success(result) {
+            resolve(normalizeChosenFiles(result, "image"));
+          },
+          fail: reject,
+        });
+      }),
+  );
+}
+
+function chooseMessageFiles(count) {
+  return new Promise((resolve, reject) => {
+    wx.chooseMessageFile({
+      count: Math.min(Number(count || 1), 9),
+      type: "file",
+      success(result) {
+        resolve(normalizeChosenFiles(result, "file"));
+      },
+      fail: reject,
+    });
+  });
+}
+
+function normalizeChosenFiles(result, fileType) {
+  const tempFiles = Array.isArray(result && result.tempFiles) ? result.tempFiles : [];
+  const tempFilePaths = tempFiles.length === 0 && Array.isArray(result && result.tempFilePaths)
+    ? result.tempFilePaths.map((item) => ({ path: item }))
+    : [];
+
+  return [...tempFiles, ...tempFilePaths]
+    .map((item) => {
+      const filePath = item.tempFilePath || item.path || "";
+      return {
+        name: item.name || extractChosenFileName(filePath),
+        path: filePath,
+        size: item.size,
+        type: fileType === "image" ? "image" : "",
+        url: filePath,
+      };
+    })
+    .filter((item) => item.path);
+}
+
+function extractChosenFileName(filePath) {
+  const parts = String(filePath || "").split(/[\\/]/);
+  return parts[parts.length - 1] || "附件";
+}
+
+function ensurePrivacyAuthorization() {
+  if (typeof wx.requirePrivacyAuthorize !== "function") {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve, reject) => {
+    wx.requirePrivacyAuthorize({
+      success: resolve,
+      fail: reject,
+    });
+  });
+}
+
+function isPickerCancelled(error) {
+  return String((error && error.errMsg) || "").includes("cancel");
+}
+
+function resolvePickerErrorMessage(error) {
+  if (Number(error && error.errno) === 112) {
+    return "请先补充隐私指引";
+  }
+
+  return String((error && (error.errMsg || error.message)) || "选择失败");
+}
+
+function showErrorDialog(title, content) {
+  wx.showModal({
+    title,
+    content: String(content || title),
+    showCancel: false,
+  });
+}
+
+function syncAttachmentState(page, attachments) {
+  const normalizedAttachments = normalizeAttachmentList(attachments);
+  page.setData({
+    attachments: normalizedAttachments,
+    fileAttachmentCards: buildAttachmentCards(normalizedAttachments, "file"),
+    fileList: buildAttachmentFileList(normalizedAttachments),
+    imageAttachmentCards: buildAttachmentCards(normalizedAttachments, "image"),
+  });
+}
+
+function buildAttachmentCards(items, type) {
+  return (items || [])
+    .map((item, index) => ({
+      iconColor: item.type === "image" ? "#34845f" : "#c43d33",
+      iconName: item.type === "image" ? "photo-o" : "description",
+      index,
+      name: item.name,
+      type: item.type,
+    }))
+    .filter((item) => (type === "image" ? item.type === "image" : item.type !== "image"));
 }

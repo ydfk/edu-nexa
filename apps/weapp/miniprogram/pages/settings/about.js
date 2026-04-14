@@ -1,7 +1,7 @@
-Page({
-  data: {},
+const { release } = require("../../config/release");
 
-  onLoad() {
-    // 静态页面，无需加载数据
+Page({
+  data: {
+    version: release.version || "",
   },
 });

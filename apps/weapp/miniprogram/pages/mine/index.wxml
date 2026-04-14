@@ -29,6 +29,5 @@
     </view>
   </block>
 
-  <view class="mine-footer text-xs text-secondary">v1.0.0</view>
   <van-dialog id="van-dialog" />
 </view>

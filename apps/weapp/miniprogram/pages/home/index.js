@@ -81,23 +81,36 @@ function buildMetrics(metrics) {
   const tones = ["primary", "info", "warning", "default"];
   return metrics.slice(0, 4).map((item, index) => ({
     id: `metric-${index}`,
-    label: item.label || "--",
+    label: normalizeMetricLabel(item.label),
     value: item.value ?? 0,
     tone: tones[index] || "default",
   }));
 }
 
 function buildSummaryCards(mealItems, homeworkItems) {
-  const completedMeals = mealItems.filter((item) => item.rawStatus === "completed").length;
-  const completedHomework = homeworkItems.filter((item) => item.rawStatus === "completed").length;
-  const notedItems = mealItems.filter((item) => item.hasRemark).length + homeworkItems.filter((item) => item.hasRemark).length;
-
   return [
-    { id: "summary-meal", label: "用餐记录", value: mealItems.length },
-    { id: "summary-homework", label: "作业记录", value: homeworkItems.length },
-    { id: "summary-completed", label: "已完成", value: completedMeals + completedHomework },
-    { id: "summary-remark", label: "备注", value: notedItems },
+    { id: "summary-meal", label: "用餐", value: mealItems.length },
+    { id: "summary-homework", label: "作业", value: homeworkItems.length },
   ];
+}
+
+function normalizeMetricLabel(label) {
+  const normalized = String(label || "").trim();
+  if (!normalized) {
+    return "--";
+  }
+
+  switch (normalized) {
+    case "托管学生":
+      return "学生";
+    case "晚辅用餐已登记":
+    case "晚辅用餐登记":
+      return "用餐";
+    case "作业完成已登记":
+      return "作业";
+    default:
+      return normalized.replace("托管", "");
+  }
 }
 
 function buildMealItems(items) {

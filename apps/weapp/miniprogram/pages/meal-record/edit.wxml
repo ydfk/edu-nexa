@@ -39,20 +39,15 @@
           <van-icon name="photo-o" size="34rpx" color="#34845f" />
           <text class="detail-attachment__name">{{item.name}}</text>
         </view>
-        <van-uploader
+        <view
           wx:if="{{!readOnly && fileList.length < 9}}"
           class="detail-attachment-uploader"
-          file-list="{{[]}}"
-          max-count="{{9 - fileList.length}}"
-          accept="image"
-          show-upload="{{false}}"
-          preview-size="72"
         >
           <view class="detail-attachment detail-attachment--upload" bindtap="chooseImages">
             <van-icon name="photograph" size="40rpx" color="#b9c3bc" />
             <text class="detail-attachment__upload-text">拍照/选图</text>
           </view>
-        </van-uploader>
+        </view>
       </view>
       <view wx:if="{{fileList.length === 0 && readOnly}}" class="detail-value detail-value--muted">暂无照片</view>
     </view>

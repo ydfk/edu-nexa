@@ -39,37 +39,65 @@
     <!-- 附件 -->
     <view class="form-group">
       <view class="form-label">附件</view>
-      <view class="detail-attachments">
-        <view
-          wx:for="{{fileList}}"
-          wx:key="name"
-          class="detail-attachment"
-          bindtap="onPreviewAttachment"
-          data-index="{{index}}"
-        >
+      <view class="attachment-section">
+        <view class="attachment-section__title">图片附件</view>
+        <view class="detail-attachments">
           <view
-            class="detail-attachment__delete"
-            catchtap="onDeleteAttachment"
-            data-index="{{index}}"
+            wx:for="{{imageAttachmentCards}}"
+            wx:key="index"
+            class="detail-attachment"
+            bindtap="onPreviewAttachment"
+            data-index="{{item.index}}"
           >
-            <van-icon name="cross" size="24rpx" color="#5f6d63" />
+            <view
+              class="detail-attachment__delete"
+              catchtap="onDeleteAttachment"
+              data-index="{{item.index}}"
+            >
+              <van-icon name="cross" size="24rpx" color="#5f6d63" />
+            </view>
+            <van-icon name="{{item.iconName}}" size="36rpx" color="{{item.iconColor}}" />
+            <text class="detail-attachment__name">{{item.name}}</text>
           </view>
-          <van-icon name="{{item.type === 'image' ? 'photo-o' : 'description'}}" size="36rpx" color="{{item.type === 'image' ? '#34845f' : '#c43d33'}}" />
-          <text class="detail-attachment__name">{{item.name}}</text>
+          <view
+            wx:if="{{fileList.length < 9}}"
+            class="detail-attachment detail-attachment--upload detail-attachment--upload-image"
+            bindtap="chooseImageAttachments"
+          >
+            <van-icon name="photo-o" size="40rpx" color="#7bb697" />
+            <text class="detail-attachment__upload-text detail-attachment__upload-text--image">上传图片</text>
+          </view>
         </view>
-        <van-uploader
-          wx:if="{{fileList.length < 9}}"
-          class="detail-attachment-uploader"
-          file-list="{{[]}}"
-          bind:after-read="afterRead"
-          max-count="{{9 - fileList.length}}"
-          accept="file"
-        >
-          <view class="detail-attachment detail-attachment--upload">
-            <van-icon name="photograph" size="40rpx" color="#b9c3bc" />
-            <text class="detail-attachment__upload-text">上传附件</text>
+      </view>
+      <view class="attachment-section">
+        <view class="attachment-section__title">文件附件</view>
+        <view class="detail-attachments">
+          <view
+            wx:for="{{fileAttachmentCards}}"
+            wx:key="index"
+            class="detail-attachment"
+            bindtap="onPreviewAttachment"
+            data-index="{{item.index}}"
+          >
+            <view
+              class="detail-attachment__delete"
+              catchtap="onDeleteAttachment"
+              data-index="{{item.index}}"
+            >
+              <van-icon name="cross" size="24rpx" color="#5f6d63" />
+            </view>
+            <van-icon name="{{item.iconName}}" size="36rpx" color="{{item.iconColor}}" />
+            <text class="detail-attachment__name">{{item.name}}</text>
           </view>
-        </van-uploader>
+          <view
+            wx:if="{{fileList.length < 9}}"
+            class="detail-attachment detail-attachment--upload detail-attachment--upload-file"
+            bindtap="chooseFileAttachments"
+          >
+            <van-icon name="description" size="40rpx" color="#c89a95" />
+            <text class="detail-attachment__upload-text detail-attachment__upload-text--file">上传文件</text>
+          </view>
+        </view>
       </view>
     </view>
 
