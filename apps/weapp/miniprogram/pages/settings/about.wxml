@@ -6,22 +6,19 @@
     <view class="about-name">作业用餐小记</view>
     <view class="about-version">v{{version}}</view>
   </view>
-
   <view class="section">
     <view class="section-header">
       <text class="section-title">系统信息</text>
     </view>
     <van-cell-group>
       <van-cell title="系统名称" value="作业用餐小记" />
+      <van-cell title="备案号" value="陕ICP备18007962号-3X" title-width="84rpx" value-class="record-number-cell" />
     </van-cell-group>
   </view>
-
   <view class="section">
     <view class="section-header">
       <text class="section-title">隐私政策</text>
     </view>
-    <view class="about-policy">
-      本系统仅在账号登录、记录查询、资料维护和图片上传所需范围内处理用户信息，不会在未经授权的情况下向第三方披露个人信息。
-    </view>
+    <view class="about-policy">本系统仅在账号登录、记录查询、资料维护和图片上传所需范围内处理用户信息，不会在未经授权的情况下向第三方披露个人信息。</view>
   </view>
 </view>

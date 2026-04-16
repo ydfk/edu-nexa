@@ -28,6 +28,11 @@
   color: var(--color-text-secondary);
 }
 
+.record-number-cell {
+  font-size: 24rpx;
+  white-space: nowrap;
+}
+
 .about-policy {
   font-size: 24rpx;
   line-height: 1.8;
